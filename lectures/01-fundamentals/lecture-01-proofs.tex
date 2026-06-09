@@ -1,0 +1,247 @@
+% =====================================================================
+%  RL in Production — Lecture 1: Mathematical Companion
+%  Fundamentals: Returns, Bellman, Contraction, MC vs TD
+%  Vizuara AI Labs · compile with XeLaTeX
+%    xelatex lecture-01-proofs.tex   (run twice for ToC)
+% =====================================================================
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in,marginparwidth=0in]{geometry}
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+% ---- Fonts (warm, course aesthetic) ----
+\setmainfont{Charter}
+\setsansfont{Avenir Next}
+\setmonofont{Menlo}[Scale=0.82]
+\setmathfont{texgyrepagella-math.otf}
+
+% ---- Palette (matches the lecture decks) ----
+\definecolor{paper}{HTML}{FCFAF4}
+\definecolor{ink}{HTML}{1F1B16}
+\definecolor{ink2}{HTML}{4A4239}
+\definecolor{ink3}{HTML}{7C7165}
+\definecolor{rule}{HTML}{D8CFBE}
+\definecolor{accred}{HTML}{8B3A3A}     % action / emphasis
+\definecolor{forest}{HTML}{3D5A4A}     % value
+\definecolor{slate}{HTML}{4A5D7E}      % state / math
+\definecolor{ochre}{HTML}{8E6B2F}      % reward
+\definecolor{plum}{HTML}{6B4E7E}       % discount / time
+
+\pagecolor{paper}
+\color{ink}
+
+% ---- Semantic math colors ----
+\newcommand{\vval}[1]{\textcolor{forest}{#1}}
+\newcommand{\vrew}[1]{\textcolor{ochre}{#1}}
+\newcommand{\vsta}[1]{\textcolor{slate}{#1}}
+\newcommand{\vact}[1]{\textcolor{accred}{#1}}
+\newcommand{\vgam}[1]{\textcolor{plum}{#1}}
+
+% ---- Operators ----
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bop}{\mathcal{T}}          % Bellman operator
+\newcommand{\boppi}{\mathcal{T}^{\pi}}  % Bellman expectation operator
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\suplim}{\norm{\cdot}_{\infty}}
+
+% ---- Hyperref ----
+\hypersetup{colorlinks=true, linkcolor=slate, urlcolor=slate,
+  pdftitle={RL in Production — Lecture 1 — The Math, Gently}, pdfauthor={Vizuara AI Labs}}
+
+% ---- Headings ----
+\titleformat{\section}{\sffamily\Large\bfseries\color{ink}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\sffamily\large\bfseries\color{ink2}}{\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.6em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.1em}{0.4em}
+
+% ---- Header / footer ----
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.3pt}
+\fancyhead[L]{\sffamily\footnotesize\color{ink3} RL in Production · Lecture 1 · Companion}
+\fancyhead[R]{\sffamily\footnotesize\color{ink3} Vizuara AI Labs}
+\fancyfoot[C]{\sffamily\footnotesize\color{ink3} \thepage}
+
+% ---- Boxes ----
+\newtcolorbox{intuition}{enhanced, breakable, colback=paper, colframe=slate,
+  boxrule=0pt, leftrule=2.5pt, arc=2pt, left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries\color{slate}, coltitle=slate, title={Intuition}}
+
+\newtcolorbox{example}{enhanced, breakable, colback=paper, colframe=forest,
+  boxrule=0pt, leftrule=2.5pt, arc=2pt, left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries\color{forest}, coltitle=forest, title={Worked example}}
+
+\newtcolorbox{remark}{enhanced, breakable, colback={accred!6}, colframe=accred,
+  boxrule=0pt, leftrule=2.5pt, arc=2pt, left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries\color{accred}, coltitle=accred, title={Why this matters for the course}}
+
+\newtcolorbox{exercise}{enhanced, breakable, colback={ochre!7}, colframe=ochre,
+  boxrule=0pt, leftrule=2.5pt, arc=2pt, left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries\color{ochre}, coltitle=ochre, title={Exercise}}
+
+% theorem / proof environment (lightweight, no amsthm dependency on style).
+% Unlike the generic boxes, the title carries the theorem number/name, so it
+% must be readable: light title backing with slate text.
+\newtcolorbox{thmbox}[1]{enhanced, breakable, colback={slate!7}, colframe=slate,
+  boxrule=0pt, leftrule=2.5pt, arc=2pt, left=10pt, right=10pt, top=6pt, bottom=6pt,
+  colbacktitle={slate!16}, attach title to upper={\par\medskip},
+  fonttitle=\sffamily\bfseries\color{slate}, coltitle=slate, title={#1}}
+
+\newcommand{\qedbox}{\textcolor{ink3}{\rule{0.55em}{0.55em}}}
+\newenvironment{proofx}{\par\smallskip\noindent\textit{\textcolor{ink3}{Proof.}}\;}{\hfill\qedbox\par\smallskip}
+
+\setlist{leftmargin=1.4em, itemsep=2pt, topsep=3pt}
+
+\begin{document}
+
+
+% ===================== TITLE =====================
+\begin{titlepage}
+\color{ink}
+\vspace*{3cm}
+\noindent{\sffamily\footnotesize\color{ink3}\MakeUppercase{Vizuara AI Labs \quad·\quad RL in Production \quad·\quad Cohort 2026}}\\[1.2cm]
+{\sffamily\bfseries\fontsize{32}{38}\selectfont Lecture 1 —\\ The Math, Gently}\\[0.4cm]
+{\fontsize{17}{21}\selectfont\itshape Why the value is finite, where the Bellman equation\\ comes from, and why our methods converge — in plain terms.}\\[1.4cm]
+\textcolor{rule}{\rule{4cm}{1pt}}\\[1.0cm]
+\noindent\begin{minipage}{\textwidth}
+\large
+A short companion to the lecture. We keep only the few facts worth knowing \emph{why}, and explain each in words first, with at most a line or two of algebra. Nothing here is needed to \emph{use} the methods --- it is here so the ideas feel inevitable rather than magical.
+\end{minipage}\\[0.8cm]
+\begin{center}
+{\fontsize{20}{24}\selectfont $\vval{V(s)} \;=\; \vrew{r} \;+\; \vgam{\gamma}\,\vval{V(s')}$}
+\end{center}
+\vfill
+\noindent{\sffamily\footnotesize\color{ink3} Companion to Lecture 1 (Fundamentals).}
+\end{titlepage}
+
+% ===================== 1 =====================
+\section{Why the value is a finite number}
+
+The return adds up infinitely many rewards: $G = \vrew{r_0} + \vgam{\gamma}\vrew{r_1} + \vgam{\gamma}^2\vrew{r_2} + \cdots$. Could it blow up to infinity? No --- as long as $\vgam{\gamma}<1$.
+
+\begin{intuition}
+Each step counts a little less than the one before (by the factor $\gamma$). Adding up a shrinking sequence gives a finite total, just like $\tfrac12+\tfrac14+\tfrac18+\cdots = 1$. So ``value'' is always a real, comparable number.
+\end{intuition}
+
+\noindent If every reward is at most $R_{\max}$, then $\;|G|\le R_{\max}(1+\gamma+\gamma^2+\cdots)=\dfrac{R_{\max}}{1-\gamma}.$ That is the whole reason $\gamma<1$ matters.
+
+% ===================== 2 =====================
+\section{Where the Bellman equation comes from}
+
+Split the return into ``the first reward'' and ``everything after'':
+\[
+G_t \;=\; \vrew{r_{t+1}} + \vgam{\gamma}\big(\vrew{r_{t+2}} + \vgam{\gamma}\vrew{r_{t+3}}+\cdots\big) \;=\; \vrew{r_{t+1}} + \vgam{\gamma}\,G_{t+1}.
+\]
+Take the average (expectation) of both sides and you get the Bellman equation:
+\[
+\vval{V(s)} \;=\; \E\big[\,\vrew{r} + \vgam{\gamma}\,\vval{V(s')}\,\big].
+\]
+
+\begin{intuition}
+``The value of where I am is the reward I just got, plus the discounted value of where I land next.'' Everything in the course is a way of solving, sampling, or approximating this one line.
+\end{intuition}
+
+% ===================== 3 =====================
+\section{Why value iteration converges}
+
+Value iteration just applies the Bellman backup over and over. Why is it guaranteed to settle on the right answer?
+
+\begin{intuition}
+The backup is like a photocopier set to 90\%. Feed in \emph{any} two guesses for the value function, copy them through one backup, and they come out closer together --- by at least the factor $\gamma$. Repeat, and every guess is squeezed toward the \emph{same} point. That point is the true value $V^\star$.
+\end{intuition}
+
+\noindent Concretely, if your current error is $E$, after one sweep it is at most $\gamma E$, after $k$ sweeps at most $\gamma^k E$ --- which goes to $0$. (The formal name is a ``contraction''; the one-line statement $\norm{\bop U-\bop V}_\infty\le\gamma\norm{U-V}_\infty$ is all it means.)
+
+\begin{remark}
+This is why a far-sighted agent ($\gamma$ near $1$) learns \emph{slowly}: $\gamma^k$ shrinks gently when $\gamma\approx1$. You will feel this when tuning $\gamma$ for DQN.
+\end{remark}
+
+% ===================== 4 =====================
+\section{Monte Carlo and TD, side by side}
+
+Both estimate the \emph{same} $V$; they differ only in what they use as the ``target'' to move toward.
+
+\begin{itemize}
+\item \textbf{Monte Carlo} averages \emph{real, observed} returns. Update toward $G_t$:
+  $\;\vval{V(s)} \leftarrow \vval{V(s)} + \alpha\,[\,G_t - \vval{V(s)}\,].$
+  Unbiased (the average of real returns is correct), but noisy, and you must wait for the episode to end.
+\item \textbf{Temporal difference} doesn't wait --- it \emph{bootstraps}, replacing the unknown tail with its current guess of the next value. Update toward $\vrew{r}+\vgam{\gamma}\vval{V(s')}$:
+  $\;\vval{V(s)} \leftarrow \vval{V(s)} + \alpha\,[\,\vrew{r}+\vgam{\gamma}\vval{V(s')} - \vval{V(s)}\,].$
+  Lower variance (one step of real randomness, not a whole episode), at the cost of a little bias early on.
+\end{itemize}
+
+\begin{intuition}
+The bracket $\vrew{r}+\vgam{\gamma}\vval{V(s')}-\vval{V(s)}$ is the \textbf{TD error} --- ``how surprised was I?''. Next lecture it becomes, almost unchanged, the loss we minimise in DQN. The ``incremental average'' shape \emph{new $\leftarrow$ old $+\,\alpha\,$(target $-$ old)} is the template for every update in this course.
+\end{intuition}
+
+\newpage
+\section*{Appendix — Answers to the ``Questions to think about''}
+\noindent The end-of-section reflective questions from the slides, with model answers (a key for discussion, not the only correct phrasings).\par\smallskip
+\subsection*{Section 2}
+\begin{enumerate}[leftmargin=1.5em,itemsep=5pt]
+\item \textbf{We claimed DQN, AlphaGo, PPO and GRPO are "the same recursion on a different surface." Pick any two and state precisely what the state, action, and reward are in each.}\\[2pt]
+\textcolor{ink2}{DQN: state = stack of Atari frames, action = joystick move, reward = change in game score. AlphaGo: state = board position, action = a legal move, reward = +1 win / \ensuremath{-}1 loss. PPO-for-RLHF: state = prompt + tokens so far, action = next token, reward = reward-model score. GRPO: same as PPO but the reward is group-relative. All four estimate value through the same V(s) = r + \ensuremath{\gamma}V(s\ensuremath{{}^{\prime}}) recursion --- only the meaning of s, a, r changes.}
+\item \textbf{Bellman had the equation in 1957, yet RL didn't work at scale until \textasciitilde{}2013. What changed in those decades? (Hint: it wasn't the math.)}\\[2pt]
+\textcolor{ink2}{Compute, data, and deep function approximation --- not the math. GPUs, large amounts of (often simulated) experience, and ConvNets made it possible to represent value over enormous state spaces. Bellman's equation was always correct; until \textasciitilde{}2013 there was just no scalable way to store V over pixels.}
+\item \textbf{TD-Gammon (1992) already combined a neural net + self-play + TD learning. So why did it take \textasciitilde{}20 more years to get DQN?}\\[2pt]
+\textcolor{ink2}{TD-Gammon worked partly because backgammon's dice smooth the value surface and make self-play explore naturally --- properties that do not transfer to most games. DQN needed the stability engineering (experience replay, target networks, convolutional features) and the compute to make TD + a neural net work on high-dimensional, deterministic, sparse-reward games. The idea existed; the tricks and hardware did not.}
+\end{enumerate}
+\subsection*{Section 3}
+\begin{enumerate}[leftmargin=1.5em,itemsep=5pt]
+\item \textbf{A single Atari frame is not Markov. Why not? What's the standard fix, and what does that fix teach you about the word "state" in general?}\\[2pt]
+\textcolor{ink2}{A single frame shows position but not velocity --- you cannot tell which way the ball is moving, so the future is not determined by the present frame alone. Standard fix: stack the last 4 frames. The lesson: 'state' is not 'what you observe', it is 'whatever makes the future independent of the past' --- you engineer the state until the Markov property holds.}
+\item \textbf{Give a real task where the Markov property is badly violated. How would you enlarge the state so it holds again --- and what does that cost you?}\\[2pt]
+\textcolor{ink2}{Almost any partially-observed task: poker (you cannot see opponents' cards) or a robot with a narrow camera. Enlarge the state by adding history or a belief over the hidden part. The cost: a much larger state space, more to learn, and you can never inject information that is genuinely unobservable.}
+\item \textbf{Describe, in one sentence each, the agent you get with \ensuremath{\gamma} = 0 versus \ensuremath{\gamma} = 0.999. When would a low \ensuremath{\gamma} actually be the right choice?}\\[2pt]
+\textcolor{ink2}{\ensuremath{\gamma} = 0 gives a purely myopic agent that maximises only the immediate reward and ignores all consequences. \ensuremath{\gamma} = 0.999 gives a far-sighted agent that weights rewards hundreds of steps away almost equally. A low \ensuremath{\gamma} is right when the task truly is immediate (one-step decisions) or when long horizons add only noise and instability.}
+\item \textbf{The reward function is the only place you tell the agent what you want. Invent a reward for "drive safely" that an agent could obviously game. What does that reveal?}\\[2pt]
+\textcolor{ink2}{Example: reward = +1 for every second without a crash. The agent games it by driving extremely slowly or never leaving the driveway --- technically 'safe', useless. It shows that the reward specifies what you measure, not what you mean; any proxy can be exploited. This is reward hacking.}
+\end{enumerate}
+\subsection*{Section 4}
+\begin{enumerate}[leftmargin=1.5em,itemsep=5pt]
+\item \textbf{If you could only be handed one of V(s) or Q(s,a), which one lets you actually act without any extra computation --- and why?}\\[2pt]
+\textcolor{ink2}{}
+\item \textbf{Two states have the same value under some policy \ensuremath{\pi}. Does that mean they're equally good under the optimal policy? Argue both directions.}\\[2pt]
+\textcolor{ink2}{No. Equal value under one policy \ensuremath{\pi} says nothing about the optimal values: a different policy could exploit one state far more than the other. Conversely, two states can still tie under the optimal policy (e.g. both one step from the goal). So same-value-under-\ensuremath{\pi} neither implies nor forbids same-value-under-optimal.}
+\item \textbf{Why is value defined as an expectation over returns rather than the return of a single rollout? What goes wrong if you trust one trajectory?}\\[2pt]
+\textcolor{ink2}{A single rollout is one sample from a random process (stochastic policy and/or environment); it can be very lucky or unlucky. Value is the mean over all such rollouts. Trust one trajectory and you fit noise --- the estimate has huge variance and can be arbitrarily wrong.}
+\item \textbf{The relation V*(s) = maxa Q*(s,a) looks innocent. What does it quietly assume about how the agent behaves after the first step?}\\[2pt]
+\textcolor{ink2}{}
+\end{enumerate}
+\subsection*{Section 5}
+\begin{enumerate}[leftmargin=1.5em,itemsep=5pt]
+\item \textbf{The backup "looks to the future to value the present." Causally the future depends on now --- so in what sense is the backup a causal inversion, and why is that legitimate?}\\[2pt]
+\textcolor{ink2}{The backup writes V(s) in terms of V(s\ensuremath{{}^{\prime}}) --- it values the present using values of the future. It is not predicting the future from the past; it defines a state's value by the values of states it can reach, then iterates until consistent. Legitimate because it is a fixed-point equation V = TV, not a causal claim --- we solve for the self-consistent V.}
+\item \textbf{Value iteration is just the same backup applied over and over. Why is it guaranteed to converge? What property of the Bellman operator forces it? (We prove this in the companion notes.)}\\[2pt]
+\textcolor{ink2}{Because the Bellman optimality operator is a \ensuremath{\gamma}-contraction in the sup-norm: each application moves any two value estimates strictly closer, by a factor \ensuremath{\gamma}. The Banach fixed-point theorem then guarantees a unique fixed point and geometric convergence. (Proved in the companion PDF.)}
+\item \textbf{A Go board has \textasciitilde{}10170 positions --- you can never enumerate them. How does AlphaGo still apply the Bellman backup without a table over all states?}\\[2pt]
+\textcolor{ink2}{It never enumerates states. AlphaGo approximates V (and the policy) with a neural network and applies the backup only along states actually visited by tree search and self-play, generalising to unseen boards. The backup is local --- it needs only the current state and its successors, not the whole space.}
+\item \textbf{Define "bootstrapping" in one sentence. Then explain why it is simultaneously the source of TD's speed and the source of its instability.}\\[2pt]
+\textcolor{ink2}{Bootstrapping = updating an estimate using other current estimates instead of waiting for the true return. It is fast because you can update every step without finishing the episode; it is unstable because errors in the estimates feed back into the targets, and with function approximation those errors can amplify (the deadly triad).}
+\end{enumerate}
+\subsection*{Section 6}
+\begin{enumerate}[leftmargin=1.5em,itemsep=5pt]
+\item \textbf{You're handed a brand-new environment with no model of its dynamics. Of DP, MC, and TD --- which are even available to you, and why is one ruled out?}\\[2pt]
+\textcolor{ink2}{MC and TD are available; DP is ruled out because DP needs the model P(s\ensuremath{{}^{\prime}}|s, a) and R up front, which you do not have. MC and TD learn directly from sampled experience.}
+\item \textbf{MC and TD both converge to the same V*. So why does TD typically get there in roughly 10\ensuremath{\times} fewer episodes? What is it exploiting that MC throws away?}\\[2pt]
+\textcolor{ink2}{TD bootstraps: it reuses its current estimate of the next state's value immediately, so a reward's information propagates after a single transition. MC discards that intermediate structure and waits for the whole-episode return, so each update is one noisy full-episode sample --- far less information per step.}
+\item \textbf{Name one concrete situation where you'd actually prefer Monte Carlo over TD. (Hint: think about bias, and about episodes that are short and cheap.)}\\[2pt]
+\textcolor{ink2}{Prefer MC when episodes are short and cheap and you want zero bootstrap bias --- or early in training when the value estimates are still unreliable, so bootstrapping would inject bad bias. MC is unbiased; when variance is not the bottleneck, that can win.}
+\item \textbf{Next lecture we replace the value table with a neural network. Predict: which term in the TD update r + \ensuremath{\gamma}V(s\ensuremath{{}^{\prime}}) \ensuremath{-} V(s) becomes the "loss" we minimise?}\\[2pt]
+\textcolor{ink2}{The TD error itself: r + \ensuremath{\gamma}V(s\ensuremath{{}^{\prime}}) \ensuremath{-} V(s). We turn the target r + \ensuremath{\gamma}V(s\ensuremath{{}^{\prime}}) into a regression label and minimise the squared TD error --- and that becomes the DQN loss.}
+\end{enumerate}
+
+\end{document}
