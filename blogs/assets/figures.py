@@ -710,12 +710,297 @@ def build_blog03() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 04 — SARSA, Q-learning, DQN
+# ----------------------------------------------------------------------------
+BLOG04 = "04-sarsa-qlearning-dqn"
+
+# --- CliffWalking (deterministic 4x12), reimplemented in numpy for reproducibility ---
+_CW_ROWS, _CW_COLS = 4, 12
+_CW_START = 36          # (3, 0)
+_CW_GOAL = 47           # (3, 11)
+_CW_CLIFF = set(range(37, 47))  # (3, 1) .. (3, 10)
+_CW_MOVES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}  # up, right, down, left
+
+
+def _cw_step(s: int, a: int):
+    """One deterministic CliffWalking transition -> (next_state, reward, done)."""
+    r, c = divmod(s, _CW_COLS)
+    dr, dc = _CW_MOVES[a]
+    nr = min(max(r + dr, 0), _CW_ROWS - 1)
+    nc = min(max(c + dc, 0), _CW_COLS - 1)
+    ns = nr * _CW_COLS + nc
+    if ns in _CW_CLIFF:
+        return _CW_START, -100.0, False  # fall off -> back to start
+    if ns == _CW_GOAL:
+        return ns, -1.0, True
+    return ns, -1.0, False
+
+
+def _cw_train(kind: str, episodes=5000, alpha=0.1, gamma=0.99, eps=0.1, seed=0):
+    """Train tabular Q-learning ('q') or SARSA ('sarsa') on CliffWalking."""
+    rng = np.random.default_rng(seed)
+    Q = np.zeros((_CW_ROWS * _CW_COLS, 4))
+    rewards = []
+
+    def act(s):
+        if rng.random() < eps:
+            return int(rng.integers(4))
+        return int(np.argmax(Q[s]))
+
+    for _ in range(episodes):
+        s = _CW_START
+        a = act(s)
+        done = False
+        total = 0.0
+        steps = 0
+        while not done and steps < 1000:
+            ns, r, done = _cw_step(s, a)
+            if kind == "q":  # off-policy: bootstrap off the BEST next action
+                target = r + (0.0 if done else gamma * np.max(Q[ns]))
+                Q[s, a] += alpha * (target - Q[s, a])
+                s = ns
+                a = act(s)
+            else:            # SARSA, on-policy: bootstrap off the action actually taken
+                na = act(ns) if not done else 0
+                target = r + (0.0 if done else gamma * Q[ns, na])
+                Q[s, a] += alpha * (target - Q[s, a])
+                s, a = ns, na
+            total += r
+            steps += 1
+        rewards.append(total)
+    return Q, rewards
+
+
+def _cw_greedy_path(Q, max_steps=60):
+    s = _CW_START
+    path = [s]
+    for _ in range(max_steps):
+        a = int(np.argmax(Q[s]))
+        ns, _, done = _cw_step(s, a)
+        path.append(ns)
+        s = ns
+        if done:
+            break
+    return path
+
+
+def _draw_cliff_grid(ax, paths=None):
+    """Draw the 4x12 cliff grid on ax. paths: list of (states, color, label, marker)."""
+    grid = np.zeros((_CW_ROWS, _CW_COLS))
+    for s in _CW_CLIFF:
+        r, c = divmod(s, _CW_COLS)
+        grid[r, c] = -1.0
+    ax.imshow(grid, cmap="RdYlGn", vmin=-1.4, vmax=0.6, aspect="equal")
+    for s in _CW_CLIFF:
+        r, c = divmod(s, _CW_COLS)
+        ax.text(c, r, "×", ha="center", va="center", fontsize=13, color=INK, fontweight="bold")
+    ax.text(0, 3, "S", ha="center", va="center", fontsize=14, fontweight="bold", color=INK)
+    ax.text(11, 3, "G", ha="center", va="center", fontsize=14, fontweight="bold", color=ACCENT)
+    if paths:
+        for states, color, label, marker in paths:
+            rows = [s // _CW_COLS for s in states]
+            cols = [s % _CW_COLS for s in states]
+            ax.plot(cols, rows, marker + "-", color=color, ms=5, lw=2, alpha=0.85, label=label)
+        ax.legend(loc="upper center", fontsize=9, frameon=False, ncol=2)
+    ax.set_xticks(range(_CW_COLS))
+    ax.set_yticks(range(_CW_ROWS))
+    ax.set_xticklabels([str(c) for c in range(_CW_COLS)], fontsize=8)
+    ax.set_yticklabels([str(r) for r in range(_CW_ROWS)], fontsize=8)
+    ax.set_xlim(-0.5, 11.5)
+    ax.set_ylim(3.5, -0.5)
+    ax.grid(False)
+
+
+def fig_q_vs_v() -> None:
+    """A state with three action-values; V(s) is the max."""
+    actions = ["a1\n(Up)", "a2\n(Right)", "a3\n(Down)"]
+    qvals = [3, 7, 5]
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    colors = [MUTED if q != max(qvals) else ACCENT for q in qvals]
+    bars = ax.bar(actions, qvals, color=colors, width=0.6)
+    ax.axhline(max(qvals), ls="--", lw=1.5, color=ACCENT)
+    ax.text(2.45, 7.15, r"$V(s)=\max_a Q(s,a)=7$", ha="right", color=ACCENT, fontsize=11)
+    for b, q in zip(bars, qvals):
+        ax.text(b.get_x() + b.get_width() / 2, q + 0.15, f"Q={q}", ha="center", fontsize=10, color=INK)
+    ax.set_ylabel(r"action-value  $Q(s,a)$")
+    ax.set_title("To act, compare action-values and take the biggest")
+    ax.set_ylim(0, 8.2)
+    ax.grid(axis="x", visible=False)
+    save(fig, BLOG04, "fig-q-vs-v")
+
+
+def fig_cliffwalking() -> None:
+    """The CliffWalking environment with the two candidate routes drawn."""
+    fig, ax = plt.subplots(figsize=(9, 3.4))
+    # Optimal/risky route: hug the cliff along row 2.
+    risky = [36, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 47]
+    # Safe route: climb to row 1, cross, then drop.
+    safe = [36, 24, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 35, 47]
+    _draw_cliff_grid(ax, paths=[
+        (risky, ACCENT, "optimal / risky (−13)", "o"),
+        (safe, MUTED, "safe (−17)", "s"),
+    ])
+    ax.set_title("CliffWalking: the short path hugs the cliff edge", pad=10)
+    save(fig, BLOG04, "fig-cliffwalking")
+
+
+def fig_sarsa_vs_q_curves() -> None:
+    """Real CliffWalking results: training curves + learned greedy paths."""
+    Q_q, rew_q = _cw_train("q", seed=0)
+    Q_s, rew_s = _cw_train("sarsa", seed=0)
+    path_q = _cw_greedy_path(Q_q)
+    path_s = _cw_greedy_path(Q_s)
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+    w = 100
+    qs = np.convolve(rew_q, np.ones(w) / w, mode="valid")
+    ss = np.convolve(rew_s, np.ones(w) / w, mode="valid")
+    axes[0].plot(qs, color=ACCENT, lw=1.8, label="Q-learning (off-policy)")
+    axes[0].plot(ss, color=MUTED, lw=1.8, label="SARSA (on-policy)")
+    axes[0].axhline(-13, ls="--", lw=1.4, color=INK, label="optimal (−13)")
+    axes[0].set_title("Training reward (100-episode average)")
+    axes[0].set_xlabel("episode")
+    axes[0].set_ylabel("total reward")
+    axes[0].set_ylim(-100, 0)
+    axes[0].legend(frameon=False, fontsize=9, loc="lower right")
+
+    _draw_cliff_grid(axes[1], paths=[
+        (path_q, ACCENT, "Q-learning (risky)", "o"),
+        (path_s, MUTED, "SARSA (safe)", "s"),
+    ])
+    axes[1].set_title("Learned greedy paths")
+    fig.suptitle("Same algorithm, one symbol apart: Q-learning takes the edge, SARSA plays it safe",
+                 fontsize=12.5, fontweight="bold", y=1.02)
+    save(fig, BLOG04, "fig-sarsa-vs-q-curves")
+
+
+def fig_max_propagation() -> None:
+    """The +10 ringing backward: two Q-learning updates up the safe column."""
+    fig, ax = plt.subplots(figsize=(5.2, 6.2))
+    cells = [("gem (+10)\nterminal", "", 3.0), ("tile (1)", "Q=5.0", 2.0), ("tile (2)", "Q=1.75", 1.0)]
+    for label, qval, y in cells:
+        face = ACCENT_SOFT if "gem" in label else CANVAS
+        ax.add_patch(plt.Rectangle((0.3, y - 0.4), 1.4, 0.8, facecolor=face,
+                                   edgecolor=INK, lw=1.6))
+        ax.text(1.0, y + 0.12, label, ha="center", va="center", fontsize=11, fontweight="bold", color=INK)
+        if qval:
+            ax.text(1.0, y - 0.2, qval, ha="center", va="center", fontsize=11, color=ACCENT)
+    # arrows (each tile steps UP)
+    ax.annotate("", xy=(1.0, 2.55), xytext=(1.0, 2.4),
+                arrowprops=dict(arrowstyle="-|>", color=ACCENT, lw=2.2, mutation_scale=16))
+    ax.annotate("", xy=(1.0, 1.55), xytext=(1.0, 1.4),
+                arrowprops=dict(arrowstyle="-|>", color=ACCENT, lw=2.2, mutation_scale=16))
+    ax.text(1.95, 2.5, r"$Q \leftarrow 0 + 0.5(10+0-0)=5.0$", ha="left", fontsize=10, color=MUTED)
+    ax.text(1.95, 1.5, r"$Q \leftarrow 0 + 0.5(-1+0.9\cdot5-0)=1.75$", ha="left", fontsize=10, color=MUTED)
+    ax.text(1.0, 0.25, r"$\alpha=0.5,\ \gamma=0.9$", ha="center", fontsize=11, color=INK)
+    ax.set_xlim(0, 5.4)
+    ax.set_ylim(0, 3.7)
+    ax.axis("off")
+    ax.set_title("The reward rings backward, one update at a time", pad=8)
+    save(fig, BLOG04, "fig-max-propagation")
+
+
+def fig_deadly_triad() -> None:
+    """Three ingredients that are dangerous together."""
+    fig, ax = plt.subplots(figsize=(7, 6.2))
+    circ = [
+        ((0.40, 0.62), "Function\napproximation", ACCENT),
+        ((0.60, 0.62), "Bootstrapping", MUTED),
+        ((0.50, 0.42), "Off-policy\ndata", ACCENT_SOFT),
+    ]
+    for (x, y), label, color in circ:
+        ax.add_patch(plt.Circle((x, y), 0.22, color=color, alpha=0.32, ec=color, lw=1.5))
+    ax.text(0.26, 0.74, "Function\napproximation", ha="center", fontsize=10.5, color=INK)
+    ax.text(0.74, 0.74, "Bootstrapping", ha="center", fontsize=10.5, color=INK)
+    ax.text(0.50, 0.26, "Off-policy data", ha="center", fontsize=10.5, color=INK)
+    ax.text(0.50, 0.52, "diverges", ha="center", va="center", fontsize=11, fontweight="bold", color=INK)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0.1, 0.95)
+    ax.axis("off")
+    ax.set_title("The deadly triad: any two are safe, all three can blow up", pad=8)
+    save(fig, BLOG04, "fig-deadly-triad")
+
+
+def fig_max_overestimation() -> None:
+    """E[max of noisy estimates] > true max, growing with the number of actions."""
+    rng = np.random.default_rng(0)
+    n_actions = np.arange(1, 17)
+    trials = 200_000
+    bias = []
+    for n in n_actions:
+        est = rng.normal(0.0, 1.0, size=(trials, n))  # true value 0 for every action
+        bias.append(est.max(axis=1).mean())
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(n_actions, bias, marker="o", ms=4, lw=2, color=ACCENT)
+    ax.axhline(0, ls="--", lw=1.4, color=INK, label="true value of every action = 0")
+    ax.set_xlabel("number of actions")
+    ax.set_ylabel(r"$\mathbb{E}[\max_a \hat{Q}(s,a)]$")
+    ax.set_title("Taking the max of noisy estimates is biased upward")
+    ax.legend(frameon=False, fontsize=9)
+    save(fig, BLOG04, "fig-max-overestimation")
+
+
+# Real avg100 logs captured from the Pong DQN run in assignments/lecture2.2.ipynb
+_PONG_LOG = [
+    (8765, -20.80), (17767, -20.55), (26769, -20.43), (36699, -20.25), (46053, -20.20),
+    (55511, -20.18), (64771, -20.19), (73749, -20.23), (82486, -20.27), (91754, -20.30),
+    (101253, -20.23), (110829, -20.22), (120037, -20.25), (130133, -20.23), (139884, -20.23),
+    (148875, -20.27), (158705, -20.27), (169027, -20.18), (179366, -20.07), (189741, -19.97),
+    (199896, -19.91), (210935, -19.81), (221075, -19.73), (231794, -19.74), (241909, -19.76),
+    (253364, -19.57), (263830, -19.54), (275199, -19.58), (286346, -19.57), (297499, -19.59),
+    (310692, -19.49), (323989, -19.38), (336911, -19.35), (349282, -19.28), (361806, -19.16),
+    (375289, -19.17), (389075, -19.04), (402851, -18.94), (417009, -18.83), (431026, -18.71),
+    (445182, -18.72), (459111, -18.79), (474602, -18.68), (489218, -18.65), (504376, -18.59),
+    (519187, -18.53), (535213, -18.44), (550323, -18.29), (566371, -18.18), (582528, -18.01),
+    (600253, -17.80), (618128, -17.42), (635224, -17.12), (654267, -16.87), (673371, -16.49),
+    (691576, -16.27), (708791, -16.10), (727101, -15.82), (747896, -15.44), (769119, -15.03),
+    (791110, -14.65), (814509, -14.35), (838564, -13.94), (865410, -13.21), (896044, -12.55),
+    (925277, -11.49), (956377, -10.10), (991386, -8.45), (1018737, -6.03), (1046442, -3.73),
+    (1074037, -1.47), (1100738, 0.94), (1126019, 3.28), (1154704, 5.18), (1179417, 7.32),
+    (1204370, 9.30), (1229099, 10.87), (1252841, 12.09), (1278123, 12.21), (1301489, 12.60),
+    (1323873, 13.13), (1347656, 13.29), (1369962, 13.59), (1393385, 14.08), (1417096, 14.19),
+    (1439421, 14.26), (1463512, 14.29), (1487800, 14.35), (1510775, 14.60), (1532076, 14.75),
+    (1553653, 14.93), (1575006, 15.17), (1599348, 15.01), (1623929, 14.93), (1647244, 14.97),
+    (1669555, 14.94), (1695198, 14.74), (1719400, 14.55), (1741648, 14.68), (1764896, 14.70),
+    (1787517, 14.49), (1810864, 14.37), (1834350, 14.50), (1857036, 14.60), (1879017, 14.67),
+    (1903744, 14.70), (1927599, 14.97), (1954010, 14.96), (1980020, 14.60),
+]
+
+
+def fig_pong_training() -> None:
+    """The real Pong DQN learning curve (avg of last 100 episodes vs frames)."""
+    frames = np.array([f for f, _ in _PONG_LOG]) / 1e6
+    avg100 = np.array([v for _, v in _PONG_LOG])
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.plot(frames, avg100, lw=2, color=ACCENT)
+    ax.axhline(-21, ls="--", lw=1.4, color=MUTED, label="loses every point (−21)")
+    ax.axhline(0, ls=":", lw=1.2, color=INK, label="break-even (0)")
+    ax.set_xlabel("environment frames (millions)")
+    ax.set_ylabel("reward (avg of last 100 episodes)")
+    ax.set_title("DQN on Pong: from −21 to +15 in ~2M frames")
+    ax.legend(frameon=False, fontsize=9, loc="lower right")
+    save(fig, BLOG04, "fig-pong-training")
+
+
+def build_blog04() -> None:
+    print(f"[{BLOG04}]")
+    fig_q_vs_v()
+    fig_cliffwalking()
+    fig_sarsa_vs_q_curves()
+    fig_max_propagation()
+    fig_deadly_triad()
+    fig_max_overestimation()
+    fig_pong_training()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
     "01": build_blog01,
     "02": build_blog02,
     "03": build_blog03,
+    "04": build_blog04,
 }
 
 

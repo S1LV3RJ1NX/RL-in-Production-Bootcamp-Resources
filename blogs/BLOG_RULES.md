@@ -33,6 +33,60 @@ from **intuition → math → a worked example → code**, with Gymnasium as the
 Close with a short **"Where this goes next"** that sets up the following post (and, if
 natural, states the next equation the reader will derive).
 
+### 1a. Depth rule — expand the new, recall-and-link the old
+
+Source slides are usually terse one-liners. **Expand every one-liner about a _new_ idea into a
+full explanation:** state it, give the intuition, work the *why*. No new term is used before it
+is defined; no new equation appears without the one line of algebra a reader could get stuck on.
+Fold companion notes/PDFs into the prose as depth rather than citing them.
+
+**But never re-teach a concept an earlier post already covered.** For anything established in a
+previous blog (e.g. the Bellman equation, discounting, the TD update, bootstrapping, the Markov
+property, GPI), give a **one-line recall plus a markdown link** to that post and immediately use
+it; do not re-derive it. The depth budget belongs to what is genuinely new in *this* post. This
+keeps each post focused instead of ballooning into a re-run of the series so far.
+
+**Reference other posts by their `shortName`, never by number.** Write "the [MDPs & Bellman](...)
+post" or "as we saw in [DP, MC & TD](...)", not "Blog 2" or "the previous blog". Numbers go stale
+when posts are reordered, and a name tells the reader what the link is about before they click.
+The link text is the target post's `shortName` from its frontmatter.
+
+### 1b. Understanding checks — include every Q&A from the source
+
+If the source material (slides, companion PDFs, or the matching assignment) contains quiz or
+self-check Q&A, **include all of it.** Render each as a hidden-answer check so the reader can
+self-test first:
+
+```markdown
+<details>
+<summary><strong>Check:</strong> one-sentence question?</summary>
+
+**Answer.** The answer, 1–3 sentences, in this post's own wording.
+</details>
+```
+
+Two formatting rules for checks:
+
+- **Summary stays clean:** the visible line is just `Check:` plus the question. Do **not** tag it
+  with the source (no "(from the assignment)", "(B4 exercise)", "(ablation A)", etc.); the reader
+  doesn't care where it came from.
+- **Revealed answer leads with a bold keyword:** the hidden text starts with **`Answer.`** (or
+  **`Explanation.`** when it's more of a walkthrough than a single answer), so the resolution is
+  obvious the moment the block expands.
+
+**No `$…$` math in the `<summary>` line.** The summary is raw HTML, so KaTeX never processes it
+and `$\gamma$` renders as the literal characters `$\gamma$`. Write the question with plain text
+and Unicode instead (e.g. `γ < 1`, `V(s)`, `Q(s, a)`, `max_a Q`, `10^170`, `s′`). Math `$…$` is
+fine in the **answer body** (it sits after a blank line, so it's normal markdown and renders).
+Likewise, keep any single display equation narrow enough to fit: split a long one across lines
+with `\begin{aligned} … \\ … \end{aligned}`, since display math does not wrap and overflows
+get clipped on the right.
+
+Place each check **immediately after the section it tests** (mirroring how lectures interleave
+them), and collect any that don't map cleanly into a single **"Check your understanding"**
+appendix just before "Where this goes next." Reword answers to match the post's prose and
+notation; pull in answers we wrote in the assignment (e.g. ablation analyses) as checks too.
+
 ---
 
 ## 2. Folder & file layout
@@ -63,12 +117,20 @@ Start every post with YAML frontmatter — it drives the portfolio's content col
 ```yaml
 ---
 title: "..."          # sentence case, specific, no clickbait
-date: "YYYY-MM-DD"
-summary: "1–3 sentences. What the reader will be able to do after reading."
+shortName: "..."      # 2-4 word handle other posts use to link here (e.g. "MDPs & Bellman")
+date: "YYYY-MM-DD"    # the actual publish date (today when you ship). Set it fresh, never copy the previous post's date
+summary: "1-3 sentences. What the reader will be able to do after reading."
 tags: ["reinforcement-learning", "..."]
 order: N               # matches the NN- folder prefix
 ---
 ```
+
+`shortName` is how the series cross-references itself (see §1a): every post links to others
+by this handle, never by "Blog 2".
+
+`date` must be the **current date on the day you publish** (the day you run the sync command),
+in `YYYY-MM-DD`. Do not inherit it from the copy-paste skeleton or a sibling post: each post
+carries its own real publish date, so the series never shows every entry on the same day.
 
 ---
 
@@ -151,11 +213,34 @@ highlighting. To host a math+figures post, the site needs (one-time):
 
 **Per-post publish steps:**
 1. Copy `blogs/NN-slug/README.md` → `site/src/content/blog/NN-slug.md`.
-2. Copy `blogs/NN-slug/images/*` → `site/public/blog/NN-slug/` and rewrite image paths
-   from `./images/...` to `/blog/NN-slug/...`.
+2. Copy `blogs/NN-slug/images/*` → `site/public/blogs/NN-slug/` and rewrite image paths
+   from `./images/...` to `/blogs/NN-slug/...`.
 3. `npm run build` to verify, then commit & push (Cloudflare Pages auto-deploys).
 4. Subdomain `blogs.prathameshsaraf.com`: add it as a custom domain on the Pages project
    (or a dedicated Pages project) and add the `blogs` CNAME in Cloudflare DNS.
+
+> Note the **plural** `public/blogs/<slug>/` directory and `/blogs/<slug>/...` URL prefix —
+> that is what the existing posts (01–03) and the `[slug]` route use. Content markdown lives
+> under the singular `src/content/blog/` collection.
+
+**Concrete sync command (steps 1–2, copy-paste).** Run from the RL repo root; set `SLUG`
+to the post folder. It copies the images, copies the markdown, and rewrites the relative
+`./images/...` paths to the site's absolute `/blogs/<slug>/...` paths in one go:
+
+```bash
+SLUG="04-sarsa-qlearning-dqn"                                  # <- the only thing to change
+SITE="/Users/prathamesh/portfolio/site"
+
+mkdir -p "$SITE/public/blogs/$SLUG" "$SITE/src/content/blog"
+cp blogs/$SLUG/images/* "$SITE/public/blogs/$SLUG/"            # figures, hero, gifs
+sed "s#\./images/#/blogs/$SLUG/#g" blogs/$SLUG/README.md \
+    > "$SITE/src/content/blog/$SLUG.md"                        # markdown + path rewrite
+
+cd "$SITE" && npm run build                                    # step 3: verify before pushing
+```
+
+Re-running it is idempotent (it overwrites), so it doubles as the "update a published post"
+command.
 
 Keep the palette/fonts aligned: canvas `#FAFAFA`, ink `#0A0A0A`, accent `#C8421A`,
 Geist / Geist Mono — so figures and site share one visual language.
@@ -168,13 +253,22 @@ Geist / Geist Mono — so figures and site share one visual language.
 - Lead with the "why" before the "what." Use a vivid concrete example, then generalize.
 - Bold the one takeaway sentence per section. Don't pad.
 - No emojis unless asked. American spelling. Define jargon on first use.
+- **No em dashes (`—`).** They read as AI-generated. Use the punctuation the sentence actually
+  wants instead: a comma for an aside, a colon to introduce, parentheses for a true parenthetical,
+  or a period to split into two sentences. (This applies to prose only; the minus sign `−` in math
+  and the en dash `–` in numeric ranges like `B1–B5` are fine.)
 
 ---
 
 ## 9. Pre-publish checklist
 
 - [ ] 4-part spine present and in order; throughline sentence referenced.
-- [ ] Frontmatter complete (`title`, `date`, `summary`, `tags`, `order`).
+- [ ] Every new one-liner expanded; prior-blog concepts recalled in one line + linked, not re-derived (§1a).
+- [ ] Other posts referenced by `shortName` + link, never "Blog N" (§1a, §3).
+- [ ] No em dashes (`—`) anywhere in prose; proper punctuation used instead (§8).
+- [ ] All source Q&A included as hidden-answer checks, placed after the section each tests (§1b).
+- [ ] Check summaries are untagged (`Check:` + question only); revealed answers lead with a bold `Answer.`/`Explanation.` (§1b).
+- [ ] Frontmatter complete (`title`, `shortName`, `date`, `summary`, `tags`, `order`); `date` is today's real publish date, not copied from the skeleton or a sibling post (§3).
 - [ ] Every symbol defined on first use; one clean derivation, no proof dumps.
 - [ ] At least one hand-worked numeric example per key formula.
 - [ ] Figures: `ai-*` for concepts, `fig-*.svg` for numbers; all have alt text and relative paths.
@@ -192,7 +286,8 @@ Geist / Geist Mono — so figures and site share one visual language.
 ```markdown
 ---
 title: "..."
-date: "YYYY-MM-DD"
+shortName: "..."
+date: "YYYY-MM-DD"   # today's date when you publish; do not copy this line's value forward
 summary: "..."
 tags: ["reinforcement-learning", "..."]
 order: N

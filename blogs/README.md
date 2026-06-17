@@ -12,10 +12,11 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 01 | [Reinforcement Learning from First Principles (and the Math You Actually Need)](./01-rl-intro-and-prerequisites/) | ✅ Draft |
 | 02 | [MDPs and the Bellman Equation: The Recursion Behind Every RL Algorithm](./02-mdps-and-bellman/) | ✅ Draft |
 | 03 | [DP, Monte Carlo, and TD: Three Ways to Solve the Bellman Equation](./03-dp-mc-td/) | ✅ Draft |
+| 04 | [SARSA, Q-learning, and DQN: From a Table to a Network That Plays Atari](./04-sarsa-qlearning-dqn/) | ✅ Draft |
 
 ## Writing a new post
 
-Read [`BLOG_RULES.md`](./BLOG_RULES.md) — it has the 4-part spine, math/image/code
+Read [`BLOG_RULES.md`](./BLOG_RULES.md): it has the 4-part spine, math/image/code
 conventions, the figure pipeline, publishing steps, and a copy-paste skeleton.
 
 ## Figures
@@ -27,5 +28,5 @@ uv run python blogs/assets/figures.py            # all posts
 uv run python blogs/assets/figures.py --blog 01  # one post
 ```
 
-- `ai-*.png` — AI-generated conceptual illustrations (no precise labels).
-- `fig-*.svg` — code-generated diagrams with numbers/axes/math (vector, no JS).
+- `ai-*.png`: AI-generated conceptual illustrations (no precise labels).
+- `fig-*.svg`: code-generated diagrams with numbers/axes/math (vector, no JS).

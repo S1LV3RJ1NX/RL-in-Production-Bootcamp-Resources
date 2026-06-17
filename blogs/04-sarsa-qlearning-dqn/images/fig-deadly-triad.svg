@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="405pt" height="379.778pt" viewBox="0 0 405 379.778" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-06-15T11:33:11.638201</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.0, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 379.778 
+L 405 379.778 
+L 405 0 
+L 0 0 
+z
+" style="fill: #fafafa"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 163.44 251.262235 
+C 186.229433 251.262235 208.088537 241.888333 224.2031 225.205021 
+C 240.317662 208.521709 249.372 185.891107 249.372 162.297341 
+C 249.372 138.703575 240.317662 116.072973 224.2031 99.389661 
+C 208.088537 82.70635 186.229433 73.332447 163.44 73.332447 
+C 140.650567 73.332447 118.791463 82.70635 102.6769 99.389661 
+C 86.562338 116.072973 77.508 138.703575 77.508 162.297341 
+C 77.508 185.891107 86.562338 208.521709 102.6769 225.205021 
+C 118.791463 241.888333 140.650567 251.262235 163.44 251.262235 
+z
+" clip-path="url(#p3676cc1fe8)" style="fill: #c8421a; opacity: 0.32; stroke: #c8421a; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 241.56 251.262235 
+C 264.349433 251.262235 286.208537 241.888333 302.3231 225.205021 
+C 318.437662 208.521709 327.492 185.891107 327.492 162.297341 
+C 327.492 138.703575 318.437662 116.072973 302.3231 99.389661 
+C 286.208537 82.70635 264.349433 73.332447 241.56 73.332447 
+C 218.770567 73.332447 196.911463 82.70635 180.7969 99.389661 
+C 164.682338 116.072973 155.628 138.703575 155.628 162.297341 
+C 155.628 185.891107 164.682338 208.521709 180.7969 225.205021 
+C 196.911463 241.888333 218.770567 251.262235 241.56 251.262235 
+z
+" clip-path="url(#p3676cc1fe8)" style="fill: #525252; opacity: 0.32; stroke: #525252; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 202.5 332.139412 
+C 225.289433 332.139412 247.148537 322.765509 263.2631 306.082198 
+C 279.377662 289.398886 288.432 266.768283 288.432 243.174518 
+C 288.432 219.580752 279.377662 196.950149 263.2631 180.266838 
+C 247.148537 163.583526 225.289433 154.209624 202.5 154.209624 
+C 179.710567 154.209624 157.851463 163.583526 141.7369 180.266838 
+C 125.622338 196.950149 116.568 219.580752 116.568 243.174518 
+C 116.568 266.768283 125.622338 289.398886 141.7369 306.082198 
+C 157.851463 322.765509 179.710567 332.139412 202.5 332.139412 
+z
+" clip-path="url(#p3676cc1fe8)" style="fill: #e8a48f; opacity: 0.32; stroke: #e8a48f; stroke-width: 1.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_1">
+    <text style="font-size: 10.5px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #0a0a0a" transform="translate(88.3335 101.244535)">Function</text>
+    <text style="font-size: 10.5px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #0a0a0a" transform="translate(75.108422 113.771035)">approximation</text>
+   </g>
+   <g id="text_2">
+    <text style="font-size: 10.5px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="296.244" y="113.771035" transform="rotate(-0 296.244 113.771035)">Bootstrapping</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 10.5px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="202.5" y="307.876259" transform="rotate(-0 202.5 307.876259)">Off-policy data</text>
+   </g>
+   <g id="text_4">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="202.5" y="206.904929" transform="rotate(-0 202.5 206.904929)">diverges</text>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 14px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="202.5" y="20.85" transform="rotate(-0 202.5 20.85)">The deadly triad: any two are safe, all three can blow up</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p3676cc1fe8">
+   <rect x="7.2" y="28.85" width="390.6" height="343.728"/>
+  </clipPath>
+ </defs>
+</svg>
