@@ -233,7 +233,9 @@ SITE="/Users/prathamesh/portfolio/site"
 
 mkdir -p "$SITE/public/blogs/$SLUG" "$SITE/src/content/blog"
 cp blogs/$SLUG/images/* "$SITE/public/blogs/$SLUG/"            # figures, hero, gifs
-sed "s#\./images/#/blogs/$SLUG/#g" blogs/$SLUG/README.md \
+sed -e "s#\./images/#/blogs/$SLUG/#g" \
+    -e 's#\.\./\([0-9][0-9]-[^/]*\)/README\.md#/blogs/\1#g' \
+    blogs/$SLUG/README.md \
     > "$SITE/src/content/blog/$SLUG.md"                        # markdown + path rewrite
 
 cd "$SITE" && npm run build                                    # step 3: verify before pushing
