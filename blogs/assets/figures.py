@@ -994,6 +994,140 @@ def build_blog04() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 05 — Policy Gradients
+# ----------------------------------------------------------------------------
+BLOG05 = "05-policy-gradients"
+
+
+def fig_policy_fan() -> None:
+    """Softmax policy over 9 angles BEFORE and AFTER one REINFORCE update."""
+    angles = [f"a{i}" for i in range(1, 10)]
+    before = np.array([0.042, 0.063, 0.094, 0.172, 0.256, 0.172, 0.094, 0.063, 0.042])
+    after = np.array([0.039, 0.059, 0.089, 0.164, 0.246, 0.189, 0.089, 0.059, 0.039])
+
+    x = np.arange(len(angles))
+    w = 0.38
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.bar(x - w / 2, before, width=w, color=ACCENT, label="before")
+    ax.bar(x + w / 2, after, width=w, color=INK, label="after")
+    ax.bar(5 + w / 2, after[5], width=w, color=INK, edgecolor=ACCENT, lw=2.2)
+    ax.annotate("a₆ taken", xy=(5, after[5]), xytext=(6.4, 0.24),
+                fontsize=10, color=ACCENT, fontweight="bold",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.2))
+    ax.set_xticks(x)
+    ax.set_xticklabels(angles)
+    ax.set_xlabel("angle")
+    ax.set_ylabel("π(angle)")
+    ax.set_title("One REINFORCE update shifts the fan toward a₆")
+    ax.legend(frameon=False)
+    save(fig, BLOG05, "fig-policy-fan")
+
+
+def fig_logit_gradients() -> None:
+    """Per-logit gradient pushes from one REINFORCE update."""
+    angles = [f"a{i}" for i in range(1, 10)]
+    grads = np.array([-0.038, -0.057, -0.085, -0.155, -0.230,
+                       +0.745, -0.085, -0.057, -0.038])
+
+    colors = [ACCENT if g > 0 else MUTED for g in grads]
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.bar(angles, grads, color=colors, width=0.6)
+    ax.axhline(0, ls="-", lw=0.8, color=DIVIDER)
+    ax.set_xlabel("angle")
+    ax.set_ylabel("logit gradient")
+    ax.set_title("Per-logit gradients: one up, eight down, sum = 0")
+    save(fig, BLOG05, "fig-logit-gradients")
+
+
+def fig_score_push() -> None:
+    """Push = 1 − π(a) vs current probability π(a)."""
+    pi = np.linspace(0.001, 0.999, 500)
+    push = 1.0 - pi
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.plot(pi, push, lw=2.4, color=ACCENT)
+    ax.scatter([0.10], [0.90], color=INK, zorder=5, s=30)
+    ax.annotate("surprising: big push", xy=(0.10, 0.90),
+                xytext=(0.22, 0.85), fontsize=10, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    ax.scatter([0.85], [0.15], color=INK, zorder=5, s=30)
+    ax.annotate("confident: tiny push", xy=(0.85, 0.15),
+                xytext=(0.55, 0.30), fontsize=10, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    ax.set_xlabel("current probability π(a)")
+    ax.set_ylabel("push per unit advantage: 1 − π(a)")
+    ax.set_title("How hard ∇log π pushes: surprising actions move more")
+    save(fig, BLOG05, "fig-score-push")
+
+
+def fig_credit_assignment() -> None:
+    """Cumulative discounted return building across the Archer MDP trajectory."""
+    gamma = 0.9
+    G_shoot = 10.0
+    G_10 = -0.2 + gamma * G_shoot
+    G_20 = -0.2 + gamma * G_10
+    G_30 = -0.2 + gamma * G_20
+    G_40 = -0.2 + gamma * G_30
+
+    states = ["step@40m", "step@30m", "step@20m", "step@10m", "shoot"]
+    returns = [G_40, G_30, G_20, G_10, G_shoot]
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.bar(states, returns, color=ACCENT, width=0.6)
+    ax.axhline(0, ls="-", lw=1.2, color=INK)
+    for i, (s, g) in enumerate(zip(states, returns)):
+        ax.text(i, g + 0.25, f"{g:.2f}", ha="center", fontsize=10, color=INK, fontweight="bold")
+    ax.set_xlabel("state")
+    ax.set_ylabel("return $G_t$")
+    ax.set_title("Credit assignment: the return at 40 m is +5.87, not −0.2")
+    save(fig, BLOG05, "fig-credit-assignment")
+
+
+def fig_variance_ladder() -> None:
+    """Gradient variance for three methods on a log scale."""
+    methods = ["REINFORCE", "+baseline", "Actor-Critic"]
+    variances = [0.0437, 0.0006, 0.0004]
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.bar(methods, variances, color=ACCENT, width=0.55)
+    ax.set_yscale("log")
+    ax.set_ylabel("gradient variance (log scale)")
+    ax.set_title("The variance ladder: baseline cuts noise by ~73×, critic by ~110×")
+    for i, v in enumerate(variances):
+        ax.text(i, v * 1.5, f"{v:.4f}", ha="center", fontsize=10, color=INK, fontweight="bold")
+    save(fig, BLOG05, "fig-variance-ladder")
+
+
+def fig_greedy_returns() -> None:
+    """Greedy return per method with a solved threshold line."""
+    methods = ["REINFORCE", "+baseline", "Actor-Critic"]
+    returns = [4.66, 9.60, 9.62]
+    threshold = 9.0
+
+    colors = [ACCENT if r >= threshold else MUTED for r in returns]
+    fig, ax = plt.subplots(figsize=(7.2, 4.2))
+    ax.bar(methods, returns, color=colors, width=0.55)
+    ax.axhline(threshold, ls="--", lw=1.8, color=INK)
+    ax.text(2.35, threshold + 0.15, "solved threshold", fontsize=10, color=INK,
+            ha="right", va="bottom")
+    for i, r in enumerate(returns):
+        ax.text(i, r + 0.15, f"{r:.2f}", ha="center", fontsize=10, color=INK, fontweight="bold")
+    ax.set_ylabel("greedy return")
+    ax.set_title("Greedy evaluation: only variance-reduced methods solve the task")
+    save(fig, BLOG05, "fig-greedy-returns")
+
+
+def build_blog05() -> None:
+    print(f"[{BLOG05}]")
+    fig_policy_fan()
+    fig_logit_gradients()
+    fig_score_push()
+    fig_credit_assignment()
+    fig_variance_ladder()
+    fig_greedy_returns()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -1001,6 +1135,7 @@ BUILDERS = {
     "02": build_blog02,
     "03": build_blog03,
     "04": build_blog04,
+    "05": build_blog05,
 }
 
 
