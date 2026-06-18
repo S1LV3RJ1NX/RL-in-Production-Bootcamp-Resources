@@ -74,16 +74,22 @@ Both routes are one line of NumPy: the exact weighted sum $\sum_x x\,p(x)$, and 
 ```python
 import numpy as np
 
-# Exact: weight each face by its probability.  E[X] = Σ x·p(x)
+# --- Route 1: Exact expectation via the formula E[X] = Σ x·p(x) ---
+# faces = [1, 2, 3, 4, 5, 6], each with equal probability 1/6.
+# Multiplying element-wise and summing gives the true mean: 3.5.
 faces = np.arange(1, 7)
 probs = np.full(6, 1 / 6)
 exact = (faces * probs).sum()
 
-# Estimated: roll many times and average (law of large numbers).
+# --- Route 2: Monte-Carlo estimate (sample average → true mean by LLN) ---
+# We can't always compute E[X] analytically (environments are complex).
+# Instead, draw N samples and average them.  The Law of Large Numbers
+# guarantees this converges to E[X] as N → ∞.
 rng = np.random.default_rng(0)
-samples = rng.integers(1, 7, size=100_000)
-estimate = samples.mean()
+samples = rng.integers(1, 7, size=100_000)   # 100k simulated die rolls
+estimate = samples.mean()                     # sample average ≈ 3.5
 
+# Both routes should land near 3.5; the gap shrinks with more samples.
 print(f"exact={exact:.4f}  estimate={estimate:.4f}")
 ```
 
@@ -272,20 +278,33 @@ Both quantities are a single line of NumPy. Notice the asymmetry in the last two
 ```python
 import numpy as np
 
+# --- Entropy: H(p) = -Σ p(x) log₂ p(x) ---
+# Measures how "spread out" (uncertain) a distribution is.
+# High entropy → exploring many actions; low entropy → committed to one.
 def entropy_bits(p):
     p = np.asarray(p, dtype=float)
-    p = p[p > 0]                       # 0·log0 = 0 by convention
-    return -(p * np.log2(p)).sum()
+    p = p[p > 0]                       # 0·log0 = 0 by convention; skip zeros
+    return -(p * np.log2(p)).sum()     # negative because log(p<1) is negative
 
+# --- KL divergence: D_KL(p1 ‖ p2) = Σ p1(x) log₂(p1(x)/p2(x)) ---
+# Measures the extra surprise (in bits) when you believe p2 but truth is p1.
+# Always ≥ 0; equals 0 only when p1 == p2.
+# IMPORTANT: KL is asymmetric — swapping p1 and p2 gives a different answer,
+# which is why PPO/TRPO are careful about *which direction* they constrain.
 def kl_bits(p1, p2):
     p1, p2 = np.asarray(p1, float), np.asarray(p2, float)
     return (p1 * np.log2(p1 / p2)).sum()
 
+# Biased coin (0.25, 0.75): less uncertain → entropy < 1 bit
 print(entropy_bits([0.25, 0.75]))
+# Fair coin (0.5, 0.5): maximum uncertainty for 2 outcomes → exactly 1 bit
 print(entropy_bits([0.5, 0.5]))
 
+# Two policies over {left, stay, right}
 pi1, pi2 = [0.7, 0.2, 0.1], [0.4, 0.4, 0.2]
+# Forward KL: "How much does π₂ surprise π₁?" (weighted by π₁)
 print(kl_bits(pi1, pi2))
+# Reverse KL: "How much does π₁ surprise π₂?" (weighted by π₂) — different!
 print(kl_bits(pi2, pi1))
 ```
 
@@ -408,22 +427,42 @@ import numpy as np
 
 def estimate_start_value(episodes=20_000, gamma=0.99, seed=0):
     """V(start) under a random policy = average discounted return over episodes."""
-    env = gym.make("FrozenLake-v1", is_slippery=True)   # a stochastic gridworld MDP
+
+    # FrozenLake: 4×4 grid, agent must reach the goal without falling in holes.
+    # is_slippery=True makes it stochastic (agent slides with probability 2/3),
+    # so even repeating the same actions can produce different outcomes — a true MDP.
+    env = gym.make("FrozenLake-v1", is_slippery=True)
     rng = np.random.default_rng(seed)
+
+    # We'll collect one discounted return G per episode, then average them all.
+    # That average is our Monte-Carlo estimate of V(start) = E[G_t | s₀].
     returns = []
 
     for ep in range(episodes):
         state, _ = env.reset(seed=int(rng.integers(1 << 31)))
+
+        # G   = discounted return for this episode (G_t = Σ γ^k r_{t+k+1})
+        # discount = γ^k, the weight for the k-th future reward; starts at 1
         G, discount, done = 0.0, 1.0, False
+
+        # --- The agent–environment loop from §1 ---
         while not done:
-            action = env.action_space.sample()          # random policy π
+            action = env.action_space.sample()          # random policy π (uniformly random)
             state, reward, terminated, truncated, _ = env.step(action)
-            G += discount * reward                       # accumulate G_t = Σ γ^k r
-            discount *= gamma
+
+            # Build the return incrementally: G += γ^k · r_k
+            # Each reward is discounted by how far into the future it occurs.
+            G += discount * reward
+            discount *= gamma                           # γ^k → γ^(k+1) for next step
+
             done = terminated or truncated
+
         returns.append(G)
 
     env.close()
+
+    # Monte-Carlo value estimate: V(s₀) ≈ (1/N) Σ Gᵢ  (§2.1 sampling trick)
+    # std tells us how noisy a single episode is (high variance from §2.3)
     return np.mean(returns), np.std(returns)
 
 mean_return, std_return = estimate_start_value()

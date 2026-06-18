@@ -44,9 +44,18 @@ $$
 
 ```python
 import numpy as np
-Q_s = np.array([3.0, 7.0, 5.0])   # action-values for one state s
-print("V(s) =", Q_s.max())         # value of the state = the BEST action-value
-print("pi(s) =", int(Q_s.argmax())) # greedy policy = the arg of the best
+
+# Q(s, a) for three actions in a single state s.
+# Think of it as: "if I'm in state s, how good is each move?"
+Q_s = np.array([3.0, 7.0, 5.0])
+
+# V(s) = max_a Q(s, a) — the state's value is the best action available.
+# No need to know transition dynamics; just pick the highest number.
+print("V(s) =", Q_s.max())
+
+# π(s) = argmax_a Q(s, a) — the greedy policy is whichever action index
+# achieves that max. Here action 1 (value 7.0) wins.
+print("pi(s) =", int(Q_s.argmax()))
 ```
 
 ```text title="Output"
@@ -112,13 +121,34 @@ Here $\alpha$ is the step size (how far we move toward the target), $\gamma$ the
 
 ```python
 def q_learning_update(Q, s, a, r, s2, done, alpha, gamma):
-    best_next = 0.0 if done else Q[s2].max()   # max_a' Q(s', a')  <- the new piece
-    target = r + gamma * best_next              # TD target  (just r if done)
-    Q[s, a] += alpha * (target - Q[s, a])       # step toward the target
+    # Q-learning update rule:
+    # Q(s,a) ← Q(s,a) + α·[r + γ·max_a' Q(s',a') − Q(s,a)]
+    #
+    # The key insight: the target bootstraps off the BEST next action (max),
+    # not the action actually taken. That max is the implicit policy improvement.
+
+    # If the episode ended (done), there's no future — the target is just r.
+    # Forgetting this "done" branch is the single most common Q-learning bug.
+    best_next = 0.0 if done else Q[s2].max()   # max_a' Q(s', a')
+
+    # TD target: the one-step-ahead estimate of Q*(s,a).
+    # Combines the real reward r with a discounted estimate of future value.
+    target = r + gamma * best_next
+
+    # Nudge Q(s,a) a fraction α toward the target.
+    # α controls how aggressively we update: 0 = never move, 1 = jump all the way.
+    Q[s, a] += alpha * (target - Q[s, a])
     return Q[s, a]
 
 import numpy as np
-Q = np.zeros((3, 2)); Q[2, 1] = 10.0            # next state s2=2 already looks good
+
+# 3 states × 2 actions, all zeros except Q(s2=2, a=1) = 10.
+# State 2 "already looks good" — we'll see that value flow backward.
+Q = np.zeros((3, 2)); Q[2, 1] = 10.0
+
+# Even with r=0, Q(0,1) jumps from 0 → 4.5:
+# target = 0 + 0.9·10 = 9, and we move halfway (α=0.5) from 0 to 9.
+# This is value propagating backward from a promising future state.
 print(q_learning_update(Q, s=0, a=1, r=0.0, s2=2, done=False, alpha=0.5, gamma=0.9))
 ```
 
@@ -134,11 +164,18 @@ A purely greedy agent repeats the first okay path it finds and never discovers a
 
 ```python
 def epsilon_greedy(Q, s, eps):
+    # ε-greedy exploration: with probability ε pick a random action (explore),
+    # otherwise pick the action with the highest Q-value (exploit).
+    # This is the simplest way to balance learning about new actions
+    # vs. cashing in on what you already know.
     if np.random.random() < eps:
-        return np.random.randint(Q.shape[1])   # explore: random action
-    return int(np.argmax(Q[s]))                 # exploit: greedy action
+        return np.random.randint(Q.shape[1])   # explore: uniformly random action
+    return int(np.argmax(Q[s]))                 # exploit: argmax_a Q(s, a)
 
+# One state with 4 actions; only action 2 has value (Q=1.0).
 Q = np.zeros((1, 4)); Q[0, 2] = 1.0
+
+# With eps=0, exploration is off → always returns the greedy choice (action 2).
 print("greedy action (eps=0):", epsilon_greedy(Q, 0, 0.0))
 ```
 
@@ -168,10 +205,23 @@ The reward $r$ and discount $\gamma$ are identical. The only difference is the n
 
 ```python
 gamma = 0.9
-Q_s2 = np.array([2.0, 5.0, 8.0])   # action-values at the next state s'
-a_next = 0                          # exploratory policy happens to pick 'left'
-sarsa_target  = 0 + gamma * Q_s2[a_next]   # value of the action TAKEN
-qlearn_target = 0 + gamma * Q_s2.max()     # value of the BEST action
+
+# Three action-values at the next state s': left=2, stay=5, right=8.
+Q_s2 = np.array([2.0, 5.0, 8.0])
+
+# Suppose ε-greedy explores and picks a' = 0 (left), not the best (right=8).
+a_next = 0
+
+# SARSA target = r + γ·Q(s', a')  — uses the action the policy ACTUALLY takes.
+# Honest about the exploratory "left" → backs up Q(s', left) = 2.0.
+sarsa_target  = 0 + gamma * Q_s2[a_next]
+
+# Q-learning target = r + γ·max_a' Q(s', a') — always uses the BEST action.
+# Ignores the exploratory "left", assumes greedy "right" → backs up max = 8.0.
+qlearn_target = 0 + gamma * Q_s2.max()
+
+# Same transition, wildly different targets (1.8 vs 7.2).
+# The gap exists only because the policy explored; on greedy steps they agree.
 print("SARSA target      =", sarsa_target)
 print("Q-learning target =", qlearn_target)
 ```
@@ -212,9 +262,18 @@ The fix is the leap into deep RL, and it changes only the *container* for $Q$, n
 
 ```python
 import torch, torch.nn as nn
+
+# Replace the Q-table with a neural network Q(s, a; θ).
+# Input: a state vector (here dim=7). Output: one Q-value per action (here 3 actions).
+# Two hidden layers with ReLU give nonlinear function approximation,
+# so the network can generalize to states it has never seen (a table cannot).
 net = nn.Sequential(nn.Linear(7, 64), nn.ReLU(),
                     nn.Linear(64, 64), nn.ReLU(),
-                    nn.Linear(64, 3))      # linear head: one Q-value per action
+                    nn.Linear(64, 3))      # linear head — no activation on output,
+                                           # because Q-values are unbounded expected returns
+
+# One forward pass maps a state → all action-values at once,
+# so acting is still just argmax over the output vector.
 print("one forward pass ->", tuple(net(torch.zeros(1, 7)).shape), "(a Q-value per action)")
 ```
 
@@ -245,20 +304,45 @@ The catch is the **semi-gradient**: $y$ also depends on $\theta$, but we differe
 
 ```python
 import torch.nn.functional as F
-def compute_td_loss(policy_net, target_net, batch, gamma=0.99):
-    states, actions, rewards, next_states, dones = batch
-    q = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)  # Q(s,a) prediction
-    with torch.no_grad():                                  # no gradient flows into the target
-        max_next = target_net(next_states).max(1).values   # max_a' Q(s', a'; theta-)
-        y = rewards + gamma * (1 - dones) * max_next        # Bellman target (y=r when done)
-    return F.smooth_l1_loss(q, y)                           # Huber loss (robust to outliers)
 
+def compute_td_loss(policy_net, target_net, batch, gamma=0.99):
+    """Core DQN loss: L(θ) = (y − Q(s,a;θ))², where y = r + γ·max_a' Q(s',a';θ⁻).
+    This is the Bellman optimality equation turned into a regression problem."""
+
+    states, actions, rewards, next_states, dones = batch
+
+    # Q(s, a; θ) — the online network's prediction for the action actually taken.
+    # gather picks out the Q-value at the stored action index from each row.
+    q = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+
+    # --- Build the frozen label y (the "semi-gradient" trick) ---
+    # no_grad() blocks gradients through the target: we only differentiate
+    # the prediction Q(s,a;θ), treating y as a fixed constant.
+    # Differentiating both sides would let the net chase its own tail.
+    with torch.no_grad():
+        # max_a' Q(s', a'; θ⁻) — the off-policy max, using the FROZEN target net.
+        max_next = target_net(next_states).max(1).values
+
+        # y = r + γ·(1−done)·max_a' Q(s',a';θ⁻)
+        # (1−done) zeros out the future term at terminal states, so y = r there.
+        y = rewards + gamma * (1 - dones) * max_next
+
+    # Huber (smooth L1) loss: like MSE near zero but linear for large errors,
+    # making it robust to the occasional wild outlier transition.
+    return F.smooth_l1_loss(q, y)
+
+# --- Quick demo with a toy batch of 8 transitions ---
 torch.manual_seed(0)
 policy = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 2))
 target = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 2))
-target.load_state_dict(policy.state_dict())                # target starts as a copy
+
+# Target net starts as an exact copy of the policy net (θ⁻ = θ initially).
+target.load_state_dict(policy.state_dict())
+
+# Fake batch: 8 transitions of (state, action, reward, next_state, done).
 batch = (torch.randn(8, 4), torch.randint(0, 2, (8,)),
          torch.randn(8), torch.randn(8, 4), torch.zeros(8))
+
 print("TD loss:", round(compute_td_loss(policy, target, batch).item(), 4))
 ```
 
@@ -283,14 +367,35 @@ The fix: a large circular buffer storing the last $N$ transitions $(s,a,r,s',\te
 ```python
 from collections import deque
 import random
+
 class ReplayBuffer:
-    def __init__(self, capacity): self.buffer = deque(maxlen=capacity)  # drops oldest when full
-    def push(self, *transition): self.buffer.append(transition)
-    def sample(self, n): return random.sample(self.buffer, n)           # uniform random minibatch
+    """Circular buffer storing raw (s, a, r, s', done) transitions.
+    Breaks temporal correlation by letting each gradient step sample
+    a uniformly random minibatch from across the agent's entire history."""
+
+    def __init__(self, capacity):
+        # deque(maxlen=N) automatically drops the oldest transition when full,
+        # keeping the buffer a fixed-size sliding window over experience.
+        self.buffer = deque(maxlen=capacity)
+
+    def push(self, *transition):
+        # Store one transition tuple — no labels, just raw experience.
+        self.buffer.append(transition)
+
+    def sample(self, n):
+        # Draw n transitions uniformly at random (not sequential!).
+        # This breaks the near-identical-consecutive-frame correlation
+        # that would otherwise make SGD overfit the present moment.
+        return random.sample(self.buffer, n)
+
     def __len__(self): return len(self.buffer)
 
+# Fill with 500 dummy transitions; the buffer holds up to 1000.
 buf = ReplayBuffer(1000)
 for i in range(500): buf.push(i, 0, 0.0, i + 1, False)
+
+# Each gradient step samples a random minibatch (here 64) from the whole buffer,
+# mixing early and late experience for decorrelated, approximately i.i.d. data.
 print("buffer size:", len(buf), "| sampled batch:", len(buf.sample(64)))
 ```
 
@@ -319,9 +424,14 @@ The second thing that breaks is the label itself. If we compute $y$ with the sam
 The fix: keep a second, **frozen** copy $Q(\cdot;\theta^-)$ and compute the label with it. Now the target is stationary for a stretch, and the update becomes ordinary supervised regression toward a fixed number. Every $C$ steps, sync it: $\theta^- \leftarrow \theta$. The target lurches forward, then holds still again, and slow-moving goalposts are reachable.
 
 ```python
-TARGET_UPDATE = 1000        # sync interval C (gradient steps)
+# Every C gradient steps, copy the online weights into the frozen target net:
+#   θ⁻ ← θ
+# Between syncs the target is stationary, so the DQN update is ordinary
+# regression toward a fixed label — no moving goalpost.
+# C trades stability (large C) against freshness of the target (small C).
+TARGET_UPDATE = 1000
 if grad_steps % TARGET_UPDATE == 0:
-    target_net.load_state_dict(policy_net.state_dict())   # theta- <- theta
+    target_net.load_state_dict(policy_net.state_dict())
 ```
 
 Both extremes break it: sync **every** step ($C=1$) and the target moves every update, so the original instability returns; freeze it **forever** ($C=\infty$) and you keep aiming at an old estimate that never improves, so learning stalls. $C$ trades steadiness against freshness.
@@ -352,11 +462,24 @@ The fix is the "enlarge the state" trick: **stack the last 4 frames** as a $4\ti
 
 ```python
 from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation as FrameStack
+
 def make_env(render_mode=None):
+    # Raw Pong with no built-in frame skip — we control preprocessing ourselves.
     env = gym.make("PongNoFrameskip-v4", render_mode=render_mode)
+
+    # Standard Atari preprocessing pipeline (Mnih et al., 2015):
+    #  • noop_max=30:  start each episode with up to 30 random no-ops for variety
+    #  • frame_skip=4: repeat each action for 4 raw frames (saves compute)
+    #  • screen_size=84: downsample 210×160 RGB → 84×84
+    #  • grayscale:    3 color channels → 1 (color is irrelevant for Pong)
     env = AtariPreprocessing(env, noop_max=30, frame_skip=4, screen_size=84,
                              grayscale_obs=True, scale_obs=False)
-    env = FrameStack(env, stack_size=4)            # <- 4 frames -> motion -> Markov
+
+    # Stack the last 4 processed frames into one observation (4×84×84).
+    # A single frame is a snapshot — you can't tell ball direction or speed.
+    # Stacking restores the Markov property by encoding velocity/acceleration
+    # as pixel differences across consecutive frames.
+    env = FrameStack(env, stack_size=4)
     return env
 ```
 
@@ -462,8 +585,18 @@ The $\max$ that powers control has a subtle cost. Suppose every action at a stat
 
 ```python
 rng = np.random.default_rng(0)
-true_values = np.zeros(4)                      # every action truly worth 0
-est = rng.normal(0, 1, size=(100000, 4))       # noisy, unbiased estimates
+
+# Ground truth: all 4 actions are worth exactly 0. The true max is 0.
+true_values = np.zeros(4)
+
+# Simulate 100k episodes of noisy, unbiased Q-estimates (mean=0, std=1).
+# Each row is one set of 4 action-value estimates.
+est = rng.normal(0, 1, size=(100000, 4))
+
+# E[max of noisy estimates] ≈ 1.03, well above the true max of 0.
+# This is Jensen's inequality in action: E[max] ≥ max E.
+# The max operator picks the luckiest noise each time, creating
+# a systematic upward bias that bootstrapping then propagates backward.
 print("true max:", true_values.max(), "| E[max of estimates]:", round(est.max(1).mean(), 3))
 ```
 
@@ -503,16 +636,25 @@ One end-to-end Gymnasium program. Same hyperparameters, same $\epsilon$-greedy b
 import numpy as np
 import gymnasium as gym
 
+# CliffWalking: 4×12 grid (48 states, 4 actions: up/right/down/left).
+# Start = bottom-left, Goal = bottom-right, cliff = bottom row in between.
+# Step cost = −1; cliff = −100 + teleport to Start. The tension:
+# shortest path hugs the cliff (13 steps) but random missteps are fatal.
 env = gym.make("CliffWalking-v1")
 n_states, n_actions = env.observation_space.n, env.action_space.n
-N_EPISODES, ALPHA, GAMMA, EPS = 5000, 0.1, 0.99, 0.1   # fixed epsilon highlights the difference
+
+# Fixed ε = 0.1 (no decay) so the on-policy vs off-policy difference stays visible.
+N_EPISODES, ALPHA, GAMMA, EPS = 5000, 0.1, 0.99, 0.1
 
 def epsilon_greedy(Q, s, eps):
+    # With probability ε explore randomly, otherwise exploit the greedy action.
     if np.random.random() < eps:
         return env.action_space.sample()
     return int(np.argmax(Q[s]))
 
 def train(kind):
+    """Train either Q-learning (kind='q') or SARSA (kind='sarsa').
+    The ONLY difference is which next-state value enters the TD target."""
     Q = np.zeros((n_states, n_actions))
     rewards = []
     for _ in range(N_EPISODES):
@@ -520,13 +662,22 @@ def train(kind):
         a = epsilon_greedy(Q, s, EPS)
         done, total = False, 0
         while not done:
-            s2, r, term, trunc, _ = env.step(a)        # the reset()/step() loop
+            s2, r, term, trunc, _ = env.step(a)
             done = term or trunc
-            if kind == "q":                             # OFF-policy: bootstrap off the best next action
+
+            if kind == "q":
+                # Q-LEARNING (off-policy):
+                # target = r + γ · max_a' Q(s', a')
+                # Bootstraps off the BEST next action, regardless of what
+                # ε-greedy actually picks. Learns Q* even while exploring.
                 target = r + (0 if done else GAMMA * np.max(Q[s2]))
                 Q[s, a] += ALPHA * (target - Q[s, a])
                 s, a = s2, epsilon_greedy(Q, s2, EPS)
-            else:                                       # SARSA, ON-policy: bootstrap off the action TAKEN
+            else:
+                # SARSA (on-policy):
+                # target = r + γ · Q(s', a')  where a' is the action TAKEN.
+                # Honest about exploration: if ε-greedy wanders off the cliff,
+                # that cost enters the target, making cliff-adjacent states look bad.
                 a2 = epsilon_greedy(Q, s2, EPS) if not done else 0
                 target = r + (0 if done else GAMMA * Q[s2, a2])
                 Q[s, a] += ALPHA * (target - Q[s, a])
@@ -536,6 +687,7 @@ def train(kind):
     return Q, rewards
 
 def greedy_len(Q):
+    """Roll out the fully greedy policy (ε=0) and count steps to the goal."""
     s, _ = env.reset(); n = 0
     for _ in range(100):
         s, _, term, trunc, _ = env.step(int(np.argmax(Q[s]))); n += 1
@@ -545,6 +697,11 @@ def greedy_len(Q):
 np.random.seed(0)
 Qq, rq = train("q")
 Qs, rs = train("sarsa")
+
+# Key result — the paradox:
+# • SARSA gets better TRAINING reward (−19.9 vs −48.2) because it avoids the cliff.
+# • Q-learning learns the SHORTER greedy path (13 vs 15 steps) because its max
+#   assumes perfect play, but during ε-greedy training it keeps falling off.
 print(f"Q-Learning  avg last 500 reward: {np.mean(rq[-500:]):.1f}")
 print(f"SARSA       avg last 500 reward: {np.mean(rs[-500:]):.1f}")
 print(f"Q-Learning greedy path length: {greedy_len(Qq)} steps")
@@ -568,19 +725,36 @@ The deep version is the *same* loop, now wrapping `compute_td_loss` (§2.6), the
 
 ```python
 for frame in range(1, total_frames + 1):
-    epsilon = get_epsilon(frame)                       # linearly annealed 1.0 -> 0.1
-    action = select_action(state, epsilon)             # epsilon-greedy on the online net
+    # Anneal ε linearly from 1.0 (pure exploration) → 0.1 (mostly greedy).
+    # Early frames explore widely; later frames exploit learned Q-values.
+    epsilon = get_epsilon(frame)
+
+    # ε-greedy action selection using the ONLINE network's Q-values.
+    action = select_action(state, epsilon)
+
+    # Step the Atari environment and observe the transition.
     next_state, reward, term, trunc, _ = env.step(action)
     done = term or trunc
-    buffer.push(state, action, np.sign(reward), next_state, float(done))  # reward clipping
+
+    # Store transition in replay buffer. np.sign(reward) clips rewards to {-1, 0, +1},
+    # keeping the loss scale consistent across games with different score magnitudes.
+    buffer.push(state, action, np.sign(reward), next_state, float(done))
     state = next_state if not done else env.reset()[0]
 
+    # --- Learning phase (only after enough experience is buffered) ---
     if len(buffer) >= LEARNING_START and frame % TRAIN_FREQ == 0:
+        # Sample a random minibatch from replay (Trick 1: decorrelates data).
         loss = compute_td_loss(policy_net, target_net, buffer.sample(BATCH_SIZE))
+
+        # Standard PyTorch backward pass with gradient clipping
+        # to prevent exploding gradients from outlier transitions.
         optimizer.zero_grad(); loss.backward()
-        nn.utils.clip_grad_norm_(policy_net.parameters(), 10.0)            # gradient clipping
+        nn.utils.clip_grad_norm_(policy_net.parameters(), 10.0)
         optimizer.step()
-        if grad_steps % TARGET_UPDATE == 0:                                # the two-trick payoff
+
+        # Trick 2: periodically sync θ⁻ ← θ so the target net
+        # catches up. Between syncs the target stays frozen.
+        if grad_steps % TARGET_UPDATE == 0:
             target_net.load_state_dict(policy_net.state_dict())
 ```
 

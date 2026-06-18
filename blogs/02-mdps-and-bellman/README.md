@@ -86,12 +86,22 @@ In Gymnasium, this table lives in `env.unwrapped.P`. Each entry is a list of `(p
 ```python
 import gymnasium as gym
 
+# Create the 4x4 FrozenLake with slippery ice (stochastic transitions).
+# is_slippery=True means each action has only 1/3 chance of going where intended;
+# the other 2/3 of the time the agent slides perpendicular.
 env = gym.make("FrozenLake-v1", is_slippery=True)
+
+# P is the full dynamics table p(s', r | s, a).
+# P[s][a] returns a list of (probability, next_state, reward, done) tuples —
+# every possible outcome of taking action a in state s.
 P = env.unwrapped.P
 
+# Query: "What happens if I try to go Right (action=2) from state 6?"
 state, action = 6, 2   # state 6 (row 1, col 2), action Right
 print(f"p(s', r | s={state}, a={action}):")
 for prob, next_state, reward, done in P[state][action]:
+    # Each tuple is one branch of the stochastic outcome:
+    # prob = p(s',r|s,a), the transition probability for this specific outcome
     print(f"  prob={prob:.4f}  s'={next_state:2d}  r={reward:.0f}  done={done}")
 env.close()
 ```
@@ -123,11 +133,19 @@ A quick calculation: with $\gamma = 0.99$ and $R_{\max} = 1$, the return is boun
 ```python
 import numpy as np
 
+# A 4-step episode where the agent gets 0 reward for 3 steps, then +1 at the goal.
+# This simulates reaching the goal after 3 "wasted" steps.
 rewards = [0, 0, 0, 1]  # four-step episode: reward +1 at the goal
 gamma = 0.99
 
+# G_t = Σ_{k=0}^{T} γ^k · R_{t+k+1}
+# Each future reward is exponentially discounted: reward at step k is worth γ^k today.
+# Here: G = 0.99^0·0 + 0.99^1·0 + 0.99^2·0 + 0.99^3·1 = 0.9703
 G = sum(gamma**k * r for k, r in enumerate(rewards))  # G_t = Σ γ^k R_{t+k+1}
 print(f"Return G = {G:.4f}")
+
+# Geometric series bound: G ≤ R_max / (1 - γ). With γ=0.99, max possible return = 100.
+# This finite ceiling is why discounting keeps infinite-horizon problems tractable.
 print(f"Upper bound with R_max=1: {1 / (1 - gamma):.0f}")
 ```
 
@@ -215,24 +233,34 @@ P = env.unwrapped.P
 nS, nA = 16, 4
 gamma = 0.99
 
+# Start with a rough placeholder V(s) to demonstrate the V↔Q bridge.
+# In practice, V would come from solving the Bellman equation; here we
+# seed it with small random values and set known terminal states.
 V = np.random.default_rng(0).uniform(0, 0.1, size=nS)  # placeholder V
-V[15] = 1.0  # goal state
-V[[5, 7, 11, 12]] = 0.0  # holes
+V[15] = 1.0  # goal state has high value (reward +1 for arriving)
+V[[5, 7, 11, 12]] = 0.0  # holes are absorbing with zero value
 
 def q_from_v(V, s, a):
-    """Q^π(s,a) = Σ p(s',r|s,a) [r + γ V(s')]"""
+    """Q → V direction: Q^π(s,a) = Σ_{s'} p(s',r|s,a) · [r + γ·V(s')]
+    "Given I take action a in state s, what's my expected return?"
+    Averages over environment randomness (where do I land?)."""
     return sum(p * (r + gamma * V[s2]) for p, s2, r, d in P[s][a])
 
 def v_from_q(Q_sa, pi_sa):
-    """V^π(s) = Σ_a π(a|s) Q(s,a)"""
+    """V → Q direction: V^π(s) = Σ_a π(a|s) · Q(s,a)
+    "What's the value of state s under policy π?"
+    Averages over agent randomness (which action do I pick?)."""
     return sum(pi * q for pi, q in zip(pi_sa, Q_sa))
 
+# Compute Q(6, a) for all 4 actions, then recover V(6) from Q.
 s = 6
 Q_s = [q_from_v(V, s, a) for a in range(nA)]
-pi_uniform = [0.25] * nA
+pi_uniform = [0.25] * nA  # uniform random policy: equal weight on all actions
 
 print(f"Q({s}, a) = {[f'{q:.4f}' for q in Q_s]}")
 print(f"V({s}) via Q = {v_from_q(Q_s, pi_uniform):.4f}")
+# Greedy action = argmax_a Q(s,a): the model-free decision rule.
+# With Q in hand, acting optimally is just picking the largest number.
 print(f"Greedy action = {np.argmax(Q_s)} ({['Left','Down','Right','Up'][np.argmax(Q_s)]})")
 env.close()
 ```
@@ -295,17 +323,30 @@ nS, nA = 16, 4
 gamma = 0.99
 
 def bellman_backup(V, s, pi):
-    """One Bellman expectation backup: V^π(s) = Σ_a π(a|s) Σ_s' p [r + γ V(s')]"""
+    """One Bellman expectation backup for state s:
+    V^π(s) = Σ_a π(a|s) · Σ_{s'} p(s'|s,a) · [r + γ·V(s')]
+
+    This computes a NEW estimate for V(s) by looking one step ahead:
+    for each action (weighted by policy), for each next state (weighted
+    by dynamics), accumulate [immediate reward + discounted future value].
+    """
     total = 0.0
     for a in range(nA):
         for prob, s2, r, done in P[s][a]:
+            # π(a|s) · p(s'|s,a) · [r + γ·V(s')]
+            # Agent randomness × environment randomness × one-step lookahead
             total += pi[a] * prob * (r + gamma * V[s2])
     return total
 
+# Initialize V to all zeros except the goal. This simulates "before any
+# value has propagated": only the goal knows it's valuable.
 V_test = np.zeros(nS)
 V_test[15] = 1.0  # goal state has value 1 (reward = 1 for reaching it)
 pi = [0.25] * nA  # uniform random policy
 
+# One backup at state 6: can the goal's value reach state 6 in a single step?
+# State 6 is several cells away from state 15, so the answer is no (0.0).
+# Repeated backups (or solving the full system) propagate value outward.
 v6 = bellman_backup(V_test, 6, pi)
 print(f"Bellman backup at state 6: V(6) = {v6:.6f}")
 env.close()
@@ -528,35 +569,56 @@ import numpy as np
 
 env = gym.make("FrozenLake-v1", is_slippery=True)
 P = env.unwrapped.P
-nS, nA = env.observation_space.n, env.action_space.n
+nS, nA = env.observation_space.n, env.action_space.n  # 16 states, 4 actions
 gamma = 0.99
 
-# --- Step 1: Build transition matrix T_π and reward vector r_π for uniform random policy ---
-pi = np.full((nS, nA), 1.0 / nA)  # uniform random policy
-T_pi = np.zeros((nS, nS))         # T_π[s, s'] = Σ_a π(a|s) p(s'|s,a)
-r_pi = np.zeros(nS)               # r_π[s]     = Σ_a π(a|s) Σ_s' p(s'|s,a) r
+# === Step 1: Build the matrix form of the Bellman equation ===
+# The Bellman eq V = r_π + γ·T_π·V is linear in V, so we can express
+# the entire 16-state system as one matrix equation and solve it directly.
+
+pi = np.full((nS, nA), 1.0 / nA)  # uniform random policy: π(a|s) = 0.25 ∀ a,s
+
+# T_π[s, s'] = probability of transitioning from s to s' under policy π
+#            = Σ_a π(a|s) · p(s'|s,a)
+# This "marginalizes out" the action: what's the overall s→s' transition prob?
+T_pi = np.zeros((nS, nS))
+
+# r_π[s] = expected immediate reward at state s under policy π
+#         = Σ_a π(a|s) · Σ_{s'} p(s',r|s,a) · r
+r_pi = np.zeros(nS)
 
 for s in range(nS):
     for a in range(nA):
         for prob, s2, reward, done in P[s][a]:
+            # Accumulate policy-weighted transition probabilities and rewards
             T_pi[s, s2] += pi[s, a] * prob
             r_pi[s]     += pi[s, a] * prob * reward
 
-# --- Step 2: Solve (I - γ T_π) V = r_π  (the Bellman linear system) ---
+# === Step 2: Solve the Bellman linear system exactly ===
+# V = r_π + γ·T_π·V  →  (I - γ·T_π)·V = r_π  →  V = (I - γ·T_π)⁻¹ · r_π
+# This is a standard Ax = b linear system: one matrix solve gives V^π for ALL states.
 V_pi = np.linalg.solve(np.eye(nS) - gamma * T_pi, r_pi)  # V^π(s) for all s
 
-# --- Step 3: Compute Q(s,a) from V, then extract the greedy policy ---
+# === Step 3: Extract Q(s,a) from V, then derive the greedy (improved) policy ===
+# Q^π(s,a) = Σ_{s'} p(s'|s,a) · [r + γ·V^π(s')]
+# This uses the V→Q bridge: knowing V for all states, compute Q for each action.
 Q = np.zeros((nS, nA))
 for s in range(nS):
     for a in range(nA):
         Q[s, a] = sum(p * (r + gamma * V_pi[s2]) for p, s2, r, d in P[s][a])
 
+# The greedy policy picks the best action at each state: π(s) = argmax_a Q(s,a).
+# No model needed at decision time — just compare 4 numbers per state.
 greedy_policy = np.argmax(Q, axis=1)  # π*(s) = argmax_a Q(s,a)
 action_names = ["Left", "Down", "Right", "Up"]
 
+# Display V^π as a 4x4 grid matching the FrozenLake layout
 print("V^π(s) under random policy:")
 print(np.round(V_pi.reshape(4, 4), 4))
 print()
+
+# Visualize the greedy policy as directional arrows on the grid.
+# Holes (H) and goal (G) are shown as letters since no action is taken there.
 print("Greedy policy from Q (argmax_a Q(s,a)):")
 grid = np.array(list("SFFF" "FHFH" "FFFH" "HFFG"))
 for s in range(nS):

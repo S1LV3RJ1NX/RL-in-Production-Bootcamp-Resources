@@ -61,14 +61,22 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Mars Rover Gridworld: a stochastic MDP where the agent must navigate a 5×5
+# grid to a science target (+10) while avoiding craters (-10).
+# We build the full environment as a Gymnasium Env so that:
+#   - DP can read the internal model P[s][a] directly (model-based),
+#   - MC and TD can only interact via reset()/step() (model-free).
+# ═══════════════════════════════════════════════════════════════════════════════
+
 # World layout. Coordinates are (row, col), 0-indexed from the top-left corner.
 GRID = 5                       # 5x5 board, so 25 discrete states (numbered 0..24)
 GOAL = (4, 4)                  # science target: landing here ends the episode with +10
 CRATERS = {(2, 2), (1, 3)}     # landing in a crater ends the episode with -10
 SLIP = 0.1                     # probability of slipping to EACH of the two perpendicular tiles
 GAMMA = 0.95                   # discount: a reward k steps away is worth 0.95**k today
-MOVES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}  # action -> (d_row, d_col): up, right, down, left
-PERP = {0: [3, 1], 1: [0, 2], 2: [1, 3], 3: [2, 0]}     # for each action, the two sideways slip directions
+MOVES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}  # action -> (Δrow, Δcol): up, right, down, left
+PERP = {0: [3, 1], 1: [0, 2], 2: [1, 3], 3: [2, 0]}     # perpendicular actions for slip: e.g. "up" can slip to "left" or "right"
 
 def rc(s):
     "State number -> (row, col)."
@@ -129,21 +137,25 @@ class MarsRoverEnv(gym.Env):
         return self.s, {}
 
     def step(self, action):
-        # Roll the dice: sample an actual next state using the slip probabilities.
+        # Simulate a real interaction: sample ONE outcome from P[s][a] according to
+        # its probabilities. This is all MC and TD ever see — they never peek at the
+        # full distribution, only the single (s', r, done) triple that nature dealt.
         tr = self.P[self.s][action]
         i = self.np_random.choice(len(tr), p=[t[0] for t in tr])
         _, s_next, reward, terminated = tr[i]
         self.s = s_next
         return s_next, reward, terminated, False, {}
 
-# Watch an untrained, uniformly-random policy stumble around for up to 20 steps.
+# Demonstrate what a policy-less agent looks like: no learning, just random moves.
+# The rover has no concept of value yet — every direction is equally likely.
+# This is the "before" picture; DP/MC/TD will give it purposeful behavior.
 env = MarsRoverEnv()
 obs, _ = env.reset(seed=42)
 done = False
 steps = 0
 print("Episode trace (random policy):")
 while not done and steps < 20:
-    a = env.action_space.sample()                  # pick a random move (there is no learning yet)
+    a = env.action_space.sample()                  # uniform random action (no intelligence)
     obs_next, r, terminated, truncated, _ = env.step(a)
     # Show the transition as  (row,col) --a=action--> (row,col)  and the reward received.
     print(f"  ({rc(obs)[0]},{rc(obs)[1]}) --a={a}--> ({rc(obs_next)[0]},{rc(obs_next)[1]})  r={r:.0f}")
@@ -153,6 +165,7 @@ while not done and steps < 20:
 if done:
     print(f"  Episode ended at ({rc(obs)[0]},{rc(obs)[1]})")
 else:
+    # 20 steps with no goal reached = the random policy is hopelessly inefficient
     print(f"  ... still wandering after {steps} steps")
 ```
 
@@ -219,23 +232,30 @@ With $\gamma = 0.95$, error halves roughly every 14 sweeps, guaranteed convergen
 
 ```python
 def value_iteration(env, gamma=GAMMA, theta=1e-6):
-    V = np.zeros(env.observation_space.n)        # start every state's value at 0
+    """Bellman optimality backup: V(s) ← max_a Σ p(s'|s,a)[r + γ·V(s')]
+    Sweeps all states repeatedly until values stop changing (< theta)."""
+    V = np.zeros(env.observation_space.n)        # start every state's value at 0 (arbitrary guess)
     while True:
-        delta = 0                                # largest value change this sweep
+        delta = 0                                # track largest change this sweep for convergence check
         for s in range(env.observation_space.n):
             v_old = V[s]
             q_values = []
             for a in range(env.action_space.n):
-                # Q(s,a) = expected (reward + discounted next value), averaged over
-                # all outcomes of taking a. (1 - done) zeroes the future at terminals.
+                # Q(s,a) = Σ p · [r + γ·V(s')·(1-done)]
+                # The (1-done) factor ensures terminal states contribute 0 future value,
+                # because once the episode ends there's nothing more to collect.
                 q = sum(p * (r + gamma * V[s_next] * (1 - done))
                         for p, s_next, r, done in env.P[s][a])
                 q_values.append(q)
-            V[s] = max(q_values)                 # the optimal value picks the best action
+            # Bellman optimality: the value of a state under the BEST policy is the max over actions
+            V[s] = max(q_values)
             delta = max(delta, abs(v_old - V[s]))
-        if delta < theta:                        # stop once the sweep barely moves V
+        # Convergence: when the biggest value change in a full sweep is negligible,
+        # we've found V* (guaranteed by the contraction mapping theorem).
+        if delta < theta:
             break
-    # Read off the greedy policy: in each state, the action with the highest Q(s,a).
+    # Extract the greedy policy: π*(s) = argmax_a Q(s,a).
+    # Given the optimal values, the best action is the one with the highest expected return.
     policy = np.zeros(env.observation_space.n, dtype=int)
     for s in range(env.observation_space.n):
         q_values = [sum(p * (r + gamma * V[s_next] * (1 - done))
@@ -246,8 +266,13 @@ def value_iteration(env, gamma=GAMMA, theta=1e-6):
 
 env = MarsRoverEnv()
 V_dp, policy = value_iteration(env)
+
+# Display V* as a 5×5 grid — higher values mean "closer to the goal in expectation"
 print("V* (5x5 grid):")
 print(V_dp.reshape(5, 5).round(2))
+
+# Show the optimal policy as directional arrows
+# This is what a perfectly rational rover would do at each cell
 print("\nGreedy policy (^>v<):")
 arrows = {0: "^", 1: ">", 2: "v", 3: "<"}
 grid = []
@@ -281,11 +306,16 @@ Values increase as you approach the goal. The policy steers down and right towar
 With `SLIP=0`, the rover has perfect control. Craters only hurt if you deliberately enter them:
 
 ```python
+# Experiment: what happens if we remove stochasticity entirely?
+# With SLIP=0 the rover always goes exactly where it intends — no random drift
+# into craters. This isolates how much of the danger comes from slip vs. proximity.
 SLIP = 0.0
 env_det = MarsRoverEnv()
 V_det, _ = value_iteration(env_det)
-SLIP = 0.1  # restore for later
+SLIP = 0.1  # restore stochastic terrain for subsequent experiments
 print("V* with SLIP=0 (deterministic):")
+# Compare this to the stochastic grid: crater-adjacent cells should now be positive
+# because the rover can simply avoid stepping into them.
 print(V_det.reshape(5, 5).round(2))
 ```
 
@@ -341,9 +371,13 @@ where $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots$ is the actual
 
 ```python
 def mc_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.02, max_steps=100):
+    """Monte Carlo prediction: estimate V^π by playing full episodes and averaging
+    the actual discounted returns observed from each state. No model needed —
+    only the ability to run reset()/step()."""
     V = np.zeros(env.observation_space.n)
     for _ in range(episodes):
-        # 1) Play one full episode, recording (state, reward) at every step.
+        # Phase 1: Generate a complete episode trajectory under the given policy.
+        # We store (state, reward) pairs to compute returns afterward.
         episode = []
         s, _ = env.reset()
         for _ in range(max_steps):
@@ -353,16 +387,20 @@ def mc_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.02, max_step
             s = s_next
             if terminated or truncated:
                 break
-        # 2) Walk the episode backward to accumulate the true return G_t,
-        #    then nudge each visited state's value toward the return it actually saw.
+        # Phase 2: Compute returns backward. Starting from the final step,
+        # accumulate G_t = r_{t+1} + γ·G_{t+1}. This is the TRUE discounted sum
+        # of rewards from that state onward — unbiased but high-variance.
         G = 0.0
         for s, reward in reversed(episode):
-            G = reward + gamma * G                 # G_t = r_{t+1} + gamma * G_{t+1}
-            V[s] = V[s] + alpha * (G - V[s])       # move V(s) a fraction alpha toward G
+            G = reward + gamma * G                 # G_t = r + γ·G_{t+1} (the recursive return)
+            # Incremental mean update: nudge V(s) toward this episode's return G.
+            # α controls the step size — too large = noisy, too small = slow learning.
+            V[s] = V[s] + alpha * (G - V[s])       # MC update: V(s) ← V(s) + α·[G_t - V(s)]
     return V
 
 env = MarsRoverEnv()
 _, policy = value_iteration(env)
+# Show convergence progress: MC gets noisier estimates with fewer episodes
 for n in [1000, 5000, 20000]:
     V_mc = mc_prediction(env, policy, episodes=n)
     print(f"MC after {n:,} episodes:  V(start)={V_mc[0]:.2f}")
@@ -402,17 +440,24 @@ The term $\delta = R + \gamma V(s') - V(s)$ is the **TD error**: "how much more 
 
 ```python
 def td_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.05, max_steps=100):
+    """TD(0) prediction: estimate V^π by bootstrapping — after each single step,
+    update V(s) toward (r + γ·V(s')), using our CURRENT estimate of the next state
+    as a stand-in for the true future return. No full episodes needed."""
     V = np.zeros(env.observation_space.n)
     for _ in range(episodes):
         s, _ = env.reset()
         for _ in range(max_steps):
             a = policy[s]                          # follow the fixed policy we are evaluating
             s_next, reward, terminated, truncated, _ = env.step(a)
-            # The target is just one observed reward plus our CURRENT guess of the
-            # next state's value (the "bootstrap"). At a terminal there is no next state.
+            # Bootstrap: V(s') is our current (imperfect) estimate of future value.
+            # At a terminal state, there IS no future, so bootstrap = 0.
             bootstrap = V[s_next] if not terminated else 0.0
+            # TD target = r + γ·V(s'): one real reward + discounted estimate of the rest.
+            # TD error δ = target - V(s): how much better/worse reality was than predicted.
             target = reward + gamma * bootstrap
-            V[s] = V[s] + alpha * (target - V[s])  # nudge V(s) toward the target, every step
+            # TD(0) update: V(s) ← V(s) + α·δ — nudge value by a fraction of the surprise.
+            # Unlike MC, this fires EVERY step, so information propagates much faster.
+            V[s] = V[s] + alpha * (target - V[s])
             s = s_next
             if terminated or truncated:
                 break
@@ -420,6 +465,8 @@ def td_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.05, max_step
 
 env = MarsRoverEnv()
 _, policy = value_iteration(env)
+# Show convergence progress: TD updates at every step, so it often converges
+# faster than MC even with the same number of episodes.
 for n in [1000, 5000, 20000]:
     V_td = td_prediction(env, policy, episodes=n)
     print(f"TD(0) after {n:,} episodes:  V(start)={V_td[0]:.2f}")
@@ -530,42 +577,57 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-GRID, GAMMA, SLIP = 5, 0.95, 0.1
-GOAL, CRATERS = (4, 4), {(2, 2), (1, 3)}
-MOVES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}
-PERP = {0: [3, 1], 1: [0, 2], 2: [1, 3], 3: [2, 0]}
+# ═══════════════════════════════════════════════════════════════════════════════
+# Complete self-contained program: Mars Rover environment + all three solvers
+# (DP, MC, TD) running on the same MDP to demonstrate they converge to the
+# same values from completely different algorithmic approaches.
+# ═══════════════════════════════════════════════════════════════════════════════
 
-def rc(s): return divmod(s, GRID)
-def idx(r, c): return r * GRID + c
+# Environment constants
+GRID, GAMMA, SLIP = 5, 0.95, 0.1          # 5×5 grid, discount factor, slip probability per perpendicular
+GOAL, CRATERS = (4, 4), {(2, 2), (1, 3)}  # terminal states: +10 reward vs -10 reward
+MOVES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}  # action encodings: up/right/down/left
+PERP = {0: [3, 1], 1: [0, 2], 2: [1, 3], 3: [2, 0]}      # perpendicular slip directions per action
+
+def rc(s): return divmod(s, GRID)          # flat state index → (row, col) tuple
+def idx(r, c): return r * GRID + c         # (row, col) → flat state index
 
 class MarsRoverEnv(gym.Env):
+    """5×5 stochastic gridworld: reach the goal (+10), avoid craters (-10), step cost -1."""
     def __init__(self):
         super().__init__()
-        self.observation_space = spaces.Discrete(GRID * GRID)
-        self.action_space = spaces.Discrete(4)
+        self.observation_space = spaces.Discrete(GRID * GRID)  # 25 states (0..24)
+        self.action_space = spaces.Discrete(4)                 # 4 actions
         self.goal = idx(*GOAL)
         self.craters = {idx(*c) for c in CRATERS}
         self.terminals = self.craters | {self.goal}
-        self.P = self._build_model()
+        self.P = self._build_model()  # full transition model for DP
 
     def _move(self, s, a):
+        """Move in direction a, clamping at grid edges (can't walk off the map)."""
         r, c = rc(s)
         dr, dc = MOVES[a]
         return idx(min(max(r+dr, 0), GRID-1), min(max(c+dc, 0), GRID-1))
 
     def _reward(self, sn):
+        """Reward depends only on where you land: goal=+10, crater=-10, else=-1."""
         if sn == self.goal: return 10.0
         if sn in self.craters: return -10.0
         return -1.0
 
     def _build_model(self):
+        """Construct P[s][a] = [(prob, next_state, reward, done), ...] for all s, a.
+        This IS the MDP model. DP reads it; MC/TD never touch it."""
         P = {s: {a: [] for a in range(4)} for s in range(GRID*GRID)}
         for s in range(GRID*GRID):
             for a in range(4):
                 if s in self.terminals:
+                    # Terminal states are absorbing: the episode is over, no more rewards.
                     P[s][a] = [(1.0, s, 0.0, True)]; continue
                 outcomes = {}
+                # Intended direction gets probability (1 - 2×SLIP) = 0.8
                 outcomes[self._move(s, a)] = 1 - 2*SLIP
+                # Each perpendicular direction gets probability SLIP = 0.1
                 for sa in PERP[a]:
                     sn = self._move(s, sa)
                     outcomes[sn] = outcomes.get(sn, 0) + SLIP
@@ -575,61 +637,84 @@ class MarsRoverEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.s = 0
+        self.s = 0  # always start at top-left (0,0)
         return self.s, {}
 
     def step(self, action):
+        """Sample one transition from P[s][a] — this is the model-free interface."""
         tr = self.P[self.s][action]
         i = self.np_random.choice(len(tr), p=[t[0] for t in tr])
         _, sn, r, done = tr[i]
         self.s = sn
         return sn, r, done, False, {}
 
-# --- Value Iteration (DP) ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# METHOD 1: Value Iteration (Dynamic Programming)
+# Needs: full model P[s][a].  Updates: all states every sweep.
+# Guarantees exact V* via the contraction mapping theorem.
+# ═══════════════════════════════════════════════════════════════════════════════
 def value_iteration(env, gamma=GAMMA):
     V = np.zeros(25)
     while True:
         delta = 0
         for s in range(25):
             v_old = V[s]
+            # Bellman optimality: V(s) = max_a Σ_s' p(s'|s,a)·[r + γ·V(s')·(1-done)]
             V[s] = max(sum(p*(r + gamma*V[sn]*(1-d)) for p,sn,r,d in env.P[s][a]) for a in range(4))
             delta = max(delta, abs(v_old - V[s]))
-        if delta < 1e-6: break
+        if delta < 1e-6: break  # converged when no state's value moves more than 1e-6
+    # Extract greedy policy: π*(s) = argmax_a Q(s,a)
     policy = np.array([np.argmax([sum(p*(r+gamma*V[sn]*(1-d)) for p,sn,r,d in env.P[s][a]) for a in range(4)]) for s in range(25)])
     return V, policy
 
-# --- MC Prediction ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# METHOD 2: Monte Carlo Prediction
+# Needs: complete episodes (no model).  Updates: end of each episode.
+# Unbiased (uses true returns G_t) but high variance.
+# ═══════════════════════════════════════════════════════════════════════════════
 def mc_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.02):
     V = np.zeros(25)
     for _ in range(episodes):
         ep, s = [], env.reset()[0]
+        # Phase 1: play one full episode under the policy
         for _ in range(100):
             sn, r, done, _, _ = env.step(policy[s])
             ep.append((s, r)); s = sn
             if done: break
+        # Phase 2: walk backward computing G_t = r + γ·G_{t+1} (true return)
+        # then do the MC update: V(s) ← V(s) + α·[G_t - V(s)]
         G = 0.0
         for s, r in reversed(ep):
             G = r + gamma * G
             V[s] += alpha * (G - V[s])
     return V
 
-# --- TD(0) Prediction ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# METHOD 3: TD(0) Prediction
+# Needs: single transitions (no model, no full episodes).  Updates: every step.
+# Bootstraps off V(s') — biased early but low variance, fast propagation.
+# ═══════════════════════════════════════════════════════════════════════════════
 def td_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.05):
     V = np.zeros(25)
     for _ in range(episodes):
         s = env.reset()[0]
         for _ in range(100):
             sn, r, done, _, _ = env.step(policy[s])
+            # TD(0) update: V(s) ← V(s) + α·[r + γ·V(s')·(1-done) - V(s)]
+            # The term (1-done) zeroes the bootstrap at terminals.
             V[s] += alpha * (r + gamma * V[sn] * (1 - done) - V[s])
             s = sn
             if done: break
     return V
 
-# --- Run all three ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# Run all three methods and compare their outputs.
+# All should converge toward the same V* values.
+# ═══════════════════════════════════════════════════════════════════════════════
 env = MarsRoverEnv()
-V_dp, policy = value_iteration(env)
-V_mc = mc_prediction(env, policy, episodes=20000)
-V_td = td_prediction(env, policy, episodes=20000)
+V_dp, policy = value_iteration(env)           # exact answer (ground truth)
+V_mc = mc_prediction(env, policy, episodes=20000)  # sample-based, full episodes
+V_td = td_prediction(env, policy, episodes=20000)  # sample-based, one-step bootstrap
 
 print("=== DP (exact) ===")
 print(V_dp.reshape(5,5).round(2))
@@ -637,6 +722,8 @@ print("\n=== MC (20k episodes) ===")
 print(V_mc.reshape(5,5).round(2))
 print("\n=== TD(0) (20k episodes) ===")
 print(V_td.reshape(5,5).round(2))
+# Max absolute error shows how close the sample-based methods are to the exact DP answer.
+# Both errors shrink toward 0 with more episodes — proof they solve the same equation.
 print(f"\nMax |MC - DP|  = {np.max(np.abs(V_mc - V_dp)):.3f}")
 print(f"Max |TD - DP|  = {np.max(np.abs(V_td - V_dp)):.3f}")
 ```

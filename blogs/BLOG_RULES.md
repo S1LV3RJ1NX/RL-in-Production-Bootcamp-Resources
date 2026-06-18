@@ -144,6 +144,11 @@ carries its own real publish date, so the series never shows every entry on the 
   $\pi$ policy, $r$/$R$ reward, $G_t$ return, $V$/$Q$ value, $\gamma$ discount,
   $\alpha$ step size, $\mathbb{E}$ expectation, $s,a,s'$ state/action/next-state.
 - Keep equations small and frequent rather than one giant block.
+- **Every display equation gets a plain-English interpretation.** Right after `$$…$$`, add a
+  sentence (or short paragraph) that reads the equation aloud: name each symbol, say what the
+  result *means*, and state what goes up or down when something changes. The reader should never
+  see a formula without a "Read it as: …" or equivalent explanation immediately below it.
+  (Intermediate algebra steps in a derivation chain can share one interpretation at the end.)
 
 ---
 
@@ -272,6 +277,7 @@ Geist / Geist Mono — so figures and site share one visual language.
 - [ ] Check summaries are untagged (`Check:` + question only); revealed answers lead with a bold `Answer.`/`Explanation.` (§1b).
 - [ ] Frontmatter complete (`title`, `shortName`, `date`, `summary`, `tags`, `order`); `date` is today's real publish date, not copied from the skeleton or a sibling post (§3).
 - [ ] Every symbol defined on first use; one clean derivation, no proof dumps.
+- [ ] Every display equation has a plain-English interpretation right after it (§4).
 - [ ] At least one hand-worked numeric example per key formula.
 - [ ] Figures: `ai-*` for concepts, `fig-*.svg` for numbers; all have alt text and relative paths.
 - [ ] `figures.py` regenerates all `fig-*.svg` for the post with no errors.
