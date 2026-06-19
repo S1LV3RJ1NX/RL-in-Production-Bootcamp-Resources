@@ -501,6 +501,12 @@ TD converges closer to the DP answer with less noise: it updates 25 states per e
 **Answer.** With **MC**, only at the **end of the episode**: the preceding state's value waits for the full return $G_t$, which doesn't exist until the run is over. With **TD**, **immediately on that step**: the $-10$ enters $r + \gamma V(s')$ for the transition into the crater, so the state before it is corrected one step later instead of one episode later.
 </details>
 
+<details>
+<summary><strong>Check:</strong> The TD target r + gamma V(s') is a "proxy" for the true return G. It is an approximation because V(s') starts wrong. So why does repeatedly using this noisy proxy converge to the correct values?</summary>
+
+**Answer.** Because the proxy is grounded in the Bellman equation: if $V$ were correct, $r + \gamma V(s')$ would equal the true expected return exactly. Each update nudges $V$ a fraction $\alpha$ toward that proxy, and as $V$ improves, the proxy improves too. The errors shrink in a virtuous circle, and under standard conditions (enough visits, a decaying step size) the process converges to the unique fixed point of the Bellman equation, the true value function.
+</details>
+
 ### 2.5 The DP / MC / TD Tradeoff
 
 | Property | DP | MC | TD |
@@ -556,6 +562,12 @@ That leap (TD + Q-values + $\max_{a'}$) is **Q-learning**, the subject of [SARSA
 <summary><strong>Check:</strong> Next we replace the value table with a neural network. Which term in the TD update R + γV(s′) − V(s) becomes the "loss" we minimize?</summary>
 
 **Answer.** The **TD error** itself, $R + \gamma V(s') - V(s)$. We turn the target $R + \gamma V(s')$ into a regression label and minimize the *squared* TD error. That squared error is precisely the DQN loss in the next post.
+</details>
+
+<details>
+<summary><strong>Check:</strong> A chess player who never improves still has a value function. What does "prediction" (evaluate) mean for that player, and how does "control" go one step further?</summary>
+
+**Answer.** Prediction asks: "given this player's fixed, possibly terrible style, what is the expected outcome from each board position?" The policy stays frozen; we just score it. Control asks: "can we improve the style itself?" It checks whether any action beats the current value, updates the policy, re-evaluates, and repeats. Prediction tells you how good your habits are; control changes them.
 </details>
 
 ---

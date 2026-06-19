@@ -254,6 +254,12 @@ That one symbol has a name:
 **Answer.** Via **GLIE** (Greedy in the Limit with Infinite Exploration): keep visiting every $(s,a)$, but anneal $\epsilon \to 0$. As exploration vanishes, the policy SARSA is honest about slides from "$\epsilon$-greedy" to "greedy," and tabular SARSA converges to the same $Q^*$ Q-learning targets directly. Q-learning gets there with a *fixed* $\epsilon$; SARSA has to turn its exploration off first.
 </details>
 
+<details>
+<summary><strong>Check:</strong> MC, TD, SARSA, and Q-learning are four algorithms, but they all grow from one formula by changing one piece at a time. Can you write the four-step chain?</summary>
+
+**Answer.** Start with the MC update: $V(s) \leftarrow V(s) + \alpha[G - V(s)]$. (1) Replace the full return $G$ with the one-step bootstrap $r + \gamma V(s')$: that is **TD**. (2) Replace $V$ with $Q$ on both sides, so the target uses the next action $a'$ actually taken: that is **SARSA**. (3) Replace $Q(s', a')$ with $\max_{a'} Q(s', a')$, taking the best next action regardless of what you did: that is **Q-learning**. Four algorithms, one formula, three substitutions.
+</details>
+
 ### 2.5 From a table to a network
 
 CliffWalking has 48 states, so a $48\times4$ table fits easily. But a real robot sees a camera image; a single $84\times84$ Atari frame has more possible values than there are atoms in the universe. **You cannot store a row per state.**

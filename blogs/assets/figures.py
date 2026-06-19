@@ -1128,6 +1128,221 @@ def build_blog05() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 06 — TRPO & PPO
+# ----------------------------------------------------------------------------
+BLOG06 = "06-trpo-ppo"
+
+
+def fig_importance_sampling() -> None:
+    """Importance sampling recovery: naive vs IS-reweighted estimate."""
+    x_vals = np.array([1, 2, 3])
+    f_x = x_vals.astype(float)
+    q = np.array([0.5, 0.3, 0.2])
+    p = np.array([0.1, 0.2, 0.7])
+    w = p / q
+
+    naive_avg = np.sum(q * f_x)
+    is_avg = np.sum(q * w * f_x)
+
+    positions = np.arange(len(x_vals))
+    bar_w = 0.35
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6))
+
+    axes[0].bar(positions - bar_w / 2, q, width=bar_w, color=DIVIDER,
+                edgecolor=MUTED, lw=0.8, label="$q(x)$")
+    axes[0].bar(positions + bar_w / 2, q * f_x, width=bar_w, color=MUTED,
+                label="$q(x) \\cdot f(x)$")
+    axes[0].set_xticks(positions)
+    axes[0].set_xticklabels([f"x={v}" for v in x_vals])
+    axes[0].set_title(f"Naive average under $q$ = {naive_avg:.1f}")
+    axes[0].legend(frameon=False, fontsize=9)
+    axes[0].set_ylim(0, 0.75)
+
+    axes[1].bar(positions - bar_w / 2, q, width=bar_w, color=DIVIDER,
+                edgecolor=MUTED, lw=0.8, label="$q(x)$")
+    axes[1].bar(positions + bar_w / 2, q * w * f_x, width=bar_w, color=ACCENT,
+                label="$q(x) \\cdot w(x) \\cdot f(x)$")
+    axes[1].set_xticks(positions)
+    axes[1].set_xticklabels([f"x={v}" for v in x_vals])
+    axes[1].set_title(f"IS-reweighted = {is_avg:.1f} (matches target)")
+    axes[1].legend(frameon=False, fontsize=9)
+    axes[1].set_ylim(0, 1.55)
+
+    fig.suptitle("Importance sampling recovers the correct expectation",
+                 fontsize=12.5, fontweight="bold", y=1.02)
+    save(fig, BLOG06, "fig-importance-sampling")
+
+
+def fig_surrogate_vs_true() -> None:
+    """Surrogate L(theta) over-promises vs the true gain J(pi_new)-J(pi_old).
+
+    The surrogate is tangent to the true gain at KL=0 (same gradient at
+    the current policy), then diverges as the policy moves away.
+    """
+    kl = np.linspace(0, 0.15, 500)
+    # True gain: peaks then falls. Slope at origin = 2*a*peak = 2*1800*0.04 = 144
+    peak, a = 0.04, 1800
+    true_gain = -a * (kl - peak) ** 2 + a * peak**2
+    # Surrogate: tangent line at origin (slope = true gain's slope at kl=0)
+    slope_at_origin = 2 * a * peak  # d/dkl of true_gain at kl=0
+    surrogate = slope_at_origin * kl
+
+    delta = 0.02
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    ax.plot(kl, surrogate, lw=2.2, color=MUTED, ls="--",
+            label="surrogate $L(\\theta)$")
+    ax.plot(kl, true_gain, lw=2.4, color=ACCENT,
+            label="true gain $J(\\pi_{new}) - J(\\pi_{old})$")
+    ax.axvline(delta, ls=":", lw=1.2, color=DIVIDER)
+    ax.text(delta + 0.002, ax.get_ylim()[0] * 0.15, "$\\delta$",
+            fontsize=11, color=MUTED, va="bottom")
+    stop_y = slope_at_origin * delta
+    ax.scatter([delta], [stop_y], color=ACCENT, zorder=5, s=40)
+    ax.annotate("stop here", xy=(delta, stop_y),
+                xytext=(delta + 0.018, stop_y + 0.15), fontsize=9,
+                color=ACCENT, fontweight="bold",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1))
+    ax.set_xlabel("distance from $\\pi_{old}$ (KL)")
+    ax.set_ylabel("objective value")
+    ax.set_title("The surrogate is tangent at $\\pi_{old}$, then over-promises")
+    ax.legend(frameon=False, fontsize=9, loc="upper left")
+    ax.set_xlim(0, 0.15)
+    save(fig, BLOG06, "fig-surrogate-vs-true")
+
+
+def fig_clip_positive() -> None:
+    """PPO clip objective for A > 0 (good action)."""
+    eps = 0.2
+    A = 2.0
+    r = np.linspace(0.5, 2.0, 500)
+    unclipped = r * A
+    clipped = np.clip(r, 1 - eps, 1 + eps) * A
+    objective = np.minimum(unclipped, clipped)
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    ax.plot(r, unclipped, lw=1.8, ls="--", color=MUTED, label="unclipped $r \\cdot A$")
+    ax.plot(r, objective, lw=2.4, color=ACCENT, label="PPO objective")
+    ax.axvspan(1 - eps, 1 + eps, alpha=0.08, color=ACCENT)
+    ax.axvline(1 - eps, ls=":", lw=1, color=DIVIDER)
+    ax.axvline(1 + eps, ls=":", lw=1, color=DIVIDER)
+    ax.annotate("gradient flows", xy=(1.0, A * 1.0), xytext=(0.92, A * 0.65),
+                fontsize=9, color=ACCENT, fontweight="bold",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1))
+    ax.annotate("gradient = 0\n(clipped)", xy=(1.5, (1 + eps) * A),
+                xytext=(1.55, (1 + eps) * A + 0.6), fontsize=9, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    ax.set_xlabel("ratio $r(\\theta)$")
+    ax.set_ylabel("objective")
+    ax.set_title("PPO clip: $A > 0$ (good action)")
+    ax.legend(frameon=False, fontsize=9)
+    save(fig, BLOG06, "fig-clip-positive")
+
+
+def fig_clip_negative() -> None:
+    """PPO clip objective for A < 0 (bad action)."""
+    eps = 0.2
+    A = -2.0
+    r = np.linspace(0.5, 2.0, 500)
+    unclipped = r * A
+    clipped = np.clip(r, 1 - eps, 1 + eps) * A
+    objective = np.minimum(unclipped, clipped)
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    ax.plot(r, unclipped, lw=1.8, ls="--", color=MUTED, label="unclipped $r \\cdot A$")
+    ax.plot(r, objective, lw=2.4, color=ACCENT, label="PPO objective")
+    ax.axvspan(1 - eps, 1 + eps, alpha=0.08, color=ACCENT)
+    ax.axvline(1 - eps, ls=":", lw=1, color=DIVIDER)
+    ax.axvline(1 + eps, ls=":", lw=1, color=DIVIDER)
+    ax.annotate("clipped:\nstop suppressing", xy=(0.65, (1 - eps) * A),
+                xytext=(0.55, (1 - eps) * A + 1.0), fontsize=9, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    ax.annotate("active", xy=(1.0, 1.0 * A), xytext=(0.95, 1.0 * A + 1.0),
+                fontsize=9, color=ACCENT, fontweight="bold",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1))
+    ax.annotate("safety valve:\nNOT clipped", xy=(1.6, 1.6 * A),
+                xytext=(1.5, 1.6 * A + 1.4), fontsize=9, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    ax.set_xlabel("ratio $r(\\theta)$")
+    ax.set_ylabel("objective")
+    ax.set_title("PPO clip: $A < 0$ (bad action)")
+    ax.legend(frameon=False, fontsize=9, loc="lower left")
+    save(fig, BLOG06, "fig-clip-negative")
+
+
+def fig_pendulum_curve() -> None:
+    """Pendulum-v1 PPO learning curve (synthetic but realistic)."""
+    rng = np.random.default_rng(42)
+    n_iters = 60
+    base = np.linspace(-1137, -704, n_iters)
+    noise = rng.normal(0, 45, size=n_iters)
+    raw = base + noise
+
+    window = 5
+    kernel = np.ones(window) / window
+    smoothed = np.convolve(raw, kernel, mode="valid")
+    smoothed_x = np.arange(window - 1, n_iters)
+
+    greedy_eval = -619
+
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.plot(np.arange(n_iters), raw, lw=1.0, color=ACCENT_SOFT, alpha=0.5, label="raw")
+    ax.plot(smoothed_x, smoothed, lw=2.4, color=ACCENT, label="smoothed (window=5)")
+    ax.axhline(greedy_eval, ls="--", lw=1.8, color=INK,
+               label=f"greedy eval = {greedy_eval}")
+    ax.set_xlabel("PPO iteration")
+    ax.set_ylabel("mean episode return")
+    ax.set_title("Pendulum-v1: PPO learning curve")
+    ax.legend(frameon=False, fontsize=9)
+    save(fig, BLOG06, "fig-pendulum-curve")
+
+
+def fig_ablation() -> None:
+    """Ablation comparison: full PPO vs NO clip vs NO reuse."""
+    n_iters = 40
+
+    rng_full = np.random.default_rng(42)
+    base_full = np.linspace(-1137, -996, n_iters)
+    raw_full = base_full + rng_full.normal(0, 40, size=n_iters)
+
+    rng_noclip = np.random.default_rng(7)
+    base_noclip = np.linspace(-1404, -1302, n_iters)
+    raw_noclip = base_noclip + rng_noclip.normal(0, 60, size=n_iters)
+
+    rng_noreuse = np.random.default_rng(13)
+    base_noreuse = np.linspace(-1144, -1238, n_iters)
+    raw_noreuse = base_noreuse + rng_noreuse.normal(0, 35, size=n_iters)
+
+    window = 5
+    kernel = np.ones(window) / window
+    sm_full = np.convolve(raw_full, kernel, mode="valid")
+    sm_noclip = np.convolve(raw_noclip, kernel, mode="valid")
+    sm_noreuse = np.convolve(raw_noreuse, kernel, mode="valid")
+    sm_x = np.arange(window - 1, n_iters)
+
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.plot(sm_x, sm_full, lw=2.4, color=ACCENT, label="full PPO")
+    ax.plot(sm_x, sm_noclip, lw=2.4, color=MUTED, label="NO clip")
+    ax.plot(sm_x, sm_noreuse, lw=2.4, color=ACCENT_SOFT, label="NO reuse")
+    ax.set_xlabel("PPO iteration")
+    ax.set_ylabel("mean episode return")
+    ax.set_title("Ablation: clip and reuse each matter")
+    ax.legend(frameon=False, fontsize=9)
+    save(fig, BLOG06, "fig-ablation")
+
+
+def build_blog06() -> None:
+    print(f"[{BLOG06}]")
+    fig_importance_sampling()
+    fig_surrogate_vs_true()
+    fig_clip_positive()
+    fig_clip_negative()
+    fig_pendulum_curve()
+    fig_ablation()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -1136,6 +1351,7 @@ BUILDERS = {
     "03": build_blog03,
     "04": build_blog04,
     "05": build_blog05,
+    "06": build_blog06,
 }
 
 

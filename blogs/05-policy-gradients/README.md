@@ -458,6 +458,12 @@ The near-optimal constant baseline is approximately the average return, $b^* \ap
 **Answer.** Because the score function divides by $\pi(a)$: an action with $\pi(a) = 0$ makes $\nabla \log \pi$ blow up and can never be sampled or learned about. Policies should keep every probability strictly positive during training (e.g. via entropy regularization, or a softmax that never fully saturates) so every action stays explorable and the gradient stays well-defined.
 </details>
 
+<details>
+<summary><strong>Check:</strong> An LLM's final layer is a softmax over 50,000 token logits, exactly like our Archer's 9-angle softmax. If a generated answer earns a positive reward, what does REINFORCE do to the token probabilities, and how is it the same push/pull we just derived?</summary>
+
+**Answer.** Exactly the same mechanics: for each token the model produced, a positive advantage pushes that token's logit up ($\partial \log\pi / \partial z_a = 1 - \pi(a) > 0$) and pushes every other token's logit down ($-\pi(a_k)$). The only differences are scale (50K actions instead of 9) and the fact that the reward arrives at the end of a whole sequence, not one shot. This is the core of RLHF and PPO for LLMs, which the [TRPO & PPO](../06-trpo-ppo/README.md) post covers in full.
+</details>
+
 ### 2.7 Adding states: from bandit to MDP
 
 So far the Archer stood at one fixed spot and took one shot. Now we let it walk. The instant an action changes what happens next, the bandit becomes a full sequential problem.
@@ -770,6 +776,12 @@ The Actor-Critic reaches a greedy return near the maximum possible score. The cr
 <summary><strong>Check:</strong> Actor-Critic can update every step, but REINFORCE must wait for the episode to end. Which property of the advantage makes online updates possible?</summary>
 
 **Answer.** Bootstrapping: the advantage uses $V(s')$, a one-step estimate of the future, instead of the full return $G_t$. You do not need the rest of the episode, just the next state's value, so you can update immediately after each transition.
+</details>
+
+<details>
+<summary><strong>Check:</strong> Actor-Critic adds a critic network and reduces variance. Yet plain REINFORCE (no critic) is used in production for tasks like text-to-SQL. Why would the simpler algorithm ever be preferred?</summary>
+
+**Answer.** When episodes are short, reward is sparse but clear (the SQL query either runs correctly or not), and the action space is small enough that variance is manageable, the extra complexity of training a critic is not worth the engineering cost. REINFORCE is dead simple to implement, and for tasks with a strong binary signal at episode end, its high variance is tolerable because the reward already tells you whether the output was right or wrong.
 </details>
 
 ### 2.10 A note on continuous actions

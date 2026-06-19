@@ -14,6 +14,7 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 03 | [DP, Monte Carlo, and TD: Three Ways to Solve the Bellman Equation](./03-dp-mc-td/) | ✅ Draft |
 | 04 | [SARSA, Q-learning, and DQN: From a Table to a Network That Plays Atari](./04-sarsa-qlearning-dqn/) | ✅ Draft |
 | 05 | [Policy Gradients: Learning the Policy Directly, from a Bandit to Actor-Critic](./05-policy-gradients/) | ✅ Draft |
+| 06 | [TRPO and PPO: The Largest Safe Step a Policy Can Take](./06-trpo-ppo/) | ✅ Draft |
 
 ## Writing a new post
 
