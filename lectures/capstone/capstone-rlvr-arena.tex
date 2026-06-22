@@ -1,0 +1,374 @@
+% RL in Production — Capstone Project: The RLVR Arena
+% Vizuara AI Labs · compile with XeLaTeX
+%   xelatex capstone-rlvr-arena.tex   (run twice)
+\documentclass[11pt]{article}
+\usepackage{fontspec}
+\usepackage[a4paper, margin=1.9cm, top=2.0cm, bottom=2.2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[most]{tcolorbox}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{microtype}
+\usepackage{fancyvrb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+% ── Palette ──────────────────────────────────────────────────────────────────
+\definecolor{cream}{HTML}{F7F3EC}
+\definecolor{paper}{HTML}{FBF8F2}
+\definecolor{ink}{HTML}{2B2B2B}
+\definecolor{ink2}{HTML}{55514A}
+\definecolor{ink3}{HTML}{8A8475}
+\definecolor{indigo}{HTML}{4C5B9A}
+\definecolor{amber}{HTML}{C8851B}
+\definecolor{mint}{HTML}{4E8D6E}
+\definecolor{rose}{HTML}{B5566B}
+\definecolor{plum}{HTML}{6B4E7E}
+\pagecolor{cream}\color{ink}
+
+% ── Fonts ────────────────────────────────────────────────────────────────────
+\setmainfont{Charter}[Numbers=OldStyle, Ligatures=TeX]
+\newfontfamily\sans{Avenir Next}[Ligatures=TeX]
+\newfontfamily\sansbold{Avenir Next}[UprightFont={* Bold}, Ligatures=TeX]
+\newfontfamily\sanstrack{Avenir Next}[LetterSpace=14.0, Ligatures=TeX]
+\setmonofont{Menlo}[Scale=0.78]
+
+% ── Commands ─────────────────────────────────────────────────────────────────
+\newcommand{\eyebrow}[1]{{\sanstrack\footnotesize\color{ink3}\MakeUppercase{#1}}\par\vspace{0.2em}}
+\newcommand{\pts}[1]{{\sans\footnotesize\color{amber}\textbf{[#1]}}}
+\newcommand{\provided}{{\sans\footnotesize\color{mint}\textbf{[\,PROVIDED\,]}}}
+\newcommand{\todotag}[1]{{\sans\footnotesize\color{rose}\textbf{[\,TODO #1\,]}}}
+\newcommand{\lbtag}{{\sans\footnotesize\color{plum}\textbf{[\,LEADERBOARD\,]}}}
+\newcommand{\codesm}[1]{{\ttfamily\footnotesize #1}}
+
+% ── Section style ─────────────────────────────────────────────────────────────
+\titleformat{\section}{\sansbold\Large\color{ink}}{}{0pt}{}[\vspace{-0.4em}{\color{ink3}\rule{\textwidth}{0.4pt}}]
+\titleformat{\subsection}{\sansbold\normalsize\color{ink2}}{}{0pt}{}
+\titlespacing{\section}{0pt}{1.4em}{0.5em}
+\titlespacing{\subsection}{0pt}{0.9em}{0.3em}
+\setlength{\parindent}{0pt}\setlength{\parskip}{0.48em}\linespread{1.07}
+
+% ── Boxes ────────────────────────────────────────────────────────────────────
+\newtcolorbox{qbox}[1]{enhanced, colback=paper, colframe=#1, boxrule=0pt,
+  leftrule=3pt, arc=2mm, left=5mm, right=5mm, top=2.5mm, bottom=2.5mm, breakable}
+\newtcolorbox{deliver}{enhanced, colback=mint!8, colframe=mint, boxrule=0pt,
+  leftrule=3pt, arc=2mm, left=5mm, right=5mm, top=2.2mm, bottom=2.2mm, breakable}
+\newtcolorbox{warn}{enhanced, colback=amber!7, colframe=amber, boxrule=0pt,
+  leftrule=3pt, arc=2mm, left=5mm, right=5mm, top=2.2mm, bottom=2.2mm, breakable}
+\newtcolorbox{herobox}{enhanced, colback=indigo!7, colframe=indigo, boxrule=0pt,
+  leftrule=3pt, arc=2mm, left=6mm, right=6mm, top=3mm, bottom=3mm, breakable}
+\DefineVerbatimEnvironment{code}{Verbatim}{fontsize=\footnotesize, frame=leftline,
+  framerule=0.6pt, rulecolor=\color{ink3}, framesep=7pt, baselinestretch=0.96}
+
+% ── Header / footer ──────────────────────────────────────────────────────────
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.3pt}
+\fancyhead[L]{\sans\footnotesize\color{ink3} RL in Production · Capstone Project}
+\fancyhead[R]{\sans\footnotesize\color{ink3} Vizuara AI Labs}
+\fancyfoot[C]{\sans\footnotesize\color{ink3}\thepage}
+
+\hypersetup{colorlinks=true,linkcolor=indigo,urlcolor=indigo,
+  pdftitle={RL Capstone — The RLVR Arena},pdfauthor={Vizuara AI Labs}}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+\thispagestyle{empty}
+
+\vspace*{0.3cm}
+\eyebrow{RL in Production \ \textbullet\ \ Vizuara AI Labs \ \textbullet\ \ Capstone Project}
+\vspace{0.3cm}
+
+{\fontsize{28}{33}\selectfont \textbf{The RLVR Arena}\par}
+\vspace{0.2cm}
+{\fontsize{14}{18}\selectfont\color{ink2}\itshape
+Train a language model with GRPO to solve Countdown number puzzles.
+Submit your checkpoint. It gets re-run on a secret test set.
+The result goes on a leaderboard.\par}
+
+\vspace{0.5cm}{\color{ink3}\rule{\textwidth}{0.4pt}}\vspace{0.3cm}
+
+\begin{herobox}
+\textbf{The throughline of this entire series closes here.}
+Every lecture traced one recursion: $V(s) = r + \gamma V(s')$.
+We solved it with dynamic programming (L1), approximated it with a neural network (L2),
+climbed it directly with policy gradients (L3), stabilised the climb with PPO's clip (L4),
+and applied it to a language model with RLHF (L5).
+In L6 we stripped away the critic entirely and replaced it with a group of sampled answers ---
+that was GRPO.
+Now you implement it for real, on a real model, on a real verifiable task,
+and compete on a leaderboard.
+\end{herobox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Task --- Countdown}
+
+You are given a list of numbers and a target.
+Combine \textbf{all} the numbers --- each used exactly once --- with $+\,-\,\times\,\div$ and parentheses to reach the target.
+
+\begin{qbox}{indigo}
+\textbf{Example.} \quad Numbers: \textbf{3, 7, 8, 2} \quad Target: \textbf{24}
+
+\vspace{0.3em}
+\hspace{2em}$\underbrace{(8 - 2)}_6 \times \underbrace{(7 - 3)}_4 = 24$ \quad\checkmark
+\quad uses 8, 2, 7, 3 exactly once.
+
+\vspace{0.3em}
+Your model must reason inside \codesm{<think>\,\ldots\,</think>} and give its final expression inside \codesm{<answer>\,\ldots\,</answer>}.
+That is the entire output contract.
+\end{qbox}
+
+\textbf{Why this task?}
+Correctness is a five-line arithmetic checker --- no LLM judge, no rubric, no human in the loop.
+The task is combinatorial so there is nothing to memorise from the training set.
+And a 0.5B model that has never seen this task goes from near-zero to genuine reasoning under GRPO ---
+that is the ``aha moment'' you are here to produce.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{What You Implement}
+
+Open \codesm{train\_grpo.py}. Two functions are marked \todotag{}: everything else is \provided.
+
+\subsection{TODO 1 --- Group-Relative Advantage \pts{12}}
+
+\begin{qbox}{rose}
+\textbf{Input.} A flat tensor of rewards of shape $[\textit{num\_puzzles} \times \textit{group}]$,
+where the $k$ completions for each puzzle are grouped consecutively.
+
+\textbf{Output.} An advantage tensor of the same shape.
+
+The single idea of L6: within each group, how much better (or worse) was this answer compared to
+the \emph{rest of the group}?
+That relative score --- not the absolute reward --- is the advantage.
+No critic. No baseline model. Just the group.
+
+Review the L6 slides before writing this function.
+\end{qbox}
+
+\subsection{TODO 2 --- GRPO Loss \pts{13}}
+
+\begin{qbox}{rose}
+\textbf{Inputs.} Per-token log-probs under the policy ($\log\pi_\theta$),
+the behaviour policy ($\log\pi_{\text{old}}$), and the frozen reference ($\log\pi_{\text{ref}}$);
+a completion mask; and the sequence-level advantages from TODO~1.
+
+\textbf{Output.} A scalar loss.
+
+Two ideas from lecture combine here:
+\begin{itemize}[itemsep=1pt]
+  \item \textbf{L4 (PPO):} the clipped importance-sampling surrogate.
+        Compute per-token probability ratios and clip them so no single step moves too far.
+  \item \textbf{L5 (RLHF):} a KL penalty to the frozen reference keeps the model from
+        drifting away from its starting point.
+\end{itemize}
+Average the per-token objective over actual completion tokens (use the mask).
+Return the \emph{negative} (you minimise; gradient ascent happens automatically).
+The KL estimator to use is the k3 form from the GRPO paper:
+$\exp(\log\pi_{\text{ref}} - \log\pi_\theta) - (\log\pi_{\text{ref}} - \log\pi_\theta) - 1$.
+\end{qbox}
+
+\textbf{That is all.}
+The rollout (sampling a group of completions and computing rewards), the per-token log-prob helper,
+the training loop, checkpointing, and evaluation harness are fully provided.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Files You Are Given}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\ttfamily\footnotesize}l p{10.2cm}}
+\toprule
+\normalfont\textbf{File} & \textbf{Purpose} \\
+\midrule
+countdown.py     & The task engine. Contains the exact verifier used to score your submission.
+                   Read it --- especially \codesm{verify()} and \codesm{reward()}. \\
+train\_grpo.py   & GRPO training starter. Fill the two \todotag{} functions. Everything else runs. \\
+run\_model.py    & Turn a saved checkpoint into \codesm{predictions.jsonl} for self-scoring. \\
+evaluate.py      & Score a predictions file $\to$ accuracy breakdown. Run this on \codesm{dev\_public}
+                   to see your number before submitting. \\
+data/train.jsonl & 4\,000 puzzles to train on (easy / medium / hard mix). \\
+data/dev\_public.jsonl & 300 puzzles to self-score.
+                   The leaderboard uses the \emph{same metric} on a larger held-out set. \\
+requirements.txt & Python dependencies. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{qbox}{mint}
+\textbf{Quick start.}
+\begin{code}
+pip install -r requirements.txt
+
+# Smoke-test (CPU, tiny model, 2 steps -- proves your code runs):
+python train_grpo.py --model sshleifer/tiny-gpt2 \
+    --steps 2 --group 4 --bsz 2 --smoke
+
+# Self-score on the public dev set:
+python run_model.py --model ./model \
+    --test data/dev_public.jsonl --out dev_preds.jsonl
+python evaluate.py --test data/dev_public.jsonl \
+    --predictions dev_preds.jsonl --name yourname
+\end{code}
+\end{qbox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Base Model and the Rules}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.32}
+\begin{tabular}{l p{10.5cm}}
+\toprule
+\textbf{Rule} & \textbf{Detail} \\
+\midrule
+Base model & \codesm{Qwen/Qwen2.5-0.5B-Instruct} (frozen starting point, no exceptions) \\
+Method & GRPO or any policy-gradient RL you implement. \textbf{No SFT on solution traces}
+         --- the dataset contains only puzzles, no worked answers. \\
+No tools & The model reasons in tokens only. No calculator, no code execution, no API calls. \\
+Eval config & Greedy decode, \codesm{max\_new\_tokens=640}, the canonical prompt in \codesm{countdown.py} ---
+             identical for everyone. Deterministic $\Rightarrow$ reproducible $\Rightarrow$ fair. \\
+Open track & Optional: any base model $\leq 3$B, ranked on a separate board.
+             Your reward curve must show GRPO is doing the work. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{warn}
+\textbf{Fixed base model = fixed starting line.}
+The leaderboard measures your \emph{RL}, not who has the bigger GPU or a stronger base.
+Everyone starts from exactly the same 0.5B checkpoint.
+\end{warn}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{The Leaderboard \lbtag}
+
+You submit a checkpoint. We load it, run \codesm{run\_model.py} on a \textbf{private test set you have never seen}, and \codesm{evaluate.py} produces the official score. Your self-reported accuracy is never trusted --- only the re-run counts.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.32}
+\begin{tabular}{l l p{7.5cm}}
+\toprule
+\textbf{Rank key} & \textbf{Metric} & \textbf{Notes} \\
+\midrule
+\textbf{Primary} \lbtag & Accuracy on full private test & The headline number \\
+Tie-break 1 & Accuracy on \textit{hard} split (5 numbers) & Rewards genuine reasoning \\
+Tie-break 2 & Avg tokens when correct (fewer wins) & Efficiency, no rambling \\
+Diagnostic & Format compliance rate & Did it learn the protocol? \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Reference points seeded on the board:} (1) the untrained base model (the floor --- beat this to pass), and (2) a reference GRPO run (the target --- beat this to compete).
+
+\begin{qbox}{plum}
+\textbf{The cold-start warning.}
+GRPO typically shows \emph{near-zero accuracy for the first 400--600 steps} --- this is normal.
+The model is learning the output format before it can reason.
+The ``aha moment'' (reward suddenly climbing) arrives between step 600 and 1\,000 for most correct implementations.
+Do not panic if your curve is flat early.
+Run longer if you can.
+\end{qbox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{What to Submit}
+
+\begin{deliver}
+\begin{enumerate}[leftmargin=1.5em, itemsep=3pt]
+  \item \textbf{\codesm{model/}} --- your fine-tuned checkpoint.
+        Must load with \codesm{AutoModelForCausalLM.from\_pretrained("./model")}.
+        Full weights \emph{or} a LoRA adapter with the base model ID.
+  \item \textbf{\codesm{dev\_preds.jsonl}} --- your predictions on \codesm{dev\_public.jsonl},
+        generated by \codesm{run\_model.py}. Used for a reproducibility check:
+        re-running your checkpoint must give the same accuracy within~$\pm 0.3\%$.
+  \item \textbf{\codesm{train\_grpo.py}} --- your filled-in training code.
+        The TODOs must be implemented; the rest may be modified.
+  \item \textbf{\codesm{reward\_curve.png}} --- a plot of mean reward vs.\ training step.
+        Export it from your training log.
+  \item \textbf{Report ($\leq 1$ page)} --- what you tried, the reward curve interpreted,
+        one ablation (e.g.\ group size, KL $\beta$, learning rate), one failure mode you encountered.
+\end{enumerate}
+\end{deliver}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Grading}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l r}
+\toprule
+\textbf{Component} & \textbf{Points} \\
+\midrule
+Working checkpoint: loads, runs, and beats the untrained floor & 40 \\
+GRPO implemented correctly (both TODOs, read in your code) & 25 \\
+Report: reward curve + one ablation + one failure mode & 20 \\
+Reproducibility: \codesm{dev\_preds} match our re-run of your checkpoint & 10 \\
+Leaderboard placement (top 3 gets full 5; everyone who submits gets 3) & 5 \\
+\midrule
+\textbf{Total} & \textbf{100} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Compute}
+
+\begin{qbox}{indigo}
+\textbf{Colab T4 (free).}
+The 0.5B model fits on a 16\,GB T4 at \codesm{float16}.
+Use \codesm{--group 4 --bsz 4} (16 sequences per step).
+Call \codesm{model.gradient\_checkpointing\_enable()} after loading to halve activation memory.
+Checkpoint to Drive to survive disconnects.
+One full run at 1\,000 steps takes roughly 2--3 hours.
+
+\vspace{0.4em}
+\textbf{Modal (recommended).}
+You have access to the \codesm{teamvizuara} Modal profile --- token and instructions are on the course portal.
+Use \codesm{A10G} (\codesm{gpu="A10G"}) with \codesm{--group 8 --bsz 2}.
+A 1\,000-step run finishes in about 2 hours.
+\end{qbox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Timeline}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.32}
+\begin{tabular}{l p{11cm}}
+\toprule
+\textbf{Day} & \textbf{Milestone} \\
+\midrule
+1 & Run the smoke-test (CPU, tiny-gpt2, 2 steps). Read \codesm{countdown.py} end to end.
+    Run the \emph{untrained} base model through \codesm{evaluate.py} on dev --- see the floor. \\
+2--3 & Implement both TODOs. Run on easy puzzles only (\codesm{data/train.jsonl} filtered).
+       Get the reward moving. \\
+4--5 & Full difficulty mix. Tune: group size, KL $\beta$, learning rate. Log everything. \\
+6 & Lock a checkpoint. Generate \codesm{dev\_preds.jsonl}. Write the report. \\
+7 & Submit. Leaderboard goes live. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{One last thing}
+
+\vfill
+The verifier in \codesm{countdown.py} uses \emph{exact rational arithmetic} (\codesm{fractions.Fraction})
+and a whitelisted-AST evaluator --- it never calls \codesm{eval()} on your model's output.
+A model that tries to write \codesm{\_\_import\_\_('os').system('...')} inside its \codesm{<answer>}
+tag gets scored \emph{invalid}, not executed.
+This is a good design principle to carry forward.
+
+Good luck.
+The throughline was $V(s) = r + \gamma V(s')$.
+Now make it real.
+
+\vspace{0.5cm}
+{\color{ink3}\rule{\textwidth}{0.4pt}}
+\vspace{0.1cm}
+{\sans\footnotesize\color{ink3}
+All code lives at \texttt{github.com/VizuaraAI/RL-in-Production-Bootcamp-Resources/lectures/capstone/}.
+Questions in the course channel. \quad Vizuara AI Labs · 2026.}
+
+\end{document}
