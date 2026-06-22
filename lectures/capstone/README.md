@@ -66,14 +66,25 @@ The dev accuracy you see is the same metric used for the leaderboard. Your self-
 
 ---
 
-## What to submit
+## How to submit
 
-1. `model/` — your checkpoint (`AutoModelForCausalLM.from_pretrained` must work)
-2. `dev_preds.jsonl` — predictions on `dev_public.jsonl`
-3. `train_grpo.py` — your filled-in training code
-4. `reward_curve.png` + a ≤1-page report (what you tried, one ablation, one failure mode)
+**Email [rajatdandekar@vizuara.com](mailto:rajatdandekar@vizuara.com)** with the subject line:
+`[RLVR Capstone] <Your Name> — <self-reported dev accuracy>%`
 
-See `CAPSTONE.md` for the full rubric.
+For example: `[RLVR Capstone] Alice Sharma — 14.3%`
+
+Include in the email:
+
+1. **Your self-reported dev accuracy** — run `evaluate.py` on `dev_public.jsonl` and paste the output.
+2. **HuggingFace Hub link to your model** — upload your `model/` folder to a free HF repo (`huggingface-cli upload yourname/grpo-countdown ./model`) and share the URL. The checkpoint must load with `AutoModelForCausalLM.from_pretrained`.
+3. **`dev_preds.jsonl`** — attach the file directly (it's small, ~300 lines).
+4. **`train_grpo.py`** — your filled-in training code (the two TODOs implemented).
+5. **`reward_curve.png`** — a plot of mean reward vs. training step from your training logs.
+6. **≤ 1-page report** — what you tried, one ablation, one failure mode. PDF or plain text is fine.
+
+> Your self-reported accuracy is **never** the official score. Once your email arrives, your checkpoint gets re-run on a **private held-out test set** using the exact same `run_model.py` and `evaluate.py`. That number goes on the leaderboard — not what you report.
+
+See `CAPSTONE.md` for the full rubric and grading breakdown.
 
 ---
 
