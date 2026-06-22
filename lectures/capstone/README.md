@@ -81,7 +81,7 @@ See `CAPSTONE.md` for the full rubric.
 
 **Colab T4 (free):** the 0.5B model fits at float16. Use `--group 4 --bsz 4`. Checkpoint to Drive to survive disconnects.
 
-**Modal (recommended):** the reference run uses `A10G`. You have access via the `teamvizuara` profile — see the course resources for the token.
+**Modal (if you have an account):** free account at modal.com, run `modal token new` once, then use `A10G` with `--group 8 --bsz 2`. A 1,000-step run takes ~2 hours and costs ~$1–2.
 
 ---
 
