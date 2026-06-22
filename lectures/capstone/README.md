@@ -53,6 +53,8 @@ pip install -r requirements.txt
 python train_grpo.py --model sshleifer/tiny-gpt2 --steps 2 --group 4 --bsz 2 --smoke
 
 # Real training (T4 GPU, ~2-3 hours):
+# Note: T4 has 16GB. group*bsz sequences all pass through the model in one step.
+# Keep group*bsz ≤ 16 and add gradient_checkpointing_enable() if you hit OOM.
 python train_grpo.py --model Qwen/Qwen2.5-0.5B-Instruct --steps 400 --group 4 --bsz 4
 
 # Self-score on the public dev set:
