@@ -167,7 +167,7 @@ Read it as: "sample one action $a$ from the current policy, observe its reward $
 
 In the bandit there is no future, so the weight on the chosen angle is simply its reward $r$. No returns, no credit assignment. One shot, one reward, one push.
 
-Here is the core of the bandit training loop from our assignment. The policy network maps a constant state to 9 logits, softmax turns them into probabilities, and we sample:
+Here is the core of the bandit training loop we build in this blog. The policy network maps a constant state to 9 logits, softmax turns them into probabilities, and we sample:
 
 ```python
 import gymnasium as gym
@@ -551,7 +551,7 @@ The policy-gradient theorem becomes:
 
 $$\nabla_\theta J(\theta) = \mathbb{E}\big[A(s,a) \cdot \nabla_\theta \log \pi_\theta(a \mid s)\big]$$
 
-This is the form that every method in the rest of the course shares. They differ only in how they estimate $A$.
+This is the form that every method in the rest of reinforcement learning shares. They differ only in how they estimate $A$.
 
 <details>
 <summary><strong>Check:</strong> A constant baseline subtracts the same number everywhere. Why is a state-dependent baseline V(s) strictly better?</summary>
@@ -583,7 +583,7 @@ Two losses, one pass:
 
 **Why `detach`?** The advantage is meant to be a fixed weight telling the actor how much to push. If the actor's gradient flowed into $V$, the actor could "cheat" by changing the critic to make its chosen actions look good (lowering $V(s)$) instead of improving the policy. `detach` keeps the two objectives clean.
 
-Here is the Actor-Critic training loop from the assignment (trimmed for clarity):
+Here is the Actor-Critic training loop we build in this blog (trimmed for clarity):
 
 ```python
 import gymnasium as gym
@@ -869,9 +869,9 @@ Sum of all nine: $0.000$ exactly.
 
 ### 3.2 Hand-worked: computing the variance ladder
 
-We run 1500 episodes of the Archer MDP with three methods and compute the variance of the gradient estimator. (We use the `estimator_variance` function from the assignment, which records the per-episode gradient-estimator and returns `Var(estimator)`.)
+We run 1500 episodes of the Archer MDP with three methods and compute the variance of the gradient estimator. (We use an `estimator_variance` helper, which records the per-episode gradient-estimator and returns `Var(estimator)`.)
 
-Results from our assignment (5-seed average):
+Results (5-seed average):
 
 | Method | Gradient variance | Greedy return |
 |--------|:-----------------:|:-------------:|
@@ -909,7 +909,7 @@ Why does the baseline help so much? In the Archer MDP, rewards are mostly positi
 
 The entropy $H(\pi) = -\sum_a \pi(a) \log \pi(a)$ measures how spread out the policy is. Adding $+\texttt{ent\_coef} \cdot H$ to the objective discourages premature collapse: the policy pays a "tax" for becoming too certain too early.
 
-Our ablation experiments from the assignment:
+Our ablation experiments:
 
 **Ablation A (remove entropy, `ent_coef=0.0`):** Without entropy regularization, Actor-Critic's learning becomes much more unstable. Mean greedy return drops and the variance across seeds increases significantly. The policy commits to one action early and loses the ability to explore alternatives.
 

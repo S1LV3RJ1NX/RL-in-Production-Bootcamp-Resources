@@ -158,7 +158,7 @@ The agent reached the goal after 3 zero-reward steps, so the discounted return i
 
 ### 2.3 The recursive return: the heartbeat of RL
 
-The most important algebraic trick in the entire course. Start with the definition of $G_t$ and factor out $\gamma$:
+The most important algebraic trick in all of reinforcement learning. Start with the definition of $G_t$ and factor out $\gamma$:
 
 $$
 G_t = R_{t+1} + \gamma\,R_{t+2} + \gamma^2 R_{t+3} + \cdots = R_{t+1} + \gamma\,\underbrace{(R_{t+2} + \gamma\,R_{t+3} + \cdots)}_{G_{t+1}}.

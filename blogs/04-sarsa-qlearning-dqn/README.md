@@ -494,7 +494,7 @@ Observation shape: (4, 84, 84)
 Number of actions: 6
 ```
 
-The observation is now four stacked grayscale frames, and Pong exposes six joystick actions. *(Output captured from the assignment notebook, which runs the full Atari stack.)*
+The observation is now four stacked grayscale frames, and Pong exposes six joystick actions. *(Output captured from a notebook that runs the full Atari stack.)*
 
 <details>
 <summary><strong>Check:</strong> Why stack 4 frames instead of feeding a single 84&times;84 image?</summary>
@@ -727,7 +727,7 @@ Look at the paradox: SARSA's **training** reward ($-19.9$) is far better than Q-
 
 ### Capstone B (showcase): DQN on Pong from pixels
 
-The deep version is the *same* loop, now wrapping `compute_td_loss` (§2.6), the replay buffer (§2.7), and the target-network sync (§2.8) around the Atari env (§2.9). It trains for ~2M frames (tens of minutes on a GPU), so we show the real code and the real logs rather than run it inline. The inner loop, verbatim from the assignment:
+The deep version is the *same* loop, now wrapping `compute_td_loss` (§2.6), the replay buffer (§2.7), and the target-network sync (§2.8) around the Atari env (§2.9). It trains for ~2M frames (tens of minutes on a GPU), so we show the real code and the real logs rather than run it inline. The inner loop, verbatim:
 
 ```python
 for frame in range(1, total_frames + 1):
@@ -764,7 +764,7 @@ for frame in range(1, total_frames + 1):
             target_net.load_state_dict(policy_net.state_dict())
 ```
 
-Real training log (captured from the assignment run; Pong reward starts at $-21$, "loses every point," and should climb toward $+20$):
+Real training log (captured from a training run; Pong reward starts at $-21$, "loses every point," and should climb toward $+20$):
 
 ```text title="Output"
 ep   10 | frame     8765 | eps 0.99 | avg100 -20.80 | 2072 fps

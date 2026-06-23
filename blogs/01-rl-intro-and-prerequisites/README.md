@@ -153,7 +153,7 @@ $$
 \mu_{\text{new}} \;=\; \mu_{\text{old}} \;+\; \alpha\,\big(x - \mu_{\text{old}}\big).
 $$
 
-Read the pieces: $\mu_{\text{old}}$ is your current belief, $(x - \mu_{\text{old}})$ is how wrong it was, and $\alpha \in (0,1]$ is how much you care about the new data. This is **the template for every learning rule in the course.** Monte Carlo, TD learning, Q-learning, actor-critic: all are this nudge applied to slightly different targets.
+Read the pieces: $\mu_{\text{old}}$ is your current belief, $(x - \mu_{\text{old}})$ is how wrong it was, and $\alpha \in (0,1]$ is how much you care about the new data. This is **the template for every learning rule in reinforcement learning.** Monte Carlo, TD learning, Q-learning, actor-critic: all are this nudge applied to slightly different targets.
 
 ![Incremental average tracking a noisy reward stream toward its true mean.](./images/fig-incremental-average.svg)
 

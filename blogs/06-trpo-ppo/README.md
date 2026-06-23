@@ -2,7 +2,7 @@
 title: "TRPO and PPO: The Largest Safe Step a Policy Can Take"
 shortName: "TRPO & PPO"
 date: "2026-06-19"
-summary: "The gradient gives a direction, but who chooses the step size? This post explores the step-size crisis in RL, builds importance sampling from scratch, derives the surrogate objective, fences it with TRPO's KL constraint, then clips it with PPO, all grounded in a continuous-control assignment where PPO learns to swing a pendulum upright."
+summary: "The gradient gives a direction, but who chooses the step size? This post explores the step-size crisis in RL, builds importance sampling from scratch, derives the surrogate objective, fences it with TRPO's KL constraint, then clips it with PPO, all grounded in a continuous-control example where PPO learns to swing a pendulum upright."
 tags: ["reinforcement-learning", "ppo", "trpo", "importance-sampling", "trust-region", "gymnasium"]
 order: 6
 ---
@@ -139,7 +139,7 @@ where $r = \pi_\text{new}(a \mid s) \;/\; \pi_\text{old}(a \mid s)$ is the **pro
 
 **The catch: importance sampling only works while the policies stay close.** If $\pi_\text{new}$ drifts far from $\pi_\text{old}$, a handful of ratios explode (e.g. $r = 30$ when the old policy almost never took an action the new one loves), a few samples hog all the weight, and the estimate becomes noise. The reused data is trustworthy only in a neighborhood of $\pi_\text{old}$, which is precisely the trust region.
 
-In the assignment, the ratio is computed in the PPO update loop:
+In code, the ratio is computed in the PPO update loop:
 
 ```python
 import torch
@@ -197,7 +197,7 @@ Read it as: "for each transition in the batch, multiply its advantage by the rat
 
 **At $\pi_\text{old}$ the surrogate $L = 0$ (no change yet), but its gradient equals the true policy gradient.** A small step uphill on $L$ is a real improvement. But $L$ keeps climbing forever while the true gain peaks and falls. Maximize $L$ blindly and you land on a number that was never real.
 
-In the assignment, the advantage is computed once per batch:
+In code, the advantage is computed once per batch:
 
 ```python
 import torch, numpy as np
@@ -305,7 +305,7 @@ where $\varepsilon \approx 0.2$. Two ingredients do the work:
 
 **The asymmetry in one line:** for a bad action the clip caps how hard you *suppress* it (a floor at $1-\varepsilon$), but never caps how hard you *undo* an accidental increase (no ceiling). Pessimism, by design.
 
-Here is the core of the PPO update from the assignment:
+Here is the core of the PPO update:
 
 ```python
 import torch
@@ -379,7 +379,7 @@ $$L = \mathbb{E}\!\left[L^\text{CLIP} - c_1 \big(V_\theta(s) - G_t\big)^2 + c_2 
 
 Because the clip keeps each step safe, we can reuse the same batch for **K epochs** (typically 3-10). Each epoch shuffles the batch into minibatches and takes clipped SGD steps. As the policy drifts during the epochs, the ratios for some samples leave $[1-\varepsilon, 1+\varepsilon]$; those samples' gradients go to zero and they quietly stop driving the update. The frozen `logp_old` (recorded at collection time) is the denominator of the ratio: because it never moves, the ratio measures true drift from the data-collecting policy.
 
-For continuous actions (Pendulum torque, LunarLander thrusters), the assignment's policy outputs a Gaussian:
+For continuous actions (Pendulum torque, LunarLander thrusters), the policy outputs a Gaussian:
 
 ```python
 import torch
@@ -568,7 +568,7 @@ At $r = 1.50$ (accidental increase): raw $= -3.0$, clipped $= -2.4$. The min pic
 
 ### 3.4 Real numbers: Pendulum learning curve and ablation
 
-From the assignment, training PPO on `Pendulum-v1` (60 iterations, $\gamma=0.95$, 2048 steps/batch, $K=10$ epochs, $\varepsilon=0.2$):
+Training PPO on `Pendulum-v1` (60 iterations, $\gamma=0.95$, 2048 steps/batch, $K=10$ epochs, $\varepsilon=0.2$):
 
 **Full PPO:** start mean return $\approx -1137$ (the pendulum hangs down, accruing penalties), end mean return $\approx -704$, greedy evaluation $\approx -619$ (the policy learned to swing the arm upright and hold it).
 
@@ -782,7 +782,7 @@ print(f"\nPendulum PPO:  start {np.mean(curve[:3]):.1f}  "
 Pendulum PPO:  start -1154.5  end -1036.9  greedy -1091.7
 ```
 
-The policy learns to reduce its penalties over 60 iterations: the mean return improves from about $-1155$ (arm hanging down, accruing large penalties) to about $-1037$, and by iteration 60 the per-batch mean has dropped below $-1000$. Greedy evaluation (action = the Gaussian mean, no exploration noise) reaches $-1092$. In the full assignment (with longer training), the policy continues improving to about $-700$, eventually learning to swing the arm fully upright. The entire algorithm is the four pieces introduced in this post: the Gaussian policy, the discounted returns, the standardized advantage, and the clipped surrogate with K-epoch reuse.
+The policy learns to reduce its penalties over 60 iterations: the mean return improves from about $-1155$ (arm hanging down, accruing large penalties) to about $-1037$, and by iteration 60 the per-batch mean has dropped below $-1000$. Greedy evaluation (action = the Gaussian mean, no exploration noise) reaches $-1092$. With longer training, the policy continues improving to about $-700$, eventually learning to swing the arm fully upright. The entire algorithm is the four pieces introduced in this post: the Gaussian policy, the discounted returns, the standardized advantage, and the clipped surrogate with K-epoch reuse.
 
 ---
 

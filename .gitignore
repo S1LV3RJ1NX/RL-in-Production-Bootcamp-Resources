@@ -6,3 +6,6 @@ __pycache__/
 .idea/
 .vscode/
 self-notes/
+
+# Trained reward-model artifacts (large; model.safetensors ~475MB)
+assignments/rm/

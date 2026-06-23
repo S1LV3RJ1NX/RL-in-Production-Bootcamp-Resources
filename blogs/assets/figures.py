@@ -1343,6 +1343,205 @@ def build_blog06() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 07 — RLHF
+# ----------------------------------------------------------------------------
+BLOG07 = "07-rlhf"
+
+
+def fig_bradley_terry() -> None:
+    """Bradley-Terry: gap -> probability via sigmoid, and the saturating gradient."""
+    g = np.linspace(-6, 6, 500)
+    sig = 1 / (1 + np.exp(-g))
+    grad = 1 - sig  # |d/dg of -log sigma(g)|
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
+
+    axes[0].plot(g, sig, lw=2.4, color=ACCENT)
+    axes[0].axhline(0.5, ls=":", lw=1, color=DIVIDER)
+    axes[0].axvline(0.0, ls=":", lw=1, color=DIVIDER)
+    axes[0].scatter([0], [0.5], color=INK, zorder=5, s=30)
+    axes[0].annotate("$\\sigma(0)=0.5$\n(toss-up)", xy=(0, 0.5), xytext=(1.2, 0.30),
+                     fontsize=9, color=MUTED,
+                     arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    axes[0].set_xlabel("score gap  $g = r_\\varphi(y_w) - r_\\varphi(y_l)$")
+    axes[0].set_ylabel("$P(y_w \\succ y_l) = \\sigma(g)$")
+    axes[0].set_title("The gap becomes a probability")
+    axes[0].set_ylim(0, 1)
+
+    axes[1].axhline(1.0, ls="--", lw=2, color=MUTED, label="naive loss (constant)")
+    axes[1].plot(g, grad, lw=2.4, color=ACCENT, label="Bradley-Terry  $1-\\sigma(g)$")
+    axes[1].axvspan(2, 6, alpha=0.07, color=ACCENT)
+    axes[1].annotate("already right:\ngradient fades", xy=(3.5, 1 - 1 / (1 + np.exp(-3.5))),
+                     xytext=(1.0, 0.55), fontsize=9, color=ACCENT, fontweight="bold",
+                     arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1))
+    axes[1].set_xlabel("score gap  $g$")
+    axes[1].set_ylabel("gradient magnitude")
+    axes[1].set_title("Effort flows to the unsettled pairs")
+    axes[1].legend(frameon=False, fontsize=9, loc="center right")
+    axes[1].set_ylim(0, 1.3)
+
+    fig.suptitle("Bradley-Terry: squash the gap, and the gradient self-regulates",
+                 fontsize=12.5, fontweight="bold", y=1.03)
+    save(fig, BLOG07, "fig-bradley-terry")
+
+
+def fig_per_token_credit() -> None:
+    """One end reward becomes a per-token signal: tolls, then advantages."""
+    tokens = ["Gravity", "pulls", "objects", "down"]
+    kl_toll = [0.00, -0.08, -0.02, -0.11]   # -beta * log(pi_theta / pi_ref)
+    rm = [0.0, 0.0, 0.0, 2.0]               # reward model lands on the last token
+    adv = [0.30, 0.20, 0.03, -0.06]         # A_t = G_t - V(s_t)
+    pos = np.arange(len(tokens))
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
+
+    axes[0].bar(pos, rm, color=ACCENT, label="reward-model score (last token)")
+    axes[0].bar(pos, kl_toll, color=MUTED, label="KL toll (every token)")
+    axes[0].axhline(0, lw=1, color=INK)
+    axes[0].set_xticks(pos)
+    axes[0].set_xticklabels(tokens)
+    axes[0].set_ylabel("per-token reward  $R_t$")
+    axes[0].set_title("The reward lands only at the end")
+    axes[0].legend(frameon=False, fontsize=9, loc="upper left")
+
+    colors = [ACCENT if a >= 0 else MUTED for a in adv]
+    axes[1].bar(pos, adv, color=colors)
+    axes[1].axhline(0, lw=1, color=INK)
+    for x, a in zip(pos, adv):
+        axes[1].text(x, a + (0.015 if a >= 0 else -0.03), f"{a:+.2f}",
+                     ha="center", va="bottom" if a >= 0 else "top", fontsize=9, color=INK)
+    axes[1].set_xticks(pos)
+    axes[1].set_xticklabels(tokens)
+    axes[1].set_ylabel("advantage  $A_t = G_t - V(s_t)$")
+    axes[1].set_title("Credit, spread across the sentence")
+    axes[1].set_ylim(-0.12, 0.38)
+
+    fig.suptitle("One verdict at the end, a signed nudge for every token",
+                 fontsize=12.5, fontweight="bold", y=1.03)
+    save(fig, BLOG07, "fig-per-token-credit")
+
+
+def fig_value_head_fit() -> None:
+    """The critic learns: predicted value vs realised return (Lab D, r = 0.94)."""
+    rng = np.random.default_rng(5)
+    n = 200
+    G = rng.normal(-5.6, np.sqrt(20.4), size=n)   # returns: mean/var from Lab D
+    rho = 0.935
+    noise = rng.normal(0, 1, size=n)
+    Gc = G - G.mean()
+    V = G.mean() + rho * Gc + np.sqrt(1 - rho**2) * np.std(Gc) * noise
+
+    lims = [min(G.min(), V.min()) - 1, max(G.max(), V.max()) + 1]
+
+    fig, ax = plt.subplots(figsize=(6.4, 6.0))
+    ax.plot(lims, lims, ls="--", lw=1.6, color=INK, label="perfect ($V = G$)")
+    ax.scatter(G, V, s=18, color=ACCENT, alpha=0.6, edgecolor="none")
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+    ax.set_xlabel("realised return  $G_t$")
+    ax.set_ylabel("value-head prediction  $V(s_t)$")
+    ax.set_title("After training, the critic tracks the return ($r = 0.94$)")
+    ax.legend(frameon=False, fontsize=9, loc="upper left")
+    save(fig, BLOG07, "fig-value-head-fit")
+
+
+def fig_goodhart() -> None:
+    """Over-optimisation: the proxy keeps climbing while true quality turns over."""
+    kl = np.linspace(0, 120, 500)
+    # Proxy: monotone, saturating toward 1.
+    proxy = 1 - np.exp(-kl / 28)
+    # True quality: rises, peaks near KL=30, then decays.
+    true_q = 0.72 * np.exp(-((kl - 30) ** 2) / (2 * 26**2)) * (1 + 0.0) \
+        - 0.42 * (kl / 120) ** 2
+    true_q = np.clip(true_q, 0, None)
+
+    peak_idx = int(np.argmax(true_q))
+
+    fig, ax = plt.subplots(figsize=(8.2, 4.6))
+    ax.plot(kl, proxy, lw=2.4, color=ACCENT, label="reward-model score (proxy)")
+    ax.plot(kl, true_q, lw=2.4, color=INK, label="true quality (human)")
+    ax.axvline(kl[peak_idx], ls=":", lw=1.4, color=MUTED)
+    ax.annotate("proxy and truth\npart ways", xy=(kl[peak_idx], true_q[peak_idx]),
+                xytext=(kl[peak_idx] + 14, true_q[peak_idx] + 0.02), fontsize=9,
+                color=MUTED, arrowprops=dict(arrowstyle="->", color=MUTED, lw=1))
+    ax.annotate("early-stop here", xy=(kl[peak_idx], 0.02),
+                xytext=(kl[peak_idx] - 2, 0.18), fontsize=9, color=MUTED, ha="right")
+    ax.set_xlabel("how hard we optimise  (KL from reference)")
+    ax.set_ylabel("reward / quality")
+    ax.set_title("Goodhart's law: optimise the proxy too hard and quality falls")
+    ax.legend(frameon=False, fontsize=9, loc="center right")
+    ax.set_xlim(0, 120)
+    ax.set_ylim(0, 1.05)
+    save(fig, BLOG07, "fig-goodhart")
+
+
+def fig_reward_hacking_scatter() -> None:
+    """Verbosity bias: the reward model rewards length (Lab C, corr ~ 0.25)."""
+    rng = np.random.default_rng(3)
+    n = 73
+    length = rng.integers(8, 95, size=n).astype(float)
+    rho = 0.249
+    lc = (length - length.mean()) / length.std()
+    score = 0.0 + rho * lc + np.sqrt(1 - rho**2) * rng.normal(0, 1, size=n)
+
+    # Least-squares trend line.
+    m, b = np.polyfit(length, score, 1)
+    xs = np.array([length.min(), length.max()])
+
+    fig, ax = plt.subplots(figsize=(8.0, 4.6))
+    ax.scatter(length, score, s=26, color=ACCENT, alpha=0.65, edgecolor="none")
+    ax.plot(xs, m * xs + b, lw=2, ls="--", color=INK, label="trend (r = 0.25)")
+    ax.set_xlabel("answer length (tokens)")
+    ax.set_ylabel("reward-model score (standardised)")
+    ax.set_title("Reward hacking: the proxy rewards length, not just quality")
+    ax.legend(frameon=False, fontsize=9, loc="upper left")
+    save(fig, BLOG07, "fig-reward-hacking-scatter")
+
+
+def fig_ppo_ablation() -> None:
+    """RLHF with the KL leash (beta=0.2) vs without it (beta=0): reward and KL."""
+    steps = [0, 10, 20, 30, 40, 50]
+    rew_leash = [-0.122, -0.262, -0.156, -0.096, -0.169, 0.069]
+    kl_leash = [0.0, 12.7, 8.4, 8.1, 8.1, 7.7]
+    rew_free = [-0.122, -0.218, -0.173, 0.059, 0.119, 0.381]
+    kl_free = [0.0, 20.4, 22.4, 28.7, 34.9, 42.6]
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.4))
+
+    axes[0].plot(steps, rew_leash, "-o", lw=2.2, ms=5, color=ACCENT,
+                 label="with leash ($\\beta = 0.2$)")
+    axes[0].plot(steps, rew_free, "-s", lw=2.2, ms=5, color=MUTED,
+                 label="no leash ($\\beta = 0$)")
+    axes[0].set_xlabel("PPO step")
+    axes[0].set_ylabel("mean reward-model score")
+    axes[0].set_title("Reward: $\\beta=0$ climbs higher")
+    axes[0].legend(frameon=False, fontsize=9, loc="upper left")
+
+    axes[1].plot(steps, kl_leash, "-o", lw=2.2, ms=5, color=ACCENT,
+                 label="with leash ($\\beta = 0.2$)")
+    axes[1].plot(steps, kl_free, "-s", lw=2.2, ms=5, color=MUTED,
+                 label="no leash ($\\beta = 0$)")
+    axes[1].set_xlabel("PPO step")
+    axes[1].set_ylabel("KL from reference")
+    axes[1].set_title("KL: $\\beta=0$ runs off the leash")
+    axes[1].legend(frameon=False, fontsize=9, loc="upper left")
+
+    fig.suptitle("Break the leash and the reward rises while the policy diverges",
+                 fontsize=12.5, fontweight="bold", y=1.03)
+    save(fig, BLOG07, "fig-ppo-ablation")
+
+
+def build_blog07() -> None:
+    print(f"[{BLOG07}]")
+    fig_bradley_terry()
+    fig_per_token_credit()
+    fig_value_head_fit()
+    fig_goodhart()
+    fig_reward_hacking_scatter()
+    fig_ppo_ablation()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -1352,6 +1551,7 @@ BUILDERS = {
     "04": build_blog04,
     "05": build_blog05,
     "06": build_blog06,
+    "07": build_blog07,
 }
 
 

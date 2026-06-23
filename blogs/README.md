@@ -15,6 +15,7 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 04 | [SARSA, Q-learning, and DQN: From a Table to a Network That Plays Atari](./04-sarsa-qlearning-dqn/) | ✅ Draft |
 | 05 | [Policy Gradients: Learning the Policy Directly, from a Bandit to Actor-Critic](./05-policy-gradients/) | ✅ Draft |
 | 06 | [TRPO and PPO: The Largest Safe Step a Policy Can Take](./06-trpo-ppo/) | ✅ Draft |
+| 07 | [RLHF: Teaching a Language Model What "Good" Means](./07-rlhf/) | ✅ Draft |
 
 ## Writing a new post
 
