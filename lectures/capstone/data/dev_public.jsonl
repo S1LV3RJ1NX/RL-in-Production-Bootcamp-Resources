@@ -1,0 +1,300 @@
+{"id": "dev-00000", "difficulty": "easy", "numbers": [5, 5, 10], "target": 15}
+{"id": "dev-00001", "difficulty": "easy", "numbers": [3, 18, 18], "target": 108}
+{"id": "dev-00002", "difficulty": "easy", "numbers": [3, 2, 3], "target": 11}
+{"id": "dev-00003", "difficulty": "easy", "numbers": [11, 2, 17], "target": 23}
+{"id": "dev-00004", "difficulty": "easy", "numbers": [11, 4, 13], "target": 28}
+{"id": "dev-00005", "difficulty": "easy", "numbers": [7, 13, 10], "target": 16}
+{"id": "dev-00006", "difficulty": "easy", "numbers": [4, 20, 16], "target": 40}
+{"id": "dev-00007", "difficulty": "easy", "numbers": [14, 12, 3], "target": 29}
+{"id": "dev-00008", "difficulty": "easy", "numbers": [4, 15, 16], "target": 79}
+{"id": "dev-00009", "difficulty": "easy", "numbers": [14, 6, 17], "target": 136}
+{"id": "dev-00010", "difficulty": "easy", "numbers": [9, 10, 14], "target": 33}
+{"id": "dev-00011", "difficulty": "easy", "numbers": [7, 7, 5], "target": 84}
+{"id": "dev-00012", "difficulty": "easy", "numbers": [17, 4, 3], "target": 18}
+{"id": "dev-00013", "difficulty": "easy", "numbers": [19, 7, 14], "target": 12}
+{"id": "dev-00014", "difficulty": "easy", "numbers": [6, 12, 16], "target": 32}
+{"id": "dev-00015", "difficulty": "easy", "numbers": [18, 11, 12], "target": 17}
+{"id": "dev-00016", "difficulty": "easy", "numbers": [16, 6, 15], "target": 111}
+{"id": "dev-00017", "difficulty": "easy", "numbers": [19, 14, 3], "target": 30}
+{"id": "dev-00018", "difficulty": "easy", "numbers": [8, 15, 5], "target": 28}
+{"id": "dev-00019", "difficulty": "easy", "numbers": [5, 13, 6], "target": 17}
+{"id": "dev-00020", "difficulty": "easy", "numbers": [9, 10, 3], "target": 30}
+{"id": "dev-00021", "difficulty": "easy", "numbers": [2, 9, 8], "target": 19}
+{"id": "dev-00022", "difficulty": "easy", "numbers": [7, 20, 17], "target": 44}
+{"id": "dev-00023", "difficulty": "easy", "numbers": [8, 12, 6], "target": 60}
+{"id": "dev-00024", "difficulty": "easy", "numbers": [20, 2, 10], "target": 100}
+{"id": "dev-00025", "difficulty": "easy", "numbers": [9, 16, 12], "target": 19}
+{"id": "dev-00026", "difficulty": "easy", "numbers": [19, 6, 11], "target": 125}
+{"id": "dev-00027", "difficulty": "easy", "numbers": [2, 10, 6], "target": 18}
+{"id": "dev-00028", "difficulty": "easy", "numbers": [10, 18, 17], "target": 25}
+{"id": "dev-00029", "difficulty": "easy", "numbers": [18, 16, 7], "target": 14}
+{"id": "dev-00030", "difficulty": "easy", "numbers": [13, 8, 5], "target": 39}
+{"id": "dev-00031", "difficulty": "easy", "numbers": [15, 4, 15], "target": 45}
+{"id": "dev-00032", "difficulty": "easy", "numbers": [20, 17, 3], "target": 40}
+{"id": "dev-00033", "difficulty": "easy", "numbers": [6, 14, 19], "target": 39}
+{"id": "dev-00034", "difficulty": "easy", "numbers": [9, 17, 18], "target": 10}
+{"id": "dev-00035", "difficulty": "easy", "numbers": [2, 13, 2], "target": 30}
+{"id": "dev-00036", "difficulty": "easy", "numbers": [6, 15, 18], "target": 39}
+{"id": "dev-00037", "difficulty": "easy", "numbers": [9, 20, 9], "target": 61}
+{"id": "dev-00038", "difficulty": "easy", "numbers": [16, 8, 20], "target": 40}
+{"id": "dev-00039", "difficulty": "easy", "numbers": [10, 6, 13], "target": 68}
+{"id": "dev-00040", "difficulty": "easy", "numbers": [12, 8, 8], "target": 28}
+{"id": "dev-00041", "difficulty": "easy", "numbers": [8, 20, 16], "target": 28}
+{"id": "dev-00042", "difficulty": "easy", "numbers": [9, 5, 17], "target": 13}
+{"id": "dev-00043", "difficulty": "easy", "numbers": [1, 10, 12], "target": 121}
+{"id": "dev-00044", "difficulty": "easy", "numbers": [16, 20, 10], "target": 46}
+{"id": "dev-00045", "difficulty": "easy", "numbers": [4, 8, 13], "target": 45}
+{"id": "dev-00046", "difficulty": "easy", "numbers": [20, 8, 10], "target": 22}
+{"id": "dev-00047", "difficulty": "easy", "numbers": [10, 14, 9], "target": 104}
+{"id": "dev-00048", "difficulty": "easy", "numbers": [7, 13, 10], "target": 21}
+{"id": "dev-00049", "difficulty": "easy", "numbers": [1, 12, 4], "target": 49}
+{"id": "dev-00050", "difficulty": "easy", "numbers": [18, 4, 1], "target": 23}
+{"id": "dev-00051", "difficulty": "easy", "numbers": [2, 14, 13], "target": 41}
+{"id": "dev-00052", "difficulty": "easy", "numbers": [4, 20, 3], "target": 27}
+{"id": "dev-00053", "difficulty": "easy", "numbers": [9, 4, 19], "target": 17}
+{"id": "dev-00054", "difficulty": "easy", "numbers": [11, 20, 6], "target": 15}
+{"id": "dev-00055", "difficulty": "easy", "numbers": [10, 1, 18], "target": 27}
+{"id": "dev-00056", "difficulty": "easy", "numbers": [18, 5, 14], "target": 76}
+{"id": "dev-00057", "difficulty": "easy", "numbers": [2, 13, 16], "target": 45}
+{"id": "dev-00058", "difficulty": "easy", "numbers": [16, 6, 10], "target": 36}
+{"id": "dev-00059", "difficulty": "easy", "numbers": [12, 1, 14], "target": 26}
+{"id": "dev-00060", "difficulty": "easy", "numbers": [8, 19, 15], "target": 26}
+{"id": "dev-00061", "difficulty": "easy", "numbers": [6, 13, 17], "target": 36}
+{"id": "dev-00062", "difficulty": "easy", "numbers": [6, 6, 5], "target": 31}
+{"id": "dev-00063", "difficulty": "easy", "numbers": [20, 1, 3], "target": 57}
+{"id": "dev-00064", "difficulty": "easy", "numbers": [3, 19, 13], "target": 35}
+{"id": "dev-00065", "difficulty": "easy", "numbers": [15, 17, 18], "target": 16}
+{"id": "dev-00066", "difficulty": "easy", "numbers": [8, 18, 15], "target": 25}
+{"id": "dev-00067", "difficulty": "easy", "numbers": [8, 11, 8], "target": 27}
+{"id": "dev-00068", "difficulty": "easy", "numbers": [14, 10, 11], "target": 96}
+{"id": "dev-00069", "difficulty": "easy", "numbers": [6, 13, 16], "target": 109}
+{"id": "dev-00070", "difficulty": "easy", "numbers": [15, 4, 4], "target": 31}
+{"id": "dev-00071", "difficulty": "easy", "numbers": [20, 17, 13], "target": 50}
+{"id": "dev-00072", "difficulty": "easy", "numbers": [20, 8, 5], "target": 17}
+{"id": "dev-00073", "difficulty": "easy", "numbers": [7, 11, 18], "target": 49}
+{"id": "dev-00074", "difficulty": "easy", "numbers": [1, 14, 17], "target": 32}
+{"id": "dev-00075", "difficulty": "easy", "numbers": [2, 18, 3], "target": 17}
+{"id": "dev-00076", "difficulty": "easy", "numbers": [14, 11, 17], "target": 42}
+{"id": "dev-00077", "difficulty": "easy", "numbers": [14, 5, 13], "target": 83}
+{"id": "dev-00078", "difficulty": "easy", "numbers": [20, 17, 20], "target": 57}
+{"id": "dev-00079", "difficulty": "easy", "numbers": [13, 12, 5], "target": 91}
+{"id": "dev-00080", "difficulty": "easy", "numbers": [18, 5, 11], "target": 79}
+{"id": "dev-00081", "difficulty": "easy", "numbers": [12, 8, 17], "target": 37}
+{"id": "dev-00082", "difficulty": "easy", "numbers": [9, 11, 6], "target": 75}
+{"id": "dev-00083", "difficulty": "easy", "numbers": [7, 4, 9], "target": 20}
+{"id": "dev-00084", "difficulty": "easy", "numbers": [5, 5, 12], "target": 55}
+{"id": "dev-00085", "difficulty": "easy", "numbers": [6, 2, 8], "target": 16}
+{"id": "dev-00086", "difficulty": "easy", "numbers": [8, 7, 5], "target": 20}
+{"id": "dev-00087", "difficulty": "easy", "numbers": [3, 16, 18], "target": 38}
+{"id": "dev-00088", "difficulty": "easy", "numbers": [1, 8, 10], "target": 18}
+{"id": "dev-00089", "difficulty": "easy", "numbers": [12, 12, 5], "target": 29}
+{"id": "dev-00090", "difficulty": "easy", "numbers": [3, 19, 10], "target": 87}
+{"id": "dev-00091", "difficulty": "easy", "numbers": [6, 3, 10], "target": 63}
+{"id": "dev-00092", "difficulty": "easy", "numbers": [14, 12, 2], "target": 38}
+{"id": "dev-00093", "difficulty": "easy", "numbers": [5, 7, 18], "target": 16}
+{"id": "dev-00094", "difficulty": "easy", "numbers": [5, 18, 18], "target": 41}
+{"id": "dev-00095", "difficulty": "easy", "numbers": [6, 13, 5], "target": 73}
+{"id": "dev-00096", "difficulty": "easy", "numbers": [4, 8, 16], "target": 56}
+{"id": "dev-00097", "difficulty": "easy", "numbers": [2, 10, 19], "target": 11}
+{"id": "dev-00098", "difficulty": "easy", "numbers": [6, 12, 9], "target": 42}
+{"id": "dev-00099", "difficulty": "easy", "numbers": [13, 17, 14], "target": 10}
+{"id": "dev-00100", "difficulty": "easy", "numbers": [6, 4, 11], "target": 90}
+{"id": "dev-00101", "difficulty": "easy", "numbers": [16, 5, 5], "target": 85}
+{"id": "dev-00102", "difficulty": "easy", "numbers": [1, 13, 8], "target": 104}
+{"id": "dev-00103", "difficulty": "easy", "numbers": [4, 8, 2], "target": 34}
+{"id": "dev-00104", "difficulty": "easy", "numbers": [17, 13, 19], "target": 15}
+{"id": "dev-00105", "difficulty": "easy", "numbers": [5, 14, 7], "target": 93}
+{"id": "dev-00106", "difficulty": "easy", "numbers": [1, 3, 20], "target": 60}
+{"id": "dev-00107", "difficulty": "easy", "numbers": [6, 7, 6], "target": 19}
+{"id": "dev-00108", "difficulty": "easy", "numbers": [9, 18, 12], "target": 15}
+{"id": "dev-00109", "difficulty": "easy", "numbers": [5, 5, 7], "target": 60}
+{"id": "dev-00110", "difficulty": "easy", "numbers": [8, 12, 15], "target": 81}
+{"id": "dev-00111", "difficulty": "easy", "numbers": [14, 17, 10], "target": 21}
+{"id": "dev-00112", "difficulty": "easy", "numbers": [1, 4, 11], "target": 16}
+{"id": "dev-00113", "difficulty": "easy", "numbers": [16, 2, 7], "target": 21}
+{"id": "dev-00114", "difficulty": "easy", "numbers": [8, 8, 2], "target": 14}
+{"id": "dev-00115", "difficulty": "easy", "numbers": [19, 20, 19], "target": 18}
+{"id": "dev-00116", "difficulty": "easy", "numbers": [9, 13, 6], "target": 63}
+{"id": "dev-00117", "difficulty": "easy", "numbers": [4, 9, 20], "target": 100}
+{"id": "dev-00118", "difficulty": "easy", "numbers": [16, 10, 1], "target": 26}
+{"id": "dev-00119", "difficulty": "easy", "numbers": [20, 1, 3], "target": 61}
+{"id": "dev-00120", "difficulty": "medium", "numbers": [5, 8, 9, 7], "target": 72}
+{"id": "dev-00121", "difficulty": "medium", "numbers": [11, 12, 11, 12], "target": 22}
+{"id": "dev-00122", "difficulty": "medium", "numbers": [3, 8, 5, 3], "target": 85}
+{"id": "dev-00123", "difficulty": "medium", "numbers": [4, 10, 1, 4], "target": 44}
+{"id": "dev-00124", "difficulty": "medium", "numbers": [3, 8, 12, 7], "target": 49}
+{"id": "dev-00125", "difficulty": "medium", "numbers": [1, 9, 7, 6], "target": 22}
+{"id": "dev-00126", "difficulty": "medium", "numbers": [7, 9, 8, 12], "target": 24}
+{"id": "dev-00127", "difficulty": "medium", "numbers": [2, 5, 4, 8], "target": 50}
+{"id": "dev-00128", "difficulty": "medium", "numbers": [8, 8, 8, 6], "target": 50}
+{"id": "dev-00129", "difficulty": "medium", "numbers": [5, 5, 4, 10], "target": 45}
+{"id": "dev-00130", "difficulty": "medium", "numbers": [7, 6, 8, 1], "target": 49}
+{"id": "dev-00131", "difficulty": "medium", "numbers": [9, 3, 3, 3], "target": 36}
+{"id": "dev-00132", "difficulty": "medium", "numbers": [10, 2, 7, 7], "target": 26}
+{"id": "dev-00133", "difficulty": "medium", "numbers": [11, 1, 11, 1], "target": 22}
+{"id": "dev-00134", "difficulty": "medium", "numbers": [5, 6, 8, 2], "target": 86}
+{"id": "dev-00135", "difficulty": "medium", "numbers": [8, 11, 10, 3], "target": 49}
+{"id": "dev-00136", "difficulty": "medium", "numbers": [9, 12, 9, 12], "target": 28}
+{"id": "dev-00137", "difficulty": "medium", "numbers": [4, 10, 7, 1], "target": 20}
+{"id": "dev-00138", "difficulty": "medium", "numbers": [7, 4, 10, 4], "target": 28}
+{"id": "dev-00139", "difficulty": "medium", "numbers": [8, 10, 9, 10], "target": 21}
+{"id": "dev-00140", "difficulty": "medium", "numbers": [3, 5, 5, 1], "target": 28}
+{"id": "dev-00141", "difficulty": "medium", "numbers": [10, 8, 7, 4], "target": 39}
+{"id": "dev-00142", "difficulty": "medium", "numbers": [11, 11, 7, 8], "target": 80}
+{"id": "dev-00143", "difficulty": "medium", "numbers": [9, 6, 7, 3], "target": 48}
+{"id": "dev-00144", "difficulty": "medium", "numbers": [8, 4, 3, 4], "target": 40}
+{"id": "dev-00145", "difficulty": "medium", "numbers": [4, 1, 1, 9], "target": 36}
+{"id": "dev-00146", "difficulty": "medium", "numbers": [1, 6, 12, 7], "target": 65}
+{"id": "dev-00147", "difficulty": "medium", "numbers": [8, 10, 2, 8], "target": 52}
+{"id": "dev-00148", "difficulty": "medium", "numbers": [10, 10, 1, 10], "target": 90}
+{"id": "dev-00149", "difficulty": "medium", "numbers": [4, 2, 9, 6], "target": 20}
+{"id": "dev-00150", "difficulty": "medium", "numbers": [8, 3, 3, 2], "target": 32}
+{"id": "dev-00151", "difficulty": "medium", "numbers": [7, 2, 5, 7], "target": 22}
+{"id": "dev-00152", "difficulty": "medium", "numbers": [8, 8, 6, 4], "target": 74}
+{"id": "dev-00153", "difficulty": "medium", "numbers": [2, 10, 5, 5], "target": 50}
+{"id": "dev-00154", "difficulty": "medium", "numbers": [8, 9, 9, 2], "target": 52}
+{"id": "dev-00155", "difficulty": "medium", "numbers": [9, 11, 3, 12], "target": 96}
+{"id": "dev-00156", "difficulty": "medium", "numbers": [5, 3, 9, 12], "target": 75}
+{"id": "dev-00157", "difficulty": "medium", "numbers": [3, 11, 2, 9], "target": 80}
+{"id": "dev-00158", "difficulty": "medium", "numbers": [5, 9, 2, 6], "target": 22}
+{"id": "dev-00159", "difficulty": "medium", "numbers": [3, 5, 3, 6], "target": 30}
+{"id": "dev-00160", "difficulty": "medium", "numbers": [7, 4, 6, 3], "target": 35}
+{"id": "dev-00161", "difficulty": "medium", "numbers": [4, 12, 1, 9], "target": 24}
+{"id": "dev-00162", "difficulty": "medium", "numbers": [10, 4, 11, 9], "target": 45}
+{"id": "dev-00163", "difficulty": "medium", "numbers": [9, 4, 9, 11], "target": 33}
+{"id": "dev-00164", "difficulty": "medium", "numbers": [11, 6, 9, 10], "target": 36}
+{"id": "dev-00165", "difficulty": "medium", "numbers": [5, 2, 12, 12], "target": 38}
+{"id": "dev-00166", "difficulty": "medium", "numbers": [9, 8, 2, 8], "target": 21}
+{"id": "dev-00167", "difficulty": "medium", "numbers": [9, 10, 5, 12], "target": 54}
+{"id": "dev-00168", "difficulty": "medium", "numbers": [1, 5, 6, 9], "target": 50}
+{"id": "dev-00169", "difficulty": "medium", "numbers": [6, 12, 6, 8], "target": 22}
+{"id": "dev-00170", "difficulty": "medium", "numbers": [4, 3, 9, 9], "target": 66}
+{"id": "dev-00171", "difficulty": "medium", "numbers": [11, 1, 1, 2], "target": 44}
+{"id": "dev-00172", "difficulty": "medium", "numbers": [12, 4, 5, 10], "target": 48}
+{"id": "dev-00173", "difficulty": "medium", "numbers": [6, 4, 3, 4], "target": 54}
+{"id": "dev-00174", "difficulty": "medium", "numbers": [9, 6, 8, 7], "target": 49}
+{"id": "dev-00175", "difficulty": "medium", "numbers": [12, 4, 12, 9], "target": 29}
+{"id": "dev-00176", "difficulty": "medium", "numbers": [1, 9, 5, 7], "target": 68}
+{"id": "dev-00177", "difficulty": "medium", "numbers": [3, 7, 12, 10], "target": 32}
+{"id": "dev-00178", "difficulty": "medium", "numbers": [4, 10, 6, 3], "target": 20}
+{"id": "dev-00179", "difficulty": "medium", "numbers": [6, 2, 10, 6], "target": 38}
+{"id": "dev-00180", "difficulty": "medium", "numbers": [9, 11, 12, 3], "target": 83}
+{"id": "dev-00181", "difficulty": "medium", "numbers": [12, 4, 1, 8], "target": 91}
+{"id": "dev-00182", "difficulty": "medium", "numbers": [11, 5, 7, 1], "target": 47}
+{"id": "dev-00183", "difficulty": "medium", "numbers": [11, 2, 12, 6], "target": 85}
+{"id": "dev-00184", "difficulty": "medium", "numbers": [5, 12, 8, 12], "target": 40}
+{"id": "dev-00185", "difficulty": "medium", "numbers": [1, 6, 4, 1], "target": 24}
+{"id": "dev-00186", "difficulty": "medium", "numbers": [4, 10, 4, 7], "target": 38}
+{"id": "dev-00187", "difficulty": "medium", "numbers": [8, 4, 2, 7], "target": 22}
+{"id": "dev-00188", "difficulty": "medium", "numbers": [12, 5, 12, 9], "target": 21}
+{"id": "dev-00189", "difficulty": "medium", "numbers": [5, 2, 9, 4], "target": 90}
+{"id": "dev-00190", "difficulty": "medium", "numbers": [12, 6, 5, 12], "target": 34}
+{"id": "dev-00191", "difficulty": "medium", "numbers": [8, 6, 7, 7], "target": 27}
+{"id": "dev-00192", "difficulty": "medium", "numbers": [3, 4, 5, 12], "target": 63}
+{"id": "dev-00193", "difficulty": "medium", "numbers": [5, 6, 11, 10], "target": 81}
+{"id": "dev-00194", "difficulty": "medium", "numbers": [7, 10, 6, 7], "target": 30}
+{"id": "dev-00195", "difficulty": "medium", "numbers": [7, 9, 3, 9], "target": 39}
+{"id": "dev-00196", "difficulty": "medium", "numbers": [8, 12, 9, 9], "target": 96}
+{"id": "dev-00197", "difficulty": "medium", "numbers": [3, 9, 7, 10], "target": 50}
+{"id": "dev-00198", "difficulty": "medium", "numbers": [11, 11, 5, 11], "target": 55}
+{"id": "dev-00199", "difficulty": "medium", "numbers": [3, 1, 8, 9], "target": 21}
+{"id": "dev-00200", "difficulty": "medium", "numbers": [3, 5, 7, 2], "target": 25}
+{"id": "dev-00201", "difficulty": "medium", "numbers": [6, 12, 5, 6], "target": 29}
+{"id": "dev-00202", "difficulty": "medium", "numbers": [3, 12, 6, 5], "target": 93}
+{"id": "dev-00203", "difficulty": "medium", "numbers": [8, 5, 10, 12], "target": 63}
+{"id": "dev-00204", "difficulty": "medium", "numbers": [2, 9, 10, 11], "target": 23}
+{"id": "dev-00205", "difficulty": "medium", "numbers": [8, 2, 5, 5], "target": 85}
+{"id": "dev-00206", "difficulty": "medium", "numbers": [4, 12, 7, 8], "target": 73}
+{"id": "dev-00207", "difficulty": "medium", "numbers": [5, 3, 8, 1], "target": 30}
+{"id": "dev-00208", "difficulty": "medium", "numbers": [7, 7, 6, 6], "target": 42}
+{"id": "dev-00209", "difficulty": "medium", "numbers": [12, 1, 11, 11], "target": 34}
+{"id": "dev-00210", "difficulty": "medium", "numbers": [1, 1, 10, 8], "target": 80}
+{"id": "dev-00211", "difficulty": "medium", "numbers": [2, 9, 10, 7], "target": 24}
+{"id": "dev-00212", "difficulty": "medium", "numbers": [12, 12, 11, 5], "target": 40}
+{"id": "dev-00213", "difficulty": "medium", "numbers": [1, 10, 3, 6], "target": 20}
+{"id": "dev-00214", "difficulty": "medium", "numbers": [5, 12, 4, 2], "target": 36}
+{"id": "dev-00215", "difficulty": "medium", "numbers": [11, 10, 7, 6], "target": 25}
+{"id": "dev-00216", "difficulty": "medium", "numbers": [1, 5, 8, 11], "target": 24}
+{"id": "dev-00217", "difficulty": "medium", "numbers": [11, 6, 11, 2], "target": 26}
+{"id": "dev-00218", "difficulty": "medium", "numbers": [3, 9, 9, 2], "target": 30}
+{"id": "dev-00219", "difficulty": "medium", "numbers": [5, 12, 6, 5], "target": 50}
+{"id": "dev-00220", "difficulty": "medium", "numbers": [1, 2, 3, 4], "target": 24}
+{"id": "dev-00221", "difficulty": "medium", "numbers": [11, 11, 4, 3], "target": 34}
+{"id": "dev-00222", "difficulty": "medium", "numbers": [7, 10, 5, 12], "target": 63}
+{"id": "dev-00223", "difficulty": "medium", "numbers": [11, 3, 9, 1], "target": 29}
+{"id": "dev-00224", "difficulty": "medium", "numbers": [4, 7, 6, 11], "target": 48}
+{"id": "dev-00225", "difficulty": "medium", "numbers": [4, 3, 3, 10], "target": 46}
+{"id": "dev-00226", "difficulty": "medium", "numbers": [10, 2, 1, 12], "target": 60}
+{"id": "dev-00227", "difficulty": "medium", "numbers": [11, 2, 1, 3], "target": 26}
+{"id": "dev-00228", "difficulty": "medium", "numbers": [4, 10, 5, 5], "target": 35}
+{"id": "dev-00229", "difficulty": "medium", "numbers": [7, 10, 5, 5], "target": 82}
+{"id": "dev-00230", "difficulty": "medium", "numbers": [8, 5, 8, 9], "target": 59}
+{"id": "dev-00231", "difficulty": "medium", "numbers": [3, 7, 6, 8], "target": 21}
+{"id": "dev-00232", "difficulty": "medium", "numbers": [12, 10, 5, 8], "target": 48}
+{"id": "dev-00233", "difficulty": "medium", "numbers": [7, 12, 9, 4], "target": 30}
+{"id": "dev-00234", "difficulty": "medium", "numbers": [11, 4, 7, 12], "target": 26}
+{"id": "dev-00235", "difficulty": "medium", "numbers": [9, 4, 2, 6], "target": 62}
+{"id": "dev-00236", "difficulty": "medium", "numbers": [5, 11, 2, 11], "target": 25}
+{"id": "dev-00237", "difficulty": "medium", "numbers": [1, 8, 9, 11], "target": 80}
+{"id": "dev-00238", "difficulty": "medium", "numbers": [3, 4, 3, 6], "target": 24}
+{"id": "dev-00239", "difficulty": "medium", "numbers": [1, 7, 11, 10], "target": 59}
+{"id": "dev-00240", "difficulty": "hard", "numbers": [1, 5, 14, 7, 6], "target": 132}
+{"id": "dev-00241", "difficulty": "hard", "numbers": [13, 2, 14, 10, 9], "target": 211}
+{"id": "dev-00242", "difficulty": "hard", "numbers": [9, 15, 12, 8, 5], "target": 76}
+{"id": "dev-00243", "difficulty": "hard", "numbers": [12, 11, 12, 7, 5], "target": 210}
+{"id": "dev-00244", "difficulty": "hard", "numbers": [8, 10, 1, 13, 11], "target": 265}
+{"id": "dev-00245", "difficulty": "hard", "numbers": [2, 5, 15, 9, 11], "target": 220}
+{"id": "dev-00246", "difficulty": "hard", "numbers": [5, 6, 10, 1, 5], "target": 60}
+{"id": "dev-00247", "difficulty": "hard", "numbers": [10, 7, 5, 8, 14], "target": 85}
+{"id": "dev-00248", "difficulty": "hard", "numbers": [12, 15, 6, 12, 7], "target": 51}
+{"id": "dev-00249", "difficulty": "hard", "numbers": [10, 9, 13, 2, 15], "target": 160}
+{"id": "dev-00250", "difficulty": "hard", "numbers": [5, 7, 14, 3, 1], "target": 220}
+{"id": "dev-00251", "difficulty": "hard", "numbers": [15, 11, 11, 2, 3], "target": 99}
+{"id": "dev-00252", "difficulty": "hard", "numbers": [1, 6, 7, 12, 3], "target": 168}
+{"id": "dev-00253", "difficulty": "hard", "numbers": [11, 3, 3, 14, 14], "target": 66}
+{"id": "dev-00254", "difficulty": "hard", "numbers": [12, 15, 8, 1, 3], "target": 108}
+{"id": "dev-00255", "difficulty": "hard", "numbers": [11, 15, 3, 8, 10], "target": 236}
+{"id": "dev-00256", "difficulty": "hard", "numbers": [10, 2, 3, 11, 1], "target": 166}
+{"id": "dev-00257", "difficulty": "hard", "numbers": [4, 1, 5, 15, 15], "target": 300}
+{"id": "dev-00258", "difficulty": "hard", "numbers": [11, 10, 1, 12, 13], "target": 142}
+{"id": "dev-00259", "difficulty": "hard", "numbers": [7, 1, 14, 1, 9], "target": 189}
+{"id": "dev-00260", "difficulty": "hard", "numbers": [14, 3, 15, 2, 12], "target": 59}
+{"id": "dev-00261", "difficulty": "hard", "numbers": [13, 10, 9, 2, 2], "target": 207}
+{"id": "dev-00262", "difficulty": "hard", "numbers": [8, 2, 5, 10, 9], "target": 50}
+{"id": "dev-00263", "difficulty": "hard", "numbers": [4, 2, 8, 10, 3], "target": 52}
+{"id": "dev-00264", "difficulty": "hard", "numbers": [14, 1, 5, 3, 10], "target": 122}
+{"id": "dev-00265", "difficulty": "hard", "numbers": [3, 9, 1, 13, 1], "target": 127}
+{"id": "dev-00266", "difficulty": "hard", "numbers": [9, 3, 12, 13, 11], "target": 172}
+{"id": "dev-00267", "difficulty": "hard", "numbers": [7, 11, 11, 12, 10], "target": 160}
+{"id": "dev-00268", "difficulty": "hard", "numbers": [3, 13, 9, 5, 5], "target": 175}
+{"id": "dev-00269", "difficulty": "hard", "numbers": [4, 12, 4, 3, 1], "target": 60}
+{"id": "dev-00270", "difficulty": "hard", "numbers": [10, 4, 2, 1, 11], "target": 136}
+{"id": "dev-00271", "difficulty": "hard", "numbers": [5, 4, 15, 8, 15], "target": 248}
+{"id": "dev-00272", "difficulty": "hard", "numbers": [13, 12, 15, 6, 5], "target": 104}
+{"id": "dev-00273", "difficulty": "hard", "numbers": [7, 11, 15, 5, 3], "target": 114}
+{"id": "dev-00274", "difficulty": "hard", "numbers": [3, 12, 11, 3, 2], "target": 153}
+{"id": "dev-00275", "difficulty": "hard", "numbers": [12, 6, 1, 6, 5], "target": 61}
+{"id": "dev-00276", "difficulty": "hard", "numbers": [11, 12, 6, 4, 2], "target": 116}
+{"id": "dev-00277", "difficulty": "hard", "numbers": [15, 8, 3, 14, 5], "target": 226}
+{"id": "dev-00278", "difficulty": "hard", "numbers": [11, 2, 9, 3, 8], "target": 171}
+{"id": "dev-00279", "difficulty": "hard", "numbers": [6, 14, 2, 13, 2], "target": 92}
+{"id": "dev-00280", "difficulty": "hard", "numbers": [1, 4, 12, 7, 10], "target": 78}
+{"id": "dev-00281", "difficulty": "hard", "numbers": [7, 13, 13, 8, 1], "target": 106}
+{"id": "dev-00282", "difficulty": "hard", "numbers": [11, 11, 1, 3, 8], "target": 87}
+{"id": "dev-00283", "difficulty": "hard", "numbers": [7, 15, 10, 1, 12], "target": 56}
+{"id": "dev-00284", "difficulty": "hard", "numbers": [6, 14, 4, 15, 15], "target": 110}
+{"id": "dev-00285", "difficulty": "hard", "numbers": [13, 10, 4, 8, 8], "target": 52}
+{"id": "dev-00286", "difficulty": "hard", "numbers": [3, 4, 15, 13, 2], "target": 214}
+{"id": "dev-00287", "difficulty": "hard", "numbers": [14, 10, 9, 15, 4], "target": 120}
+{"id": "dev-00288", "difficulty": "hard", "numbers": [13, 3, 7, 3, 3], "target": 207}
+{"id": "dev-00289", "difficulty": "hard", "numbers": [7, 3, 10, 9, 6], "target": 68}
+{"id": "dev-00290", "difficulty": "hard", "numbers": [3, 5, 7, 9, 11], "target": 144}
+{"id": "dev-00291", "difficulty": "hard", "numbers": [2, 6, 2, 5, 14], "target": 210}
+{"id": "dev-00292", "difficulty": "hard", "numbers": [6, 6, 1, 12, 14], "target": 92}
+{"id": "dev-00293", "difficulty": "hard", "numbers": [3, 11, 13, 6, 5], "target": 109}
+{"id": "dev-00294", "difficulty": "hard", "numbers": [8, 12, 3, 7, 1], "target": 99}
+{"id": "dev-00295", "difficulty": "hard", "numbers": [10, 14, 6, 9, 8], "target": 150}
+{"id": "dev-00296", "difficulty": "hard", "numbers": [13, 11, 7, 13, 2], "target": 91}
+{"id": "dev-00297", "difficulty": "hard", "numbers": [1, 7, 6, 11, 1], "target": 53}
+{"id": "dev-00298", "difficulty": "hard", "numbers": [5, 11, 3, 9, 4], "target": 167}
+{"id": "dev-00299", "difficulty": "hard", "numbers": [1, 2, 7, 3, 9], "target": 51}

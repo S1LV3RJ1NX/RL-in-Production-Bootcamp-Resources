@@ -1,0 +1,18 @@
+# RL Capstone — Countdown GRPO
+# Install: pip install -r requirements.txt
+#
+# Colab T4: everything below fits. For full fine-tuning of 0.5B you do NOT need LoRA.
+# Modal:    the reference run uses torch 2.6 / transformers 4.49; adjust if your
+#           Modal image pins different versions.
+
+torch>=2.2.0
+transformers>=4.40.0
+accelerate>=0.28.0
+sentencepiece>=0.1.99
+huggingface_hub>=0.22.0
+
+# optional but recommended for Colab checkpointing
+# google-colab   # pre-installed on Colab
+
+# only needed if you add LoRA (stretch)
+# peft>=0.10.0
