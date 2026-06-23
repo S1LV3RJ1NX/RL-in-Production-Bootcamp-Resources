@@ -16,6 +16,7 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 05 | [Policy Gradients: Learning the Policy Directly, from a Bandit to Actor-Critic](./05-policy-gradients/) | ✅ Draft |
 | 06 | [TRPO and PPO: The Largest Safe Step a Policy Can Take](./06-trpo-ppo/) | ✅ Draft |
 | 07 | [RLHF: Teaching a Language Model What "Good" Means](./07-rlhf/) | ✅ Draft |
+| 08 | [GRPO: Teaching a Model to Reason by Comparing It to Itself](./08-grpo/) | ✅ Draft |
 
 ## Writing a new post
 

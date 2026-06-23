@@ -1542,6 +1542,191 @@ def build_blog07() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 08 — GRPO
+# ----------------------------------------------------------------------------
+BLOG08 = "08-grpo"
+
+
+def fig_models_in_memory() -> None:
+    """Models resident at train time: PPO (~4) vs GRPO (~2), critic dropped."""
+    ppo = [("policy", 1.0, ACCENT), ("reference", 1.0, MUTED),
+           ("reward model", 1.0, ACCENT_SOFT), ("value critic", 1.0, INK)]
+    grpo = [("policy", 1.0, ACCENT), ("reference", 1.0, MUTED),
+            ("verifier", 0.18, DIVIDER)]
+
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    for col, stack in [(0, ppo), (1, grpo)]:
+        bottom = 0.0
+        for name, h, color in stack:
+            ax.bar(col, h, bottom=bottom, width=0.55, color=color,
+                   edgecolor=INK, lw=0.8)
+            ax.text(col, bottom + h / 2, name, ha="center", va="center",
+                    fontsize=9.5, color="#FAFAFA" if color in (INK, ACCENT, MUTED) else INK)
+            bottom += h + 0.04
+    ax.annotate("drop the critic", xy=(0.28, 3.2), xytext=(0.55, 3.55),
+                fontsize=10, color=ACCENT, fontweight="bold",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.4))
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["PPO / RLHF", "GRPO"])
+    ax.set_ylabel("large models held in memory")
+    ax.set_yticks([])
+    ax.set_title("GRPO drops a whole trained model: the value critic")
+    ax.set_ylim(0, 4.6)
+    save(fig, BLOG08, "fig-models-in-memory")
+
+
+def fig_group_baseline() -> None:
+    """The group is the baseline: six rewards, their mean, and the deviations."""
+    rewards = np.array([1, 0, 1, 1, 0, 1], dtype=float)
+    mean = rewards.mean()
+    pos = np.arange(len(rewards))
+
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    colors = [ACCENT if r >= mean else MUTED for r in rewards]
+    ax.bar(pos, rewards, width=0.6, color=colors, edgecolor=INK, lw=0.8)
+    ax.axhline(mean, ls="--", lw=1.8, color=INK)
+    ax.text(len(rewards) - 0.5, mean + 0.03,
+            f"group mean (baseline) = {mean:.3f}", ha="right", va="bottom",
+            fontsize=10, color=INK)
+    for x, r in zip(pos, rewards):
+        dev = r - mean
+        ax.annotate("", xy=(x, r), xytext=(x, mean),
+                    arrowprops=dict(arrowstyle="->",
+                                    color=ACCENT if dev > 0 else MUTED, lw=1.6))
+        ax.text(x, r + (0.03 if r > mean else -0.08), f"{dev:+.2f}",
+                ha="center", va="bottom" if r > mean else "top",
+                fontsize=9, color=ACCENT if dev > 0 else MUTED)
+    ax.set_xticks(pos)
+    ax.set_xticklabels([f"$o_{i+1}$" for i in range(len(rewards))])
+    ax.set_ylabel("verifier reward  $r_i$")
+    ax.set_title("The group's mean is the baseline (no critic needed)")
+    ax.set_ylim(-0.2, 1.2)
+    save(fig, BLOG08, "fig-group-baseline")
+
+
+def fig_advantage_zscore() -> None:
+    """Same group, two advantage flavours: numerator-only vs full z-score."""
+    rewards = np.array([1, 0, 1, 1, 0, 1], dtype=float)
+    numer = rewards - rewards.mean()
+    z = numer / rewards.std()
+    pos = np.arange(len(rewards))
+    w = 0.38
+
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    ax.bar(pos - w / 2, numer, width=w, color=MUTED,
+           label=r"$r_i - \mathrm{mean}$  (Dr. GRPO)")
+    ax.bar(pos + w / 2, z, width=w, color=ACCENT,
+           label=r"$(r_i - \mathrm{mean})\,/\,\mathrm{std}$  (GRPO)")
+    ax.axhline(0, lw=1, color=INK)
+    ax.set_xticks(pos)
+    ax.set_xticklabels([f"$o_{i+1}$" for i in range(len(rewards))])
+    ax.set_ylabel("advantage  $\\hat{A}_i$")
+    ax.set_title("Dividing by the spread only rescales: same signs, same centring")
+    ax.legend(frameon=False, fontsize=9, loc="lower right")
+    save(fig, BLOG08, "fig-advantage-zscore")
+
+
+def fig_all_same_no_signal() -> None:
+    """All-correct / all-wrong groups give zero advantage; only a split teaches."""
+    groups = {
+        "all correct\n{1,1,1,1}": np.array([1, 1, 1, 1], float),
+        "all wrong\n{0,0,0,0}": np.array([0, 0, 0, 0], float),
+        "split\n{1,0,1,0}": np.array([1, 0, 1, 0], float),
+    }
+    fig, axes = plt.subplots(1, 3, figsize=(11, 4.0), sharey=True)
+    for ax, (title, r) in zip(axes, groups.items()):
+        numer = r - r.mean()
+        pos = np.arange(len(r))
+        colors = [ACCENT if d > 0 else (MUTED if d < 0 else DIVIDER) for d in numer]
+        ax.bar(pos, numer, width=0.6, color=colors, edgecolor=INK, lw=0.6)
+        ax.axhline(0, lw=1, color=INK)
+        ax.set_title(title, fontsize=10)
+        ax.set_xticks([])
+        signal = "no gradient" if np.allclose(numer, 0) else "learning signal"
+        ax.text(0.5, 0.92, signal, transform=ax.transAxes, ha="center",
+                fontsize=9.5, fontweight="bold",
+                color=MUTED if np.allclose(numer, 0) else ACCENT)
+    axes[0].set_ylabel("advantage  $r_i - \\mathrm{mean}$")
+    axes[0].set_ylim(-0.7, 0.7)
+    fig.suptitle("A group only teaches when its answers disagree",
+                 fontsize=12.5, fontweight="bold", y=1.02)
+    save(fig, BLOG08, "fig-all-same-no-signal")
+
+
+def fig_length_bias() -> None:
+    """Dr. GRPO: dividing the loss by length under-penalises long answers."""
+    A = 0.5
+    lengths = np.array([20, 200])
+    push = A / lengths
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    bars = ax.bar([0, 1], push, width=0.5, color=[ACCENT, MUTED],
+                  edgecolor=INK, lw=0.8)
+    for b, v, L in zip(bars, push, lengths):
+        ax.text(b.get_x() + b.get_width() / 2, v + 0.0006,
+                f"{v:.4f}\n({L} tokens)", ha="center", va="bottom", fontsize=9.5,
+                color=INK)
+    ax.annotate("10x weaker per-token push\non the long answer",
+                xy=(1, push[1]), xytext=(0.45, 0.018), fontsize=9.5, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.2))
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["short answer", "long answer"])
+    ax.set_ylabel(r"per-token gradient  $\hat{A}_i / |o_i|$")
+    ax.set_title("Why the length normaliser rewards padding (same $\\hat{A}_i = 0.5$)")
+    ax.set_ylim(0, 0.03)
+    save(fig, BLOG08, "fig-length-bias")
+
+
+def fig_grpo_training_curve() -> None:
+    """The assignment's real GSM8K GRPO run: reward (+std) and KL over 250 steps."""
+    reward = [-0.2947, 0.2307, -0.224, -0.1645, -0.0862, 0.222, -0.1065, -0.3965, 0.4123, -0.115, 0.515, 0.2707, -0.0922, -0.2197, 0.0573, -0.0997, 0.2492, 0.6618, -0.121, -0.1368, 0.7557, 0.0218, 0.0278, -0.1048, 0.102, -0.2337, -0.0555, -0.1065, -0.0192, -0.0753, -0.0182, -0.1548, -0.1087, -1.225, -0.0935, 0.001, -0.0477, 0.0, -0.039, -0.2193, 0.0, -0.0577, 0.0, -0.082, 0.0, 0.0, 0.0208, -0.0817, 0.0, -0.0487, 0.0, 0.0602, 0.0002, 0.0, -0.0148, 0.0168, 0.0, 0.0, 0.0, 0.0, 0.3885, 0.0, 0.0, 0.0, 0.0208, 0.3003, 0.0, 0.0, 0.3837, 0.0, 0.2572, 0.0, 0.0, 0.0, 0.021, 0.0, 0.0, -0.1533, 0.0208, 0.0, 0.0, 0.0, -0.0485, 0.0188, 0.0, 0.0085, -0.0413, 0.0, 0.0, 0.0, 0.0, -0.0342, -0.0282, 0.021, 0.0, 0.0, 0.0, 0.0223, -0.0563, 0.0, 0.021, 0.0, 0.0, 0.0585, 0.0, -0.01, -0.0635, 0.0, 0.013, 0.0, 0.0052, 0.0777, 0.0378, 0.0, -0.065, -0.026, 0.0148, 0.0, 0.0, 0.0, -0.1085, 0.0273, 0.0, 0.0313, -0.0402, 0.021, 0.0, -0.0102, -0.0658, 0.0, 0.0, 0.0205, 0.0, 0.0117, 0.0, 0.0, -0.0502, 0.0, 0.0383, 0.0228, 0.0, 0.021, 0.0203, 0.0, -0.0948, 0.4738, 0.0418, 0.024, -0.055, 0.0, 0.021, 0.0792, 0.0, 0.0, 0.0178, 0.0, -0.3202, 0.2283, 0.021, 0.0788, -0.0673, 0.0, -0.3978, 0.0138, 0.0, 0.021, 0.0127, 0.0833, -0.002, 0.0, -0.0158, 0.0187, 0.0, -0.2333, -0.0005, -0.0435, 0.017, 0.0033, -0.1797, 0.0418, 0.021, -0.1782, 0.0208, 0.0197, 0.015, -0.3455, 0.0195, -0.032, 0.0682, 0.0, 0.0015, -0.0702, -0.0437, -0.0352, 0.0238, 0.0, 0.0132, 0.2722, -0.036, 0.0, 0.0413, 0.0, -0.1162, 0.8037, -0.1758, 0.015, 0.0, 0.0325, -0.2618, 0.1028, -0.0715, 0.0163, 0.0, -0.1093, -0.206, -0.1662, -0.1372, 0.0, -0.1337, 0.0, 0.0, 0.003, 0.0258, 0.0, 0.0415, 0.0412, 0.0, 0.0167, 0.0275, 0.0, 0.6483, 0.0708, 0.3462, -0.006, 0.0205, 0.2288, 0.0183, 0.0, 0.0205, 0.0417, -0.0262, 0.0013, 0.0, 0.0, 0.0, 0.0, -0.1563, 0.1283, -0.0305, -0.1538]
+    reward_std = [0.2961, 1.0016, 0.3908, 0.3162, 0.138, 0.7066, 0.2672, 0.4346, 0.8967, 0.261, 0.9042, 0.8, 0.1841, 0.3042, 0.1759, 0.1166, 0.9589, 1.3056, 0.4223, 0.3313, 1.2034, 0.0851, 0.2415, 0.1871, 0.2762, 0.3735, 0.0864, 0.3932, 0.0469, 0.1887, 0.0307, 0.2021, 0.1009, 3.0006, 0.229, 0.1688, 0.0787, 0.0, 0.0727, 0.3855, 0.0, 0.1413, 0.0, 0.2009, 0.0, 0.0, 0.051, 0.2, 0.0, 0.1192, 0.0, 0.1474, 0.0572, 0.0, 0.0363, 0.0412, 0.0, 0.0, 0.0, 0.0, 0.9516, 0.0, 0.0, 0.0, 0.051, 0.7357, 0.0, 0.0, 0.9398, 0.0, 0.6299, 0.0, 0.0, 0.0, 0.0514, 0.0, 0.0, 0.4016, 0.051, 0.0, 0.0, 0.0, 0.1188, 0.0461, 0.0, 0.0208, 0.1012, 0.0, 0.0, 0.0, 0.0, 0.1339, 0.069, 0.0514, 0.0, 0.0, 0.0, 0.0547, 0.138, 0.0, 0.0514, 0.0, 0.0, 0.1433, 0.0, 0.0245, 0.1555, 0.0, 0.0318, 0.0, 0.0127, 0.1902, 0.0586, 0.0, 0.1592, 0.0637, 0.0363, 0.0, 0.0, 0.0, 0.3308, 0.0497, 0.0, 0.0768, 0.0984, 0.0514, 0.0, 0.0249, 0.1613, 0.0, 0.0, 0.0502, 0.0, 0.0286, 0.0, 0.0, 0.1229, 0.0, 0.0596, 0.0559, 0.0, 0.0514, 0.0498, 0.0, 0.2018, 0.9909, 0.1025, 0.0588, 0.1347, 0.0, 0.0514, 0.1424, 0.0, 0.0, 0.0437, 0.0, 0.5018, 0.7341, 0.0514, 0.0616, 0.205, 0.0, 0.4386, 0.0339, 0.0, 0.0514, 0.031, 0.2041, 0.206, 0.0, 0.0247, 0.0289, 0.0, 0.4034, 0.0012, 0.1066, 0.0416, 0.0082, 0.4401, 0.1025, 0.0514, 0.1957, 0.051, 0.0482, 0.0367, 0.5697, 0.0478, 0.2191, 0.1088, 0.0, 0.0522, 0.2076, 0.107, 0.1485, 0.0453, 0.0, 0.0323, 0.6667, 0.0882, 0.0, 0.1012, 0.0, 0.2845, 1.2248, 0.448, 0.0367, 0.0, 0.1735, 0.3159, 0.2519, 0.1751, 0.04, 0.0, 0.2678, 0.3255, 0.3636, 0.2216, 0.0, 0.2649, 0.0, 0.0, 0.1493, 0.04, 0.0, 0.1017, 0.0489, 0.0, 0.0408, 0.0804, 0.0, 1.0102, 0.0581, 0.7892, 0.4196, 0.0502, 0.8379, 0.0449, 0.0, 0.0502, 0.0646, 0.1349, 0.0772, 0.0, 0.0, 0.0, 0.0, 0.3829, 0.2018, 0.1091, 0.3768]
+    kl = [0.0, 0.0, 1e-05, 1e-05, 1e-05, 1e-05, 1e-05, 1e-05, 1e-05, 1e-05, 2e-05, 2e-05, 2e-05, 2e-05, 2e-05, 6e-05, 7e-05, 8e-05, 9e-05, 0.0001, 0.00011, 5e-05, 0.00016, 7e-05, 0.00013, 0.00032, 0.00021, 0.00077, 0.00037, 0.00079, 0.00237, 0.00047, 0.00293, 0.00229, 0.00236, 0.002, 0.00282, 0.00289, 0.00689, 0.00853, 0.00291, 0.02717, 0.00753, 0.00207, 0.00213, 0.00819, 0.26953, 0.04842, 0.00375, 0.1778, 0.00429, 0.02315, 0.27605, 0.01569, 1.26636, 0.00349, 0.00321, 0.00483, 0.01607, 0.0083, 0.02195, 0.0088, 0.00843, 0.00532, 0.05739, 0.00479, 0.00373, 0.00464, 0.00374, 0.0095, 0.00946, 0.00932, 0.00545, 0.00235, 0.00384, 0.00716, 0.00863, 0.32045, 0.00456, 0.00597, 0.01398, 0.00909, 0.03692, 0.00554, 0.00889, 0.0132, 0.12858, 0.01191, 0.01247, 0.00416, 0.00804, 0.00488, 0.00515, 0.00924, 0.01299, 0.00797, 0.01363, 0.00876, 0.00627, 0.00688, 0.04443, 0.00407, 0.01382, 0.01664, 0.00702, 0.00605, 0.02061, 0.00884, 0.00384, 0.01341, 0.00874, 0.31506, 0.04773, 0.01004, 0.01461, 0.00968, 0.00563, 0.00312, 0.00451, 0.00708, 0.05039, 0.01277, 0.0047, 0.00835, 0.00592, 0.0044, 0.00732, 0.17243, 0.00541, 0.00276, 0.00642, 0.00428, 0.00184, 0.00667, 0.01005, 0.02289, 0.12335, 0.0079, 2.03906, 0.55574, 0.00607, 0.00705, 0.00329, 0.00543, 0.00623, 0.00833, 0.0054, 0.24105, 0.00581, 0.00606, 0.00767, 0.0163, 0.01324, 0.00419, 0.00928, 0.0097, 0.00989, 0.19304, 0.00802, 0.01213, 0.00283, 0.00791, 0.04237, 0.01777, 0.0077, 0.00407, 0.00287, 0.01632, 1.77546, 0.00492, 0.0149, 0.14239, 0.0171, 0.00552, 0.05007, 0.02618, 0.01013, 0.02185, 0.00526, 0.00952, 0.00688, 0.27326, 0.01692, 0.00408, 0.01162, 0.00907, 0.05992, 0.10518, 0.2814, 0.00552, 0.13639, 0.00707, 0.00671, 0.00757, 0.02481, 0.00926, 0.07145, 0.00436, 0.00817, 0.01147, 0.18293, 0.01465, 0.00946, 0.15703, 0.01128, 0.01191, 0.01338, 0.02241, 0.28017, 0.02136, 0.00733, 0.01768, 0.01717, 0.01223, 0.04571, 0.13142, 0.01554, 0.00745, 0.01497, 0.0157, 0.00363, 0.55405, 0.06607, 0.00848, 0.02215, 0.01114, 0.02782, 0.00769, 0.0137, 0.00551, 0.01463, 0.18356, 0.04261, 0.08298, 0.01986, 0.12182, 0.01545, 0.00858, 0.00998, 0.00743, 0.08439, 0.01138, 0.01987, 0.01176, 0.00884, 0.00331, 0.00883, 0.01363, 0.04144, 0.00948]
+
+    reward = np.array(reward); reward_std = np.array(reward_std); kl = np.array(kl)
+    steps = np.arange(1, len(reward) + 1)
+
+    def smooth(x, w=11):
+        k = np.ones(w) / w
+        return np.convolve(x, k, mode="same")
+
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.4))
+
+    axes[0].fill_between(steps, reward - reward_std, reward + reward_std,
+                         color=ACCENT_SOFT, alpha=0.30, label="$\\pm$ reward std (in-group spread)")
+    axes[0].plot(steps, reward, lw=0.9, color=ACCENT_SOFT, alpha=0.8)
+    axes[0].plot(steps, smooth(reward), lw=2.4, color=ACCENT, label="reward (smoothed)")
+    axes[0].axhline(0, lw=1, color=INK)
+    axes[0].scatter([204], [0.804], color=INK, zorder=5, s=28)
+    axes[0].annotate("best group\n(step 204)", xy=(204, 0.804), xytext=(120, 0.95),
+                     fontsize=9, color=INK,
+                     arrowprops=dict(arrowstyle="->", color=INK, lw=1))
+    axes[0].set_xlabel("GRPO step")
+    axes[0].set_ylabel("group reward")
+    axes[0].set_title("Reward: noisy, format-driven, slowly rising")
+    axes[0].legend(frameon=False, fontsize=8.5, loc="lower right")
+
+    axes[1].plot(steps, kl + 1e-6, lw=1.6, color=MUTED)
+    axes[1].set_yscale("log")
+    axes[1].set_xlabel("GRPO step")
+    axes[1].set_ylabel("KL to reference (log)")
+    axes[1].set_title("KL stays tiny: the policy never bolts")
+    fig.suptitle("The real assignment: 250 GRPO steps on GSM8K (Llama-3.2-3B)",
+                 fontsize=12.5, fontweight="bold", y=1.02)
+    save(fig, BLOG08, "fig-grpo-training-curve")
+
+
+def build_blog08() -> None:
+    print(f"[{BLOG08}]")
+    fig_models_in_memory()
+    fig_group_baseline()
+    fig_advantage_zscore()
+    fig_all_same_no_signal()
+    fig_length_bias()
+    fig_grpo_training_curve()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -1552,6 +1737,7 @@ BUILDERS = {
     "05": build_blog05,
     "06": build_blog06,
     "07": build_blog07,
+    "08": build_blog08,
 }
 
 
