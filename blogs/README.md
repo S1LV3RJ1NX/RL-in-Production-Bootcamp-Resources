@@ -17,6 +17,7 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 06 | [TRPO and PPO: The Largest Safe Step a Policy Can Take](./06-trpo-ppo/) | ✅ Draft |
 | 07 | [RLHF: Teaching a Language Model What "Good" Means](./07-rlhf/) | ✅ Draft |
 | 08 | [GRPO: Teaching a Model to Reason by Comparing It to Itself](./08-grpo/) | ✅ Draft |
+| 09 | [DPO and Agentic RL: Align Without a Reward Model, Then Step Into the World](./09-dpo-and-agentic-rl/) | ✅ Draft |
 
 ## Writing a new post
 

@@ -1727,6 +1727,173 @@ def build_blog08() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 09 — DPO, SimPO, KTO, and Agentic RL
+# ----------------------------------------------------------------------------
+BLOG09 = "09-dpo-and-agentic-rl"
+
+
+def fig_dpo_margin() -> None:
+    """DPO loss and gradient weight as functions of the margin (beta=0.1)."""
+    beta = 0.1
+    m = np.linspace(-1.5, 2.0, 400)
+    loss = -np.log(1.0 / (1.0 + np.exp(-m)))            # -log sigma(m)
+    weight = beta / (1.0 + np.exp(m))                   # beta * sigma(-m)
+    m_star = 0.12                                       # the worked-example pair
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.3))
+
+    ax1.plot(m, loss, lw=2.4, color=ACCENT)
+    ax1.axhline(np.log(2), ls=":", lw=1.3, color=MUTED)
+    ax1.text(1.95, np.log(2) + 0.04, "coin-flip  $-\\ln 2$", ha="right",
+             va="bottom", fontsize=9, color=MUTED)
+    loss_star = -np.log(1.0 / (1.0 + np.exp(-m_star)))
+    ax1.scatter([m_star], [loss_star], s=55, color=INK, zorder=5)
+    ax1.annotate("worked pair\n$m=+0.12,\\ \\mathcal{L}\\approx0.64$",
+                 xy=(m_star, loss_star), xytext=(0.55, 1.15), fontsize=9,
+                 color=INK, arrowprops=dict(arrowstyle="->", color=INK, lw=1))
+    ax1.set_xlabel("margin  $m = \\hat{r}_w - \\hat{r}_l$")
+    ax1.set_ylabel("DPO loss  $-\\log\\sigma(m)$")
+    ax1.set_title("Loss falls as the ranking gets clearer")
+    ax1.set_ylim(-0.05, 2.2)
+
+    ax2.plot(m, weight, lw=2.4, color=ACCENT)
+    w_star = beta / (1.0 + np.exp(m_star))
+    ax2.scatter([m_star], [w_star], s=55, color=INK, zorder=5)
+    ax2.annotate("mis-ranked pairs\nget the biggest push", xy=(-1.0, beta / (1 + np.exp(-1.0))),
+                 xytext=(-1.45, 0.045), fontsize=9, color=ACCENT,
+                 arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.2))
+    ax2.set_xlabel("margin  $m = \\hat{r}_w - \\hat{r}_l$")
+    ax2.set_ylabel("gradient weight  $\\beta\\,\\sigma(-m)$")
+    ax2.set_title("Weight fades once the pair is confidently correct")
+    ax2.set_ylim(0, beta * 1.02)
+
+    fig.suptitle("DPO spends its gradient on the pairs it currently gets wrong",
+                 fontsize=14, fontweight="bold", color=INK)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    save(fig, BLOG09, "fig-dpo-margin")
+
+
+def fig_simpo_length() -> None:
+    """Sum vs average log-prob: the length bias DPO has and SimPO removes."""
+    chosen = np.array([-0.20, -0.30, -0.10])               # short, confident
+    rejected = np.array([-0.50, -0.60, -0.70, -0.60, -0.80, -0.70])  # long, mediocre
+    sums = [chosen.sum(), rejected.sum()]
+    avgs = [chosen.mean(), rejected.mean()]
+    labels = [f"chosen\n(short, {len(chosen)} tok)", f"rejected\n(long, {len(rejected)} tok)"]
+    pos = np.arange(2)
+    w = 0.38
+
+    fig, ax = plt.subplots(figsize=(8.4, 4.6))
+    ax.bar(pos - w / 2, sums, width=w, color=MUTED, edgecolor=INK, lw=0.8,
+           label="sum  $\\sum\\log\\pi$  (DPO, length-biased)")
+    ax.bar(pos + w / 2, avgs, width=w, color=ACCENT, edgecolor=INK, lw=0.8,
+           label="average  $\\frac{1}{|y|}\\sum\\log\\pi$  (SimPO)")
+    ax.axhline(0, lw=1, color=INK)
+    for x, (s, a) in enumerate(zip(sums, avgs)):
+        ax.text(x - w / 2, s - 0.12, f"{s:+.2f}", ha="center", va="top", fontsize=9, color=MUTED)
+        ax.text(x + w / 2, a - 0.04, f"{a:+.2f}", ha="center", va="top", fontsize=9, color=ACCENT)
+    ax.set_xticks(pos)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("log-probability score")
+    ax.set_title("By sum, length wins; by average, per-token quality wins")
+    ax.legend(frameon=False, fontsize=9, loc="lower left")
+    save(fig, BLOG09, "fig-simpo-length")
+
+
+def fig_kto_value_curve() -> None:
+    """The Kahneman-Tversky value curve: S-shape, steeper for losses."""
+    x = np.linspace(-3, 3, 400)
+    lam_gain, lam_loss = 1.0, 1.5                          # loss aversion: losses weigh more
+    gains = np.where(x >= 0, lam_gain * (1 - np.exp(-0.9 * x)), np.nan)
+    losses = np.where(x < 0, -lam_loss * (1 - np.exp(0.9 * x)), np.nan)
+
+    fig, ax = plt.subplots(figsize=(7.6, 4.8))
+    ax.plot(x, gains, lw=2.6, color=ACCENT, label="gains (thumbs-up above $z_0$)")
+    ax.plot(x, losses, lw=2.6, color=MUTED, label="losses (thumbs-down below $z_0$)")
+    ax.axhline(0, lw=1, color=INK)
+    ax.axvline(0, lw=1, color=INK)
+    ax.text(0.08, 2.0, "reference\npoint  $z_0$", fontsize=9, color=INK, va="top")
+    ax.annotate("a loss hurts more than\nan equal gain feels good",
+                xy=(-1.6, -lam_loss * (1 - np.exp(0.9 * -1.6))),
+                xytext=(-2.95, -0.4), fontsize=9, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.1))
+    ax.set_xlabel("reward relative to reference  $r_\\theta - z_0$")
+    ax.set_ylabel("subjective value  $v$")
+    ax.set_title("KTO borrows prospect theory: diminishing sensitivity + loss aversion")
+    ax.legend(frameon=False, fontsize=9, loc="lower right")
+    ax.set_ylim(-2.4, 2.4)
+    save(fig, BLOG09, "fig-kto-value-curve")
+
+
+def fig_credit_assignment() -> None:
+    """A multi-step trajectory earns one terminal reward; which steps get credit?"""
+    steps = ["think", "search", "observe", "search", "observe", "answer"]
+    kinds = ["agent", "agent", "env", "agent", "env", "agent"]
+    pos = np.arange(len(steps))
+
+    fig, ax = plt.subplots(figsize=(10.2, 4.4))
+    for x, (s, k) in enumerate(zip(steps, kinds)):
+        color = ACCENT if k == "agent" else DIVIDER
+        ax.scatter(x, 0, s=950, color=color, edgecolor=INK, lw=1.0, zorder=3)
+        ax.text(x, 0, s, ha="center", va="center", fontsize=8.5,
+                color="#FAFAFA" if k == "agent" else INK, zorder=4)
+        if x < len(steps) - 1:
+            ax.annotate("", xy=(x + 0.72, 0), xytext=(x + 0.28, 0),
+                        arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.4))
+    # terminal reward
+    rx = len(steps)
+    ax.scatter(rx, 0, marker="*", s=1500, color=ACCENT, edgecolor=INK, lw=1.0, zorder=3)
+    ax.text(rx, -0.34, "reward\n0 / 1", ha="center", va="top", fontsize=9, color=ACCENT)
+    ax.annotate("", xy=(rx - 0.32, 0), xytext=(rx - 1 + 0.28, 0),
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.4))
+    # credit arcs back over the agent's actions
+    for x, k in zip(pos, kinds):
+        if k == "agent":
+            ax.annotate("", xy=(x, 0.16), xytext=(rx, 0.16),
+                        arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.1,
+                                        connectionstyle="arc3,rad=0.35", alpha=0.7))
+    ax.text((rx) / 2, 0.95, "one sparse reward, credited back over the agent's own actions",
+            ha="center", fontsize=10, color=INK, style="italic")
+    ax.text(2, -0.62, "grey = environment observations (masked, no gradient)",
+            ha="center", fontsize=8.5, color=MUTED)
+    ax.set_xlim(-0.7, rx + 0.7)
+    ax.set_ylim(-0.9, 1.2)
+    ax.axis("off")
+    ax.set_title("Credit assignment over a trajectory", color=INK, fontweight="bold")
+    save(fig, BLOG09, "fig-credit-assignment")
+
+
+def fig_env_scaling() -> None:
+    """RL environment counts exploding across model generations (log axis)."""
+    gens = ["gen 1\n(CartPole era)", "gen 2", "gen 3", "gen 4\n(Qwen3.5 era)"]
+    counts = [20, 20_000, 200_000, 3_000_000]
+    pos = np.arange(len(gens))
+
+    fig, ax = plt.subplots(figsize=(8.6, 4.6))
+    bars = ax.bar(pos, counts, width=0.6, color=ACCENT, edgecolor=INK, lw=0.8)
+    ax.set_yscale("log")
+    for x, c in zip(pos, counts):
+        label = f"~{c:,}" if c < 1000 else (f"~{c // 1000}k" if c < 1_000_000 else f"~{c // 1_000_000}M")
+        ax.text(x, c * 1.25, label, ha="center", va="bottom", fontsize=10,
+                color=INK, fontweight="bold")
+    ax.set_xticks(pos)
+    ax.set_xticklabels(gens)
+    ax.set_ylabel("RL environments used  (log scale)")
+    ax.set_title("The environment, not the model, became the scarce resource")
+    ax.set_ylim(5, 1e7)
+    save(fig, BLOG09, "fig-env-scaling")
+
+
+def build_blog09() -> None:
+    print(f"[{BLOG09}]")
+    fig_dpo_margin()
+    fig_simpo_length()
+    fig_kto_value_curve()
+    fig_credit_assignment()
+    fig_env_scaling()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -1738,6 +1905,7 @@ BUILDERS = {
     "06": build_blog06,
     "07": build_blog07,
     "08": build_blog08,
+    "09": build_blog09,
 }
 
 
