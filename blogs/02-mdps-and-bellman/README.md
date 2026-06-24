@@ -117,6 +117,18 @@ p(s', r | s=6, a=2):
 
 Because the ice is slippery, action "Right" from state 6 has only a 1/3 chance of actually going right (to state 7, a hole!). The other 2/3 of the time the agent slides down or up. This is the stochasticity that makes the problem an MDP rather than a deterministic puzzle.
 
+#### Worked example: reading the dynamics table
+
+FrozenLake state 6, action Right (2). From `env.unwrapped.P[6][2]`:
+
+| $p$ | $s'$             | $r$ | done |
+| --- | ---------------- | --- | ---- |
+| 1/3 | 10 (down)        | 0   | no   |
+| 1/3 | 7 (right, hole!) | 0   | yes  |
+| 1/3 | 2 (up)           | 0   | no   |
+
+Probabilities sum to 1. The agent intended to go right, but on slippery ice it slides down or up with equal probability: that's the stochasticity encoded in $p(s', r \mid s, a)$.
+
 ### 2.2 Returns: what exactly are we maximizing?
 
 The agent doesn't maximize a single reward; it maximizes the **return** $G_t$, the cumulative discounted reward from time $t$ onward:
@@ -316,6 +328,22 @@ $Q(6, \text{Left})$ is highest (tied with Right), so the greedy policy says "go 
 
 </details>
 
+#### Worked example: verifying the V-Q bridge
+
+From a simplified deterministic FrozenLake: $Q(14, \cdot) = [0, 0, 1, 0]$ (Left, Down, Right, Up). Under a uniform policy:
+
+$$
+V(14) = \sum_a \pi(a)\,Q(14, a) = 0.25 \times 0 + 0.25 \times 0 + 0.25 \times 1 + 0.25 \times 0 = 0.25
+$$
+
+Check the other direction:
+
+$$
+Q(14, \text{Right}) = \sum_{s'} p(s' \mid 14, \text{Right})\,[r + \gamma V(s')] = 1 \times [1 + 0] = 1.0 \quad\checkmark
+$$
+
+Both bridges agree. $V$ is the policy average of $Q$; $Q$ is the dynamics average of $[r + \gamma V']$.
+
 ### 2.5 The Bellman expectation equation
 
 Now the payoff. Start from the recursive return $G_t = R_{t+1} + \gamma\,G_{t+1}$ and take the expectation conditioned on $S_t = s$:
@@ -422,6 +450,57 @@ With all states at zero except the goal, the backup at state 6 gives zero becaus
 
 </details>
 
+#### Worked example: computing $V^\pi$ and $Q^\pi$ on a tiny slice
+
+Consider a simplified **deterministic** FrozenLake near the goal. Focus on state 14 (one cell left of the goal at state 15). Under a uniform random policy ($\pi = 0.25$ for each action), with $\gamma = 0.99$:
+
+For simplicity, assume deterministic transitions (no slipping) and that states 5, 7, 11, 12 are holes ($V = 0$), state 15 is the goal ($V = 0$ after absorbing, reward $+1$ for arriving).
+
+**$Q^\pi(14, a)$ for each action (deterministic):**
+
+- $Q(14, \text{Right}) = r + \gamma V(15) = 1 + 0.99 \times 0 = 1.00$ (reaches goal, gets reward!)
+- $Q(14, \text{Left}) = 0 + 0.99 \times V(13) \approx 0$ (state 13, far from goal)
+- $Q(14, \text{Down}) = 0 + 0.99 \times V(14) = 0.99 \times V(14)$ (stays put in some layouts)
+- $Q(14, \text{Up}) = 0 + 0.99 \times V(10) \approx 0$ (state 10, far from goal)
+
+**$V^\pi(14)$ under the uniform policy:**
+
+$$
+V^\pi(14) = \sum_a \pi(a \mid 14)\,Q(14, a) = 0.25 \times 1.00 + 0.25 \times 0 + 0.25 \times 0 + 0.25 \times 0 = 0.25
+$$
+
+(Approximating the less-certain directions as near-zero for this hand calculation.)
+
+**Optimal value and policy:**
+
+$$
+V^*(14) = \max_a Q^*(14, a) = Q^*(14, \text{Right}) = 1.00
+$$
+
+$$
+\pi^*(14) = \arg\max_a Q^*(14, a) = \text{Right}
+$$
+
+The optimal policy at state 14 simply says "go Right", because that action leads directly to the $+1$ reward.
+
+#### Worked example: how the slippery version changes things
+
+On the actual slippery FrozenLake, "Right" from state 14 has three outcomes:
+
+| $p$ | $s'$       | $r$ |
+| --- | ---------- | --- |
+| 1/3 | 14 (stay!) | 0   |
+| 1/3 | 15 (goal!) | 1   |
+| 1/3 | 10 (up)    | 0   |
+
+So:
+
+$$
+Q(14, \text{Right}) = \tfrac{1}{3}(0 + 0.99\,V(14)) + \tfrac{1}{3}(1 + 0.99 \times 0) + \tfrac{1}{3}(0 + 0.99\,V(10))
+$$
+
+The value of going Right is no longer a clean 1.0: it's diluted by the 2/3 chance of sliding elsewhere (or staying put). This is why the Bellman equation averages over environment randomness.
+
 ### 2.6 The Bellman optimality equation
 
 Replace the policy's weighted average $\sum_a \pi(a \mid s)\,(\cdots)$ with a **maximum** $\max_a\,(\cdots)$, and you get the equation for the **optimal** value:
@@ -461,6 +540,21 @@ Interpretation: once you have the optimal Q-values, the optimal policy is trivia
 
 </details>
 
+#### Worked example: the optimal policy on slippery FrozenLake
+
+![V* heatmap and greedy policy arrows on FrozenLake 4x4 (computed by value iteration).](./images/fig-grid-values.svg)
+
+The heatmap above shows $V^*$ for every state (computed by value iteration, which we'll derive in the next post). The arrows show $\pi^* = \arg\max_a Q^*$: the greedy policy that falls out of the optimal Q-values.
+
+**Why do the arrows look wrong?** Many arrows point _away_ from the goal: Left and Up in the top rows, Down at state 14 (the cell right next to the goal). This is **correct** and it's entirely because the ice is slippery. On slippery FrozenLake, every action has only a 1/3 chance of going where intended; the other 2/3 of the time the agent slides perpendicular. So the optimal strategy isn't "aim for the goal", it's **"aim so that your slips land somewhere safe."**
+
+Consider state 14 (value 0.86, one cell left of the goal). Right seems obvious, but:
+
+- **Right**: 1/3 reaches the goal, but 1/3 slides up to state 10 (V = 0.62, far away). Q = 0.82.
+- **Down**: 1/3 reaches the goal _as a perpendicular slip_, 1/3 stays at state 14 (V = 0.86), and 1/3 slips to state 13 (V = 0.74). All slip destinations are high-value. Q = **0.86**.
+
+Down wins because its worst-case slip is much better. The same logic explains the top-row arrows: by pointing Left or Up into the walls, the agent uses them as bumpers, since it can't slip off the grid, so two of its three outcomes keep it in the same (safe) cell instead of sliding toward a hole. **The optimal policy minimizes the damage from slips, not the distance to the goal.**
+
 ### 2.7 The same recursion on a different surface
 
 A remarkable claim: DQN, AlphaGo, PPO, and GRPO are all the same recursion, $V(s) = r + \gamma \cdot V(s')$, applied to different definitions of state, action, and reward:
@@ -490,103 +584,7 @@ The Bellman equation is the universal backbone. Everything else is engineering t
 
 ---
 
-## 3. Worked examples (by hand)
-
-### Example A: reading the dynamics table
-
-FrozenLake state 6, action Right (2). From `env.unwrapped.P[6][2]`:
-
-| $p$ | $s'$             | $r$ | done |
-| --- | ---------------- | --- | ---- |
-| 1/3 | 10 (down)        | 0   | no   |
-| 1/3 | 7 (right, hole!) | 0   | yes  |
-| 1/3 | 2 (up)           | 0   | no   |
-
-Probabilities sum to 1. The agent intended to go right, but on slippery ice it slides down or up with equal probability: that's the stochasticity encoded in $p(s', r \mid s, a)$.
-
-### Example B: computing $V^\pi$ and $Q^\pi$ on a tiny slice
-
-Consider a simplified **deterministic** FrozenLake near the goal. Focus on state 14 (one cell left of the goal at state 15). Under a uniform random policy ($\pi = 0.25$ for each action), with $\gamma = 0.99$:
-
-For simplicity, assume deterministic transitions (no slipping) and that states 5, 7, 11, 12 are holes ($V = 0$), state 15 is the goal ($V = 0$ after absorbing, reward $+1$ for arriving).
-
-**$Q^\pi(14, a)$ for each action (deterministic):**
-
-- $Q(14, \text{Right}) = r + \gamma V(15) = 1 + 0.99 \times 0 = 1.00$ (reaches goal, gets reward!)
-- $Q(14, \text{Left}) = 0 + 0.99 \times V(13) \approx 0$ (state 13, far from goal)
-- $Q(14, \text{Down}) = 0 + 0.99 \times V(14) = 0.99 \times V(14)$ (stays put in some layouts)
-- $Q(14, \text{Up}) = 0 + 0.99 \times V(10) \approx 0$ (state 10, far from goal)
-
-**$V^\pi(14)$ under the uniform policy:**
-
-$$
-V^\pi(14) = \sum_a \pi(a \mid 14)\,Q(14, a) = 0.25 \times 1.00 + 0.25 \times 0 + 0.25 \times 0 + 0.25 \times 0 = 0.25
-$$
-
-(Approximating the less-certain directions as near-zero for this hand calculation.)
-
-**Optimal value and policy:**
-
-$$
-V^*(14) = \max_a Q^*(14, a) = Q^*(14, \text{Right}) = 1.00
-$$
-
-$$
-\pi^*(14) = \arg\max_a Q^*(14, a) = \text{Right}
-$$
-
-The optimal policy at state 14 simply says "go Right", because that action leads directly to the $+1$ reward.
-
-### Example C: how the slippery version changes things
-
-On the actual slippery FrozenLake, "Right" from state 14 has three outcomes:
-
-| $p$ | $s'$       | $r$ |
-| --- | ---------- | --- |
-| 1/3 | 14 (stay!) | 0   |
-| 1/3 | 15 (goal!) | 1   |
-| 1/3 | 10 (up)    | 0   |
-
-So:
-
-$$
-Q(14, \text{Right}) = \tfrac{1}{3}(0 + 0.99\,V(14)) + \tfrac{1}{3}(1 + 0.99 \times 0) + \tfrac{1}{3}(0 + 0.99\,V(10))
-$$
-
-The value of going Right is no longer a clean 1.0: it's diluted by the 2/3 chance of sliding elsewhere (or staying put). This is why the Bellman equation averages over environment randomness.
-
-### Example D: verifying the V–Q bridge
-
-From the worked example: $Q(14, \cdot) = [0, 0, 1, 0]$ (simplified, deterministic). Under a uniform policy:
-
-$$
-V(14) = \sum_a \pi(a)\,Q(14, a) = 0.25 \times 0 + 0.25 \times 0 + 0.25 \times 1 + 0.25 \times 0 = 0.25
-$$
-
-Check the other direction:
-
-$$
-Q(14, \text{Right}) = \sum_{s'} p(s' \mid 14, \text{Right})\,[r + \gamma V(s')] = 1 \times [1 + 0] = 1.0 \quad\checkmark
-$$
-
-Both bridges agree. $V$ is the policy average of $Q$; $Q$ is the dynamics average of $[r + \gamma V']$.
-
-![V* heatmap and greedy policy arrows on FrozenLake 4x4 (computed by value iteration).](./images/fig-grid-values.svg)
-
-The heatmap above shows $V^*$ for every state (computed by value iteration, which we'll derive in the next post). The arrows show $\pi^* = \arg\max_a Q^*$: the greedy policy that falls out of the optimal Q-values.
-
-**Why do the arrows look wrong?** Many arrows point _away_ from the goal: Left and Up in the top rows, Down at state 14 (the cell right next to the goal). This is **correct** and it's entirely because the ice is slippery. On slippery FrozenLake, every action has only a 1/3 chance of going where intended; the other 2/3 of the time the agent slides perpendicular. So the optimal strategy isn't "aim for the goal", it's **"aim so that your slips land somewhere safe."**
-
-Consider state 14 (value 0.86, one cell left of the goal). Right seems obvious, but:
-
-- **Right**: 1/3 reaches the goal, but 1/3 slides up to state 10 (V = 0.62, far away). Q = 0.82.
-- **Down**: 1/3 reaches the goal _as a perpendicular slip_, 1/3 stays at state 14 (V = 0.86), and 1/3 slips to state 13 (V = 0.74). All slip destinations are high-value. Q = **0.86**.
-
-Down wins because its worst-case slip is much better. The same logic explains the top-row arrows: by pointing Left or Up into the walls, the agent uses them as bumpers, since it can't slip off the grid, so two of its three outcomes keep it in the same (safe) cell instead of sliding toward a hole. **The optimal policy minimizes the damage from slips, not the distance to the goal.**
-
----
-
-## 4. Putting it all together: solving Bellman exactly on FrozenLake
+## 3. Putting it all together: solving Bellman exactly on FrozenLake
 
 We've seen each idea in isolation. Here's the whole vocabulary as a quick reference, then one runnable program that solves the Bellman expectation equation as a linear system: no iteration, no sampling, just linear algebra.
 
