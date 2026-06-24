@@ -254,19 +254,21 @@ def fig_backup_diagram() -> None:
     q_parents = [0, 0, 1, 1, 2, 2]
     for i, (vx, vy) in enumerate(zip(v_prime_x, v_prime_y)):
         ax.add_patch(plt.Circle((vx, vy), 0.18, fc=CANVAS, ec=MUTED, **circle_kw))
-        ax.text(vx, vy, r"$V'$", color=MUTED, fontsize=9, ha="center", va="center", zorder=6)
+        ax.text(vx, vy, "V\u2032", color=MUTED, fontsize=9, fontstyle="italic",
+                ha="center", va="center", zorder=6)
         qx, qy = q_positions[q_parents[i]]
         ax.plot([qx, vx], [qy - 0.22, vy + 0.18], color=MUTED, lw=1.5, zorder=3)
 
-    # p labels
-    ax.text(-1.0, 1.1, r"$p(s',r|s,a)$", color=MUTED, fontsize=10, ha="center")
+    # p labels — use Unicode prime to avoid cmsy10 rendering issues
+    ax.text(-1.0, 1.1, "p(s\u2032, r | s, a)", color=MUTED, fontsize=10,
+            fontstyle="italic", ha="center")
 
     # Layer labels
-    ax.text(-1.45, 3.0, "state $s$", color=ACCENT, fontsize=10, va="center")
-    ax.text(-1.45, 1.8, "action $a$", color=INK, fontsize=10, va="center")
-    ax.text(-1.45, 0.4, "next $s'$", color=MUTED, fontsize=10, va="center")
+    ax.text(-1.45, 3.0, "state s", color=ACCENT, fontsize=10, fontstyle="italic", va="center")
+    ax.text(-1.45, 1.8, "action a", color=INK, fontsize=10, fontstyle="italic", va="center")
+    ax.text(-1.45, 0.4, "next s\u2032", color=MUTED, fontsize=10, fontstyle="italic", va="center")
 
-    ax.set_title("Backup diagram: V decomposes into Q, Q decomposes into V'", fontsize=12, pad=12)
+    ax.set_title("Backup diagram: V decomposes into Q, Q decomposes into V\u2032", fontsize=12, pad=12)
     save(fig, BLOG02, "fig-backup-diagram")
 
 

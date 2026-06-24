@@ -200,7 +200,7 @@ The two diagrams below visualize these equations as a tree and a bar chart.
 
 ![Value vs action-value: V is the policy-weighted average of Q at a state.](./images/fig-v-vs-q.svg)
 
-**Reading the bar chart.** Each bar is $Q^\pi(s, a)$ for one action (Left, Down, Right, Up) at a single state. The bars have different heights because some actions lead to better outcomes than others (Right is tallest here: it leads toward the goal). The dashed horizontal line is $V^\pi(s)$: the policy-weighted average of all four bars. Under a uniform policy ($\pi = 0.25$ for each action), V sits at exactly 1/4 of the way up each bar, averaged. This is the V-Q bridge in a picture: V is just the expected Q under the policy.
+**Reading the bar chart.** Each bar is $Q^\pi(s, a)$ for one action (Left, Down, Right, Up) at a single state. The bars have different heights because some actions lead to better outcomes than others (Right is tallest here: it leads toward the goal). The dashed horizontal line is $V^\pi(s) \approx 0.026$: the policy-weighted average of all four Q-values. Under a uniform policy ($\pi = 0.25$ for each action), that average is simply $(Q_\text{Left} + Q_\text{Down} + Q_\text{Right} + Q_\text{Up}) / 4$, which lands between the bars, not at any single bar's height. This is the V-Q bridge in a picture: V is just the expected Q under the policy.
 
 #### Why $Q$ matters more in practice
 
