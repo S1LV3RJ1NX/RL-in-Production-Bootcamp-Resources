@@ -192,9 +192,15 @@ Read: "Q-pi of s, a equals the sum over all possible next states s' and rewards 
 
 Interpretation: $Q$ is the environment-weighted average of $[r + \gamma V']$. You average over where the environment sends you: each landing spot contributes its immediate reward plus the discounted value of landing there, weighted by how likely that transition is.
 
+The two diagrams below visualize these equations as a tree and a bar chart.
+
 ![Backup diagram: V branches over actions via π to Q; Q branches over next states via p to V'.](./images/fig-backup-diagram.svg)
 
+**Reading the backup diagram (tree).** Start at the top: the single $V$ node is the state you're in. Going *down one level*, it branches into multiple $Q$ nodes, one per action the policy might take. The edges are labeled $\pi(a_i)$: the probability the policy gives to each action. This is the first equation ($V = \sum_a \pi \cdot Q$): V averages over actions using policy probabilities. Going *down another level*, each $Q$ node branches into multiple $V'$ nodes (next states). The edges are labeled $p(s', r \mid s, a)$: the transition probabilities from the environment. This is the second equation ($Q = \sum_{s'} p \cdot [r + \gamma V']$): Q averages over next states using environment probabilities. Together, the full tree from top to bottom is the expanded Bellman equation: two layers of averaging (agent choice, then environment randomness).
+
 ![Value vs action-value: V is the policy-weighted average of Q at a state.](./images/fig-v-vs-q.svg)
+
+**Reading the bar chart.** Each bar is $Q^\pi(s, a)$ for one action (Left, Down, Right, Up) at a single state. The bars have different heights because some actions lead to better outcomes than others (Right is tallest here: it leads toward the goal). The dashed horizontal line is $V^\pi(s)$: the policy-weighted average of all four bars. Under a uniform policy ($\pi = 0.25$ for each action), V sits at exactly 1/4 of the way up each bar, averaged. This is the V-Q bridge in a picture: V is just the expected Q under the policy.
 
 #### Why $Q$ matters more in practice
 
