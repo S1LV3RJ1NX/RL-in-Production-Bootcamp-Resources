@@ -196,7 +196,7 @@ The two diagrams below visualize these equations as a tree and a bar chart.
 
 ![Backup diagram: V branches over actions via π to Q; Q branches over next states via p to V'.](./images/fig-backup-diagram.svg)
 
-**Reading the backup diagram (tree).** Start at the top: the single $V$ node is the state you're in. Going *down one level*, it branches into multiple $Q$ nodes, one per action the policy might take. The edges are labeled $\pi(a_i)$: the probability the policy gives to each action. This is the first equation ($V = \sum_a \pi \cdot Q$): V averages over actions using policy probabilities. Going *down another level*, each $Q$ node branches into multiple $V'$ nodes (next states). The edges are labeled $p(s', r \mid s, a)$: the transition probabilities from the environment. This is the second equation ($Q = \sum_{s'} p \cdot [r + \gamma V']$): Q averages over next states using environment probabilities. Together, the full tree from top to bottom is the expanded Bellman equation: two layers of averaging (agent choice, then environment randomness).
+**Reading the backup diagram (tree).** Start at the top: the single $V$ node is the state you're in. Going _down one level_, it branches into multiple $Q$ nodes, one per action the policy might take. The edges are labeled $\pi(a_i)$: the probability the policy gives to each action. This is the first equation ($V = \sum_a \pi \cdot Q$): V averages over actions using policy probabilities. Going _down another level_, each $Q$ node branches into multiple $V'$ nodes (next states). The edges are labeled $p(s', r \mid s, a)$: the transition probabilities from the environment. This is the second equation ($Q = \sum_{s'} p \cdot [r + \gamma V']$): Q averages over next states using environment probabilities. Together, the full tree from top to bottom is the expanded Bellman equation: two layers of averaging (agent choice, then environment randomness).
 
 ![Value vs action-value: V is the policy-weighted average of Q at a state.](./images/fig-v-vs-q.svg)
 
@@ -326,15 +326,35 @@ $$
 
 Read: "V-pi of s equals the expected value of [R_{t+1} plus gamma times V-pi of the next state S_{t+1}], given S_t = s, under policy pi."
 
-Interpretation: **the value of a state is the expected immediate reward plus the discounted value of the next state.** This is the Bellman equation in one line. Now expand the expectation in two steps:
+Interpretation: **the value of a state is the expected immediate reward plus the discounted value of the next state.** This is the Bellman equation in one line. But that $\mathbb{E}_\pi[\cdots]$ still hides two sources of randomness: (1) which action the agent picks, and (2) where the environment sends it. Let's peel them off one at a time.
 
-**Step 1: average over the agent's action randomness (policy $\pi$):**
+**Step 1: expand the expectation over the agent's action randomness (policy $\pi$).**
+
+The expectation $\mathbb{E}_\pi[\cdots \mid S_t = s]$ is an average over *everything random* that can happen from state $s$. The first random thing is: which action does the agent pick? The probability of picking action $a$ is $\pi(a \mid s)$. By the law of total expectation ("split an average into cases and weight each case by its probability"):
 
 $$
-= \sum_a \pi(a \mid s)\;\mathbb{E}\big[R_{t+1} + \gamma\,V^\pi(S_{t+1}) \mid S_t = s, A_t = a\big]
+\mathbb{E}_\pi[\cdots \mid S_t = s] \;=\; \sum_a \underbrace{\pi(a \mid s)}_{\text{prob of case } a} \;\cdot\; \underbrace{\mathbb{E}[\cdots \mid S_t = s,\, A_t = a]}_{\text{average within that case}}
 $$
 
-**Step 2: average over the environment's state randomness (dynamics $p$):**
+So the full line becomes:
+
+$$
+V^\pi(s) = \sum_a \pi(a \mid s)\;\mathbb{E}\big[R_{t+1} + \gamma\,V^\pi(S_{t+1}) \mid S_t = s, A_t = a\big]
+$$
+
+Why is there still an $\mathbb{E}$ inside? Because even after fixing the action, there is still randomness left: the *environment* hasn't rolled its dice yet. We know the state ($s$) and the action ($a$), but the next state $S_{t+1}$ is still random (the ice is slippery!). The inner expectation averages over that remaining environment randomness.
+
+**Step 2: expand the remaining expectation over the environment's state randomness (dynamics $p$).**
+
+Now we're inside a fixed $(s, a)$ pair. The only randomness left is which next state $s'$ the environment produces, with probability $p(s' \mid s, a)$. Apply the same rule again ("split into cases, weight by probability"), but this time the cases are next states:
+
+$$
+\mathbb{E}[\cdots \mid S_t = s, A_t = a] \;=\; \sum_{s'} p(s' \mid s, a)\;\big[R(s, a, s') + \gamma\,V^\pi(s')\big]
+$$
+
+No $\mathbb{E}$ remains because once we fix $s$, $a$, and $s'$, nothing is random anymore: the reward $R(s,a,s')$ is a known number, and $V^\pi(s')$ is a fixed value for that next state.
+
+**Substituting Step 2 into Step 1 gives the full Bellman expectation equation:**
 
 $$
 \boxed{V^\pi(s) = \sum_a \pi(a \mid s) \sum_{s'} p(s' \mid s, a)\;\big[R(s, a, s') + \gamma\,V^\pi(s')\big]}
@@ -342,7 +362,7 @@ $$
 
 Read: "V-pi of s equals the sum over actions a of pi(a|s) times the sum over next states s' of p(s'|s,a) times [R(s,a,s') + gamma times V-pi(s')]."
 
-Interpretation: for each action I might take (weighted by my policy), for each state I might land in (weighted by transition probability), add the reward I get plus the discounted value of where I land.
+Interpretation: for each action I might take (weighted by my policy), for each state I might land in (weighted by transition probability), add the reward I get plus the discounted value of where I land. Two nested sums, one per source of randomness, and once both are expanded there is nothing random left.
 
 Both steps use the same rule: $\mathbb{E}[X] = \sum (\text{possible value}) \times (\text{probability})$. Step 1 applies it to actions (probabilities from $\pi$). Step 2 applies it to next states (probabilities from $p$).
 
@@ -376,8 +396,10 @@ def bellman_backup(V, s, pi):
 # Initialize V to all zeros except the goal. This simulates "before any
 # value has propagated": only the goal knows it's valuable.
 V_test = np.zeros(nS)
-V_test[15] = 1.0  # goal state has value 1 (reward = 1 for reaching it)
-pi = [0.25] * nA  # uniform random policy
+# goal state has value 1 (reward = 1 for reaching it)
+V_test[15] = 1.0
+# uniform random policy
+pi = [0.25] * nA
 
 # One backup at state 6: can the goal's value reach state 6 in a single step?
 # State 6 is several cells away from state 15, so the answer is no (0.0).
@@ -420,7 +442,7 @@ $$
 
 Read: "Q-star of s, a equals the sum over next states s' of p(s'|s,a) times [R(s,a,s') + gamma times the max over next actions a' of Q-star(s', a')]."
 
-Interpretation: the optimal value of taking action $a$ in state $s$ is the expected reward plus the discounted value of the next state, *assuming you act optimally from that next state onward* (that's where the inner $\max_{a'}$ comes from).
+Interpretation: the optimal value of taking action $a$ in state $s$ is the expected reward plus the discounted value of the next state, _assuming you act optimally from that next state onward_ (that's where the inner $\max_{a'}$ comes from).
 
 And the optimal policy falls out for free:
 
