@@ -216,7 +216,23 @@ Read: "Pi-star of s equals the action a that maximizes Q-star(s, a)."
 
 Interpretation: the optimal policy just picks whichever action has the highest Q-value. No search, no model, just compare numbers and take the biggest.
 
-Here's the bridge in code: compute $Q$ from $V$ (using the model), then recover $V$ from $Q$:
+Here's the bridge in code. The key question: how does each equation become a loop?
+
+**Equation → code for $Q$ from $V$:**
+
+$$
+Q^\pi(s, a) = \sum_{s', r} p(s', r \mid s, a)\,\big[r + \gamma\,V^\pi(s')\big]
+$$
+
+The sum says: "loop over every possible outcome $(s', r)$ of taking action $a$ in state $s$." Each outcome has a probability $p$ and contributes $p \times [r + \gamma \cdot V(s')]$ to the total. In Gymnasium, `P[s][a]` gives exactly that list of outcomes as `(prob, next_state, reward, done)` tuples, so the sum becomes a for-loop accumulating `prob * (reward + gamma * V[next_state])`.
+
+**Equation → code for $V$ from $Q$:**
+
+$$
+V^\pi(s) = \sum_a \pi(a \mid s)\,Q^\pi(s, a)
+$$
+
+The sum says: "loop over every action $a$." Each action has a policy probability $\pi(a|s)$ and contributes $\pi(a|s) \times Q(s, a)$. Under a uniform policy, every action gets weight $0.25$, so V is just the average of the four Q-values.
 
 ```python
 import gymnasium as gym
@@ -234,17 +250,36 @@ V = np.random.default_rng(0).uniform(0, 0.1, size=nS)  # placeholder V
 V[15] = 1.0  # goal state has high value (reward +1 for arriving)
 V[[5, 7, 11, 12]] = 0.0  # holes are absorbing with zero value
 
-def q_from_v(V, s, a):
-    """Q → V direction: Q^π(s,a) = Σ_{s'} p(s',r|s,a) · [r + γ·V(s')]
-    "Given I take action a in state s, what's my expected return?"
-    Averages over environment randomness (where do I land?)."""
-    return sum(p * (r + gamma * V[s2]) for p, s2, r, d in P[s][a])
 
-def v_from_q(Q_sa, pi_sa):
-    """V → Q direction: V^π(s) = Σ_a π(a|s) · Q(s,a)
-    "What's the value of state s under policy π?"
-    Averages over agent randomness (which action do I pick?)."""
-    return sum(pi * q for pi, q in zip(pi_sa, Q_sa))
+def q_from_v(V, s, a):
+    """Q^π(s,a) = Σ_{s'} p(s',r|s,a) · [r + γ·V(s')]
+
+    Given I take action a in state s, what's my expected return?
+    Averages over environment randomness (where do I land?).
+    """
+    q_value = 0.0
+    # P[s][a] is the dynamics table: each entry is one possible outcome
+    # of taking action a in state s.
+    for prob, next_state, reward, done in P[s][a]:
+        # This one line IS the equation:
+        # p(s',r|s,a)  ·  [r         + γ     · V(s')        ]
+        q_value += prob * (reward + gamma * V[next_state])
+    return q_value
+
+
+def v_from_q(Q_values, pi_probs):
+    """V^π(s) = Σ_a π(a|s) · Q(s,a)
+
+    What's the value of state s under policy π?
+    Averages over agent randomness (which action do I pick?).
+    """
+    v_value = 0.0
+    # Loop over every action: weight each Q-value by the policy probability
+    for pi_a, q_a in zip(pi_probs, Q_values):
+        # π(a|s) · Q(s,a)
+        v_value += pi_a * q_a
+    return v_value
+
 
 # Compute Q(6, a) for all 4 actions, then recover V(6) from Q.
 s = 6
