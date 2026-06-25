@@ -134,31 +134,47 @@ class MarsRoverEnv(gym.Env):
         return -1.0
 
     def _build_model(self):
-        """Precompute P[s][a] = list of (probability, next_state, reward, terminated)."""
+        """This block builds the probability distribution over where the rover actually ends up after choosing an action, accounting for slip."""
         # This is the "god's-eye" model of the world. DP reads it directly;
         # MC and TD are not allowed to, they must learn from reset()/step() only.
         # P is a dict, with keys as state indices and values as dictionaries of action indices and lists of tuples (probability, next_state, reward, terminated).
         P = defaultdict(dict)
         # Iterate over all states
-        for s in range(GRID * GRID):
+        for current_state in range(GRID * GRID):
             # For each state s, iterate over all actions a
-            for a in range(4):
-                # If the state is a terminal state, the rover stays put and earns nothing more.
-                if s in self.terminals:
-                    P[s][a] = [(1.0, s, 0.0, True)]
+            for action in range(4):
+                # If the state is a terminal state,
+                # the rover stays put and earns nothing more.
+                if current_state in self.terminals:
+                    P[current_state][action] = [(1.0, current_state, 0.0, True)]
                     continue
+
                 # Initialize the outcomes dictionary - maps next_state to its probability
                 outcomes: dict[int, float] = {}
-                # With probability (1 - 2*SLIP) the rover goes where it intended...
-                intended = self._move(s, a)
-                # Add the probability of the intended outcome
+
+                # computes the tile the rover wants to reach after taking the action
+                intended = self._move(current_state, action)
+
+                # It lands there with probability 1 - 2*SLIP
+                # outcomes.get(intended, 0) + ... accumulates into a dict instead of overwriting.
+                # This matters because near walls several of these directions can resolve to the same tile (since _move clamps at the edges), and their probabilities must add up rather than clobber each other.
                 outcomes[intended] = outcomes.get(intended, 0) + (1 - 2 * SLIP)
+
                 # Add the probability of the perpendicular outcomes
-                for slip_a in PERP[a]:
-                    slipped = self._move(s, slip_a)
+                # PERP[action] are the two directions perpendicular to the intended one.
+                # The rover "slips" to each of those with probability SLIP = 0.1 each. (0.8 + 0.1 + 0.1 = 1.0)
+                for slip_action in PERP[action]:
+                    slipped = self._move(current_state, slip_action)
                     outcomes[slipped] = outcomes.get(slipped, 0) + SLIP
-                P[s][a] = [(p, sn, self._reward(sn), sn in self.terminals)
-                           for sn, p in outcomes.items()]
+
+                # Build the list of transitions for this (current_state, action) pair
+                transitions = []
+                for next_state, probability in outcomes.items():
+                    reward = self._reward(next_state)
+                    terminated = next_state in self.terminals
+                    transitions.append((probability, next_state, reward, terminated))
+                P[current_state][action] = transitions
+
         return P
 
     def reset(self, seed=None, options=None):
@@ -171,11 +187,11 @@ class MarsRoverEnv(gym.Env):
         """Simulate a real interaction: sample ONE outcome from P[s][a] according to its probabilities. This is all MC and TD ever see — they never peek at the full distribution, only the single (s', r, terminated) triple that nature dealt."""
 
         # tr is a list of tuples (probability, next_state, reward, terminated)
-        tr = self.P[self.s][action]
+        transitions = self.P[self.s][action]
         # i is the index of the chosen outcome
-        i = self.np_random.choice(len(tr), p=[t[0] for t in tr])
+        i = self.np_random.choice(len(transitions), p=[t[0] for t in transitions])
         # _ is the probability of the chosen outcome
-        _, s_next, reward, terminated = tr[i]
+        _, s_next, reward, terminated = transitions[i]
         # Update the current state
         self.s = s_next
         # Return the next state, reward, terminated, truncated, and info
@@ -220,6 +236,34 @@ Episode trace (random policy):
 ```
 
 The rover wanders without direction and tumbles into a crater long before it finds the goal. To do better, it needs to know which states are worth being in and which action to take from each one. That's exactly what DP, MC, and TD compute, each from a different kind of information.
+
+Before moving on, let's peek at the transition model we just built. `env.P[s][a]` lists every `(probability, next_state, reward, terminated)` the rover could face. Two cases are worth seeing: an open cell, and a cell against a wall.
+
+```python
+# P[s][a] is a list of (probability, next_state, reward, terminated).
+# Print where each action could land the rover, and with what probability.
+def show(state, action, label):
+    print(f"{label}: from {rc(state)} taking a={action}")
+    for p, s_next, r, terminated in env.P[state][action]:
+        print(f"    p={p:.1f} → {rc(s_next)}  r={r:.0f}")
+
+# Open cell: the three outcomes are three distinct tiles -> a clean 0.8 / 0.1 / 0.1.
+show(idx(1, 1), 0, "Open space")     # 'up' from (1,1)
+# Wall cell: 'up' is clamped back onto the same tile, so probabilities MERGE.
+show(idx(0, 0), 0, "Corner (wall)")  # 'up' from (0,0)
+```
+
+```text title="Output"
+Open space: from (1, 1) taking a=0
+    p=0.8 → (0, 1)  r=-1
+    p=0.1 → (1, 0)  r=-1
+    p=0.1 → (1, 2)  r=-1
+Corner (wall): from (0, 0) taking a=0
+    p=0.9 → (0, 0)  r=-1
+    p=0.1 → (0, 1)  r=-1
+```
+
+In open space you get the textbook split: 80% to the intended tile, 10% to each perpendicular. Against the top wall, "up" (0.8) and the leftward slip (0.1) both clamp back onto `(0,0)`, so their probabilities **add** to 0.9. This is why `_build_model` accumulates with `outcomes.get(next_state, 0) + p` instead of overwriting: whenever wall-clamping sends several directions to the same tile, their mass must pool so each row still sums to 1.
 
 ### The video-game-level analogy
 
