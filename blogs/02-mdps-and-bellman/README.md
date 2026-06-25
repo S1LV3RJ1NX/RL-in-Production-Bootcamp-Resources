@@ -533,18 +533,6 @@ We've seen each idea in isolation. Here's the whole vocabulary as a quick refere
 
 ---
 
-## Practice: assignment
-
-The theory in this post — MDPs, V, Q, and the Bellman equation — is the foundation for Q-learning. The hands-on assignment that applies it arrives with Blog 4, where you'll implement tabular Q-learning from scratch and train an agent to solve Taxi-v3:
-
-> **[Assignment — Tabular Q-Learning on Taxi-v3](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.1.ipynb)**
-
-And once you've seen that work, you'll scale the same idea up with a neural network to beat Atari Pong:
-
-> **[Assignment — Deep Q-Network (DQN) on Pong](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.2.ipynb)**
-
----
-
 ## Where this goes next
 
 We've formalized the environment as an MDP, defined $V$ and $Q$, and derived the Bellman equation. But writing the equation is not the same as solving it: finding the actual values requires either exact linear algebra (feasible only for tiny state spaces) or iterative/sampling methods. The next post introduces three classical approaches:

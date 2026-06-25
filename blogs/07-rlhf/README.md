@@ -792,6 +792,22 @@ Read the symbols first: "the gradient of the objective $J$ with respect to $\the
 **Answer.** Low distinct-2 means the policy is repeating the same word pairs, the signature of reward-hacked, degenerate text. Together with a fast-rising KL-from-reference, it flags that the policy is leaving the trustworthy region and gaming the reward model, well before you would catch it by reading samples.
 </details>
 
+---
+
+## Practice: assignments
+
+The full RLHF pipeline, broken into five focused labs:
+
+> **[Lab A — Build a Reward Model from Human Preferences](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.1.ipynb)**
+
+> **[Lab B — Token-Level Rewards & Advantages](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.2.ipynb)**
+
+> **[Lab C — The Reward-Hacking Hunt](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.3.ipynb)**
+
+> **[Lab D — The Value Head, Dissected](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.4.ipynb)**
+
+> **[Flagship — Align a Tiny Assistant (RLHF with PPO)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.5.ipynb)**
+
 ## Where this goes next
 
 RLHF holds four big models at once, and the most expensive and unstable of them is the value head: training a per-token critic for an LLM is hard. The next post drops it. **GRPO** keeps PPO's clip but replaces the learned critic with a *group baseline*: sample $G$ answers for the same prompt, score them all, and let the group's mean reward stand in for $V$. The advantage becomes

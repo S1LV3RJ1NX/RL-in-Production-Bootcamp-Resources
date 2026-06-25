@@ -822,6 +822,16 @@ A few consolidated questions from the lecture that span more than one section:
 
 ---
 
+## Practice: assignments
+
+Put the theory into action — implement Q-learning from scratch, then scale it up with a neural network:
+
+> **[Assignment — Tabular Q-Learning on Taxi-v3](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.1.ipynb)**
+
+> **[Assignment — Deep Q-Network (DQN) on Pong](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.2.ipynb)**
+
+---
+
 ## Where this goes next
 
 We turned prediction into **control** with one symbol (a $\max$) and then scaled it from a 48-cell table to a convolutional network that plays Pong from pixels. The destination never changed (solve the Bellman optimality equation); only the container for $Q$ did.

@@ -786,6 +786,14 @@ The policy learns to reduce its penalties over 60 iterations: the mean return im
 
 ---
 
+## Practice: assignment
+
+Implement PPO from scratch and train a continuous-control agent (no discrete actions — real torques and forces):
+
+> **[Assignment — PPO from Scratch (Continuous Control)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture4.ipynb)**
+
+---
+
 ## Where this goes next
 
 PPO is the workhorse of modern RL, from continuous control to RLHF. But training a value network for an LLM is expensive and unstable. The next lecture drops the critic entirely: **GRPO** samples a group of responses per prompt and uses the group average as the baseline, keeping PPO's clip but replacing the learned critic with a simpler, cheaper alternative. The advantage becomes:

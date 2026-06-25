@@ -1139,6 +1139,14 @@ The Actor-Critic solves the Archer MDP, reliably reaching a greedy return of ~9.
 
 ---
 
+## Practice: assignment
+
+Build the Archer from scratch — a bandit, then an MDP agent, climbing the variance ladder from REINFORCE all the way to Actor-Critic:
+
+> **[Assignment — Policy Gradients from Scratch (The Archer)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture3.ipynb)**
+
+---
+
 ## Where this goes next
 
 The Actor-Critic gives us a clean way to climb expected return, but each policy update can take a step of any size. If the step is too large, the policy overshoots and collapses; if too small, learning crawls. The next lecture adds **trust regions**: a hard constraint (TRPO) or a clipped surrogate (PPO) that keeps each update in a safe neighborhood of the old policy. The central equation becomes:

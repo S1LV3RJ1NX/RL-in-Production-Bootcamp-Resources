@@ -620,6 +620,12 @@ Read it as: "push up the log-probability of answers that beat the baseline (posi
 **Answer.** It published both the weights and a simple, reproducible recipe (GRPO + verifiable rewards) that needed no massive human-preference dataset and no closed reward model. Suddenly any lab could train strong reasoners cheaply, which is why GRPO and its variants exploded across 2025.
 </details>
 
+---
+
+## Practice: assignment
+
+> **[Assignment — GRPO](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture6.ipynb)**
+
 ## Where this goes next
 
 GRPO gave us reasoning from a single verifiable outcome per prompt: sample a group, grade each answer with a rule, compare to the group's average, take a clipped step. But many real tasks are not one question and one boxed answer; they are *long, multi-step interactions* with tools, environments, and intermediate decisions, an **agent** taking actions over many turns. The next post points the same gradient at that setting, where an "answer" becomes a *trajectory of tool calls* and the reward arrives after a whole episode of acting in the world. Same $\nabla_\theta J = \mathbb{E}[\hat{A} \cdot \nabla_\theta \log \pi_\theta]$, a new shape of episode.
