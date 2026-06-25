@@ -770,6 +770,14 @@ Both MC and TD are converging toward the DP answer: states near the goal (bottom
 
 ---
 
+## Practice: assignment
+
+Put all three methods to work — build a Mars Rover environment, solve it with Value Iteration (DP), then estimate the same values with Monte Carlo and TD(0) and watch them converge:
+
+> **[Assignment — Mars Rover: Value Iteration, Monte Carlo & TD](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture1.ipynb)**
+
+---
+
 ## Where this goes next
 
 We've solved **prediction** (estimating $V^\pi$ for a given policy) three ways. But the real goal is **control**: finding the best policy without being handed one.
