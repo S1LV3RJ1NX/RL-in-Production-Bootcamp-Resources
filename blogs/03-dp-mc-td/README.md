@@ -303,10 +303,10 @@ $$
 Let's read that term by term:
 
 - $V_k$ is your value estimate after $k$ sweeps; $V^*$ is the true optimal value we're chasing.
-- $\|V_k - V^*\|_\infty$ is the **worst error across all states**. The $\infty$ subscript is the max-norm: compute the absolute gap $|V_k(s) - V^*(s)|$ at every state $s$, then keep the single largest one. So if this number is small, *every* state is close, not just the average state.
+- $\|V_k - V^*\|_\infty$ is the **worst error across all states**. The $\infty$ subscript is the max-norm: compute the absolute gap $|V_k(s) - V^*(s)|$ at every state $s$, then keep the single largest one. So if this number is small, _every_ state is close, not just the average state.
 - The inequality says that worst error is at most $\gamma^k$ times the error you began with ($\|V_0 - V^*\|_\infty$). Each sweep multiplies your remaining error by a factor of at most $\gamma$, so it shrinks geometrically: $\gamma, \gamma^2, \gamma^3, \dots$
 
-Because $\gamma < 1$, that bound is **guaranteed to reach 0** no matter how wrong your starting guess $V_0$ was. That is exactly what "contraction" means: the Bellman backup always pulls any value estimate closer to $V^*$, so there's a single fixed point everything funnels into. Your starting guess only affects *how many* sweeps you need, never *whether* you arrive.
+Because $\gamma < 1$, that bound is **guaranteed to reach 0** no matter how wrong your starting guess $V_0$ was. That is exactly what "contraction" means: the Bellman backup always pulls any value estimate closer to $V^*$, so there's a single fixed point everything funnels into. Your starting guess only affects _how many_ sweeps you need, never _whether_ you arrive.
 
 ![Error shrinking by gamma each sweep: the contraction mapping guarantee](./images/fig-contraction.svg)
 
@@ -347,9 +347,12 @@ def value_iteration(env, gamma=GAMMA, theta=1e-6):
     # Given the optimal values, the best action is the one with the highest expected return.
     policy = np.zeros(env.observation_space.n, dtype=int)
     for s in range(env.observation_space.n):
-        q_values = [sum(p * (r + gamma * V[s_next] * (1 - done))
-                        for p, s_next, r, done in env.P[s][a])
-                    for a in range(env.action_space.n)]
+        q_values = []
+        for a in range(env.action_space.n):
+            q = 0.0
+            for p, s_next, r, done in env.P[s][a]:
+                q += p * (r + gamma * V[s_next] * (1 - done))
+            q_values.append(q)
         policy[s] = np.argmax(q_values)
     return V, policy
 
@@ -437,10 +440,10 @@ Without slip, crater-adjacent cells have _positive_ values: they're safe if you 
 
 ### 2.2 Policy Iteration
 
-An alternative to value iteration: alternate between _evaluating_ a policy (solving the linear system from [MDPs & Bellman](../02-mdps-and-bellman/README.md)) and _improving_ it greedily. Often converges in fewer outer loops, but each inner step is more expensive.
+An alternative to value iteration: alternate between _evaluating_ a policy (sweeping the Bellman expectation backup from [MDPs & Bellman](../02-mdps-and-bellman/README.md) until its values settle) and _improving_ it greedily. Often converges in fewer outer loops, but each inner step is more expensive.
 
 $$
-\text{evaluate: } V^\pi = (I - \gamma T^\pi)^{-1} r^\pi \quad\longrightarrow\quad \text{improve: } \pi'(s) = \arg\max_a Q^\pi(s,a)
+\text{improve: } \pi'(s) = \arg\max_a Q^\pi(s,a)
 $$
 
 For our Mars Rover (25 states), both methods converge near-instantly. The distinction matters at scale: policy iteration invests more per step but takes fewer steps.
@@ -473,7 +476,8 @@ def mc_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.02, max_step
         episode = []
         s, _ = env.reset()
         for _ in range(max_steps):
-            a = policy[s]                          # follow the fixed policy we are evaluating
+            # follow the fixed policy we are evaluating
+            a = policy[s]
             s_next, reward, terminated, truncated, _ = env.step(a)
             episode.append((s, reward))
             s = s_next
@@ -484,10 +488,12 @@ def mc_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.02, max_step
         # of rewards from that state onward — unbiased but high-variance.
         G = 0.0
         for s, reward in reversed(episode):
-            G = reward + gamma * G                 # G_t = r + γ·G_{t+1} (the recursive return)
+            # G_t = r + γ·G_{t+1} (the recursive return)
+            G = reward + gamma * G
             # Incremental mean update: nudge V(s) toward this episode's return G.
             # α controls the step size — too large = noisy, too small = slow learning.
-            V[s] = V[s] + alpha * (G - V[s])       # MC update: V(s) ← V(s) + α·[G_t - V(s)]
+            # MC update: V(s) ← V(s) + α·[G_t - V(s)]
+            V[s] = V[s] + alpha * (G - V[s])
     return V
 
 env = MarsRoverEnv()
