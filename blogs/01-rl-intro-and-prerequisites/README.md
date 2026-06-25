@@ -470,6 +470,14 @@ A few things to notice, each tying straight back to the math:
 
 ---
 
+## Practice: assignment
+
+Ready to get your hands dirty? The companion assignment sets up the full RL development stack (Python, Gymnasium, NumPy, PyTorch) and walks you through your first environment interactions:
+
+> **[Assignment — Setup: the modern stack](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture1.ipynb)**
+
+---
+
 ## Where this goes next
 
 You now have the vocabulary (policy, reward, value, model) and the five tools (expectation, the Markov property, variance, the incremental update, and discounting). The next post formalizes the **environment** as a Markov Decision Process and derives the **Bellman equation**, the precise, recursive version of the one sentence at the top:
