@@ -101,10 +101,6 @@ Blog 3: DP, Monte Carlo & TD — three ways to actually *solve* this equation, i
 
 Full post with typed Python, backup diagrams, and worked examples on FrozenLake: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
 
-The hands-on assignments that apply this theory (Q-learning + DQN) arrive with Blog 4. Can't wait? Here's a preview:
-- Tabular Q-Learning on Taxi: https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.1.ipynb
-- DQN on Pong: https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.2.ipynb
-
 Learning RL for LLMs through @VizuraAI bootcamp. Follow for the rest of the series.
 
 ---

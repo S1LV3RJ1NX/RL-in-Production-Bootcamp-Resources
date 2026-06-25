@@ -47,10 +47,6 @@ I'm working through the @VizuraAI RL-for-LLMs bootcamp and writing these as note
 
 🔗 Read the full post: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
 
-🧪 The hands-on assignments that apply this theory (Q-learning + DQN) arrive with Blog 4. Preview:
-- Tabular Q-Learning: https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.1.ipynb
-- DQN on Pong: https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture2.2.ipynb
-
 Series so far:
 1. ✅ RL from First Principles
 2. ✅ MDPs & Bellman Equations (this one)
