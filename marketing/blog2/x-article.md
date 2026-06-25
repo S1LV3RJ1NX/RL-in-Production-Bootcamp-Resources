@@ -15,9 +15,9 @@
 
 ## Article Body (~1,200 words)
 
-Last week I covered the 5 math foundations behind RL. Today: the single equation that ties them all together.
+Last week I covered the five math foundations behind RL. Today, the single equation that ties them all together.
 
-Every RL algorithm you've heard of — Q-learning, SARSA, PPO, RLHF, GRPO — is solving or approximating one equation. It's called the Bellman equation, and once you see it, you can't unsee it.
+Every RL algorithm you've heard of, from Q-learning and SARSA to PPO, RLHF, and GRPO, is solving or approximating one equation. It's called the Bellman equation, and once you see it, you can't unsee it.
 
 ---
 
@@ -27,47 +27,44 @@ Before the equation, you need the framework. A Markov Decision Process has four 
 
 - **States (S)**: where you can be
 - **Actions (A)**: what you can do
-- **Dynamics p(s'|s,a)**: probability of landing in s' after taking action a in state s
+- **Dynamics p(s'|s,a)**: the probability of landing in s' after taking action a in state s
 - **Rewards R(s,a,s')**: what you get for that transition
 
-The Markov property: what happens next depends only on where you are *now*, not how you got here. This is what makes the recursion possible.
+The Markov property says what happens next depends only on where you are *now*, not how you got here. That's what makes the recursion possible.
 
 ---
 
 ### Two ways to measure "how good"
 
-**V(s)** — State-value: "How good is it to *be* in state s?"
-Expected total return from s onward, following policy π.
+**V(s)**, the state-value, answers "how good is it to *be* in state s?" It's the expected total return from s onward, following policy π.
 
-**Q(s,a)** — Action-value: "How good is it to *do* action a in state s?"
-Expected total return after taking a, then following π.
+**Q(s,a)**, the action-value, answers "how good is it to *do* action a in state s?" It's the expected total return after taking a, then following π.
 
-The bridge between them:
+The bridge from Q back to V:
 
 V(s) = Σ_a π(a|s) · Q(s,a)
 
-"Average the Q-values, weighted by how likely the policy is to pick each action."
+Average the Q-values, weighted by how likely the policy is to pick each action.
+
+And from V back to Q:
 
 Q(s,a) = Σ_{s'} p(s'|s,a) · [R + γ·V(s')]
 
-"Average the outcomes, weighted by how likely each next state is."
+Average the outcomes, weighted by how likely each next state is.
 
 ---
 
-### The Bellman Equation
+### The Bellman equation
 
 Combine both bridges and you get one self-referential equation:
 
 V(s) = Σ_a π(a|s) · Σ_{s'} p(s'|s,a) · [R(s,a,s') + γ·V(s')]
 
-Read it as: "The value of state s = over all actions I might take (weighted by policy), over all places I might land (weighted by dynamics), sum up [immediate reward + discounted future value]."
+In words: the value of state s is, over all the actions I might take (weighted by my policy) and all the places I might land (weighted by the dynamics), the sum of the immediate reward plus the discounted value of the future.
 
-This is recursive: V appears on both sides. The value of *this* state depends on the value of *next* states, which depend on the states after that, all the way to the end.
+It's recursive. V shows up on both sides. The value of *this* state depends on the value of the *next* states, which depend on the states after that, all the way down.
 
-Every RL algorithm is a different strategy for solving this recursion:
-- **Dynamic Programming**: iterate the backup with the full model
-- **Monte Carlo**: sample complete episodes and average
-- **TD Learning**: update after every step using a bootstrap
+Every RL algorithm is a different way of solving that recursion. Dynamic programming iterates the backup with the full model. Monte Carlo samples complete episodes and averages them. TD learning updates after every step using a bootstrap.
 
 ---
 
@@ -77,31 +74,25 @@ Replace the policy average (Σ π·Q) with a max, and you get the Bellman *optim
 
 V*(s) = max_a Σ_{s'} p(s'|s,a) · [R + γ·V*(s')]
 
-"Pick the best action instead of averaging over a policy."
+Pick the best action instead of averaging over a policy.
 
-And the optimal policy falls out trivially: π*(s) = argmax_a Q*(s,a).
-
-Once you have the optimal Q-values, acting optimally is just looking up the largest number.
+The optimal policy then falls out for free: π*(s) = argmax_a Q*(s,a). Once you have the optimal Q-values, acting optimally is just looking up the largest number.
 
 ---
 
 ### Why this matters for LLMs
 
-If you're working with RLHF or GRPO, you're using algorithms that approximate value functions and optimize policies. The Bellman equation is the theoretical backbone. Understanding it means you can:
-
-- Read PPO papers without confusion
-- Debug reward signals that aren't working
-- Understand why KL penalties exist (they bound how far π moves from π_ref)
+If you're working with RLHF or GRPO, you're using algorithms that approximate value functions and optimize policies. The Bellman equation is the backbone underneath all of it. Once it clicks, you can read PPO papers without getting lost, debug a reward signal that isn't working, and see why the KL penalty is there in the first place: it bounds how far π is allowed to drift from π_ref.
 
 ---
 
 ### What's next
 
-Blog 3: DP, Monte Carlo & TD — three ways to actually *solve* this equation, implemented from scratch on a custom environment.
+Blog 3 is on DP, Monte Carlo, and TD: three ways to actually *solve* this equation, built from scratch on a custom environment.
 
 Full post with typed Python, backup diagrams, and worked examples on FrozenLake: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
 
-Learning RL for LLMs through @VizuraAI bootcamp. Follow for the rest of the series.
+Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the series.
 
 ---
 

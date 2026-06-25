@@ -28,63 +28,63 @@ Use Articles for deep-dive tutorials. Use threads for listicles and live comment
 
 ## Article Body (~1,200 words target)
 
-Everyone's shipping RLHF and GRPO. But when I tried to *read* those papers, I hit a wall. Not the algorithms — the foundations.
+Everyone's shipping RLHF and GRPO. When I tried to actually *read* those papers, I hit a wall. It wasn't the algorithms. It was the foundations underneath them.
 
-So I'm writing the blog series I wish existed: RL explained from scratch, with real math, real code, and zero hand-waving.
+So I started writing the series I wish I'd had: RL from scratch, with real math and real code, and none of the hand-waving.
 
 **The one sentence the whole field hangs on:**
 
-> The value of where I am = reward I just got + discounted value of where I'll land next.
+> The value of where I am is the reward I just got, plus a discounted value of where I'll land next.
 
-Every algorithm — Q-learning, DQN, PPO, RLHF, GRPO — is a variation on that single line. This post builds the intuition behind it.
+Q-learning, DQN, PPO, RLHF, GRPO. Every one of them is a variation on that line. This post builds the intuition behind it.
 
 ---
 
-### The 5 pieces of math you need
+### The five pieces of math you need
 
-**1. Expectation — "how good" means "how good on average"**
+**1. Expectation: "how good" means "how good on average"**
 
-A single trajectory is noise. Value is the *average* over all possible futures, weighted by probability. For a fair die: E[X] = 3.5. You never roll 3.5, but it's what the rolls average to.
+A single trajectory is noise. Value is the *average* over all possible futures, weighted by probability. For a fair die, E[X] = 3.5. You never roll a 3.5, but it's what the rolls average to.
 
-This is exactly how an RL agent estimates value: collect episodes, average the returns, trust the mean.
+That's how an RL agent estimates value: collect episodes, average the returns, trust the mean.
 
-**2. The Markov Property — only the present matters**
+**2. The Markov property: only the present matters**
 
-The probability of what happens next depends only on where you are *now*, not how you got here. This is what makes RL tractable — you don't need to store the entire history.
+What happens next depends only on where you are *now*, not how you got here. That is what keeps RL tractable. You don't have to carry the whole history around.
 
-**3. Variance — why single episodes are noise**
+**3. Variance: why a single episode is noise**
 
-In FrozenLake, V(start) ≈ 0.01 but std ≈ 0.10. That's 10x the mean. Any single episode returns either 0 or ~1 — pure noise. You need thousands of samples before the average stabilizes.
+In FrozenLake, V(start) is about 0.01 but the standard deviation is about 0.10, roughly 10x the mean. Any single episode returns either 0 or close to 1, which tells you almost nothing on its own. You need thousands of samples before the average settles down.
 
-**4. Running averages — how agents learn incrementally**
+**4. Running averages: how agents learn a little at a time**
 
-You don't need to store all past rewards. The incremental update rule:
+You don't need to store every past reward. The incremental update is:
 
 μ_new = μ_old + (1/n)(x_new - μ_old)
 
-One number, one update, constant memory. This is the backbone of every TD algorithm.
+One number, one update, constant memory. It's the backbone of every TD algorithm.
 
-**5. Discounting — why $1 today > $1 tomorrow**
+**5. Discounting: why a dollar today beats a dollar tomorrow**
 
-Multiply future rewards by γ^k (0 < γ < 1). This makes the sum finite, encodes uncertainty about the future, and focuses the agent on near-term outcomes.
+Multiply future rewards by γ^k, with γ between 0 and 1. That keeps the sum finite, bakes in some uncertainty about the future, and pulls the agent's attention toward what's close.
 
 ---
 
 ### Who this is for
 
-→ ML engineers who skipped RL in school and now need it for LLM alignment
-→ Anyone who reads "PPO maximizes the clipped surrogate objective" and goes "...what?"
-→ People who learn best from code + math side by side
+- ML engineers who skipped RL in school and now need it for LLM alignment
+- Anyone who reads "PPO maximizes the clipped surrogate objective" and thinks "...what?"
+- People who learn best with the code and the math side by side
 
 ---
 
 ### What's next
 
-Blog 2 (MDPs & Bellman Equations) drops next week — the recursive structure that makes all of this actually solvable.
+Blog 2 covers MDPs and the Bellman equation, the recursive structure that makes all of this solvable. It's out next week.
 
-I'm learning this through the @VizuraAI RL-for-LLMs bootcamp and writing these so the next person doesn't hit the same walls.
+I'm learning this through the @VizuraAI RL-for-LLMs bootcamp and writing it down so the next person doesn't hit the same walls.
 
-Full post with all code examples: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequisites]
+Full post with all the code: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequisites]
 
 ---
 

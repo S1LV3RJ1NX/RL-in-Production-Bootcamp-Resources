@@ -11,37 +11,38 @@
 
 Everyone's talking about RLHF, GRPO, and PPO.
 
-But when I tried to read those papers, I realized I was missing the foundations. So I'm writing the blog series I wish existed: RL explained from scratch, with real math, real code, and zero hand-waving.
+When I sat down to read those papers, I hit a wall. I was missing the foundations nobody bothers to explain. So I started writing the series I wish I'd had: RL from scratch, with real math and real code, and none of the hand-waving.
 
-Blog 1 just dropped: "Reinforcement Learning from First Principles (and the Math You Actually Need)"
+Blog 1 is up: "Reinforcement Learning from First Principles (and the Math You Actually Need)."
 
-Here's the core idea in one sentence:
+The whole field rests on one sentence:
 
-> The value of where I am = reward I just got + discounted value of where I'll land next.
+> The value of where I am is the reward I just got, plus a discounted value of where I'll land next.
 
-That's it. Every RL algorithm — Q-learning, DQN, PPO, RLHF, GRPO — is a variation on that single line.
+That's it. Q-learning, DQN, PPO, RLHF, GRPO. Every one of them is a variation on that line.
 
-The post covers the 5 pieces of math the entire field is built on:
-→ Expectation (why "how good" means "how good on average")
-→ The Markov Property (why only the present matters)
-→ Variance & the Law of Large Numbers (why single episodes are noise)
-→ Running averages (how agents learn incrementally)
-→ Discounting (why $1 today > $1 tomorrow)
+The post walks through the five pieces of math everything else is built on:
 
-Each one gets: intuition → one clean derivation → a worked example → Python code.
+- Expectation: why "how good" means "how good on average"
+- The Markov property: why only the present matters
+- Variance and the law of large numbers: why a single episode is mostly noise
+- Running averages: how an agent learns a little at a time
+- Discounting: why a dollar today beats a dollar tomorrow
 
-I'm learning this through the Vizura.ai RL-for-LLMs bootcamp, and writing these notes so the next person doesn't have to struggle through the same gaps I did.
+Each one starts with the intuition, then one clean derivation, a worked example, and the Python to run it.
 
-🔗 Link in comments
+I'm learning this through the Vizura.ai RL-for-LLMs bootcamp, and writing the notes so the next person doesn't have to dig through the same gaps I did.
+
+Link in comments.
 
 ---
 
 Who this is for:
 
 - ML engineers who skipped RL in school and now need it for LLM alignment
-- Anyone who wants to read RLHF/GRPO papers without flinching at the math
+- Anyone who wants to read RLHF or GRPO papers without flinching at the math
 
-Next week: Blog 2 — MDPs & Bellman Equations (the recursive structure that makes RL tractable).
+Next up is Blog 2 on MDPs and the Bellman equation, the recursive structure that makes RL tractable.
 
 #ReinforcementLearning #RLHF #MachineLearning #LLMs #LearningInPublic #AI
 
@@ -49,12 +50,12 @@ Next week: Blog 2 — MDPs & Bellman Equations (the recursive structure that mak
 
 ## Comment (post immediately after)
 
-🔗 Read the full post: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequisites]
+Read the full post: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequisites]
 
 Series so far:
 
-1. ✅ RL from First Principles (this one)
-2. Coming next week: MDPs & Bellman Equations
+1. RL from First Principles (this one)
+2. Coming next week: MDPs and Bellman Equations
 
 Built with Python, NumPy, Gymnasium, and Matplotlib.
 

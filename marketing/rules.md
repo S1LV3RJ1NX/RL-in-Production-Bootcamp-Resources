@@ -142,6 +142,28 @@ Cadence: **one blog per week**. Offsite: Jul 8–14 (no posts that week).
 
 ---
 
+## Humanize every post before publishing
+
+All marketing copy (LinkedIn posts, X articles, comments) must be run through the **humanizer skill** before it ships, so the writing doesn't read as AI-generated. The skill lives at `~/.cursor/skills/humanizer/SKILL.md` (source: https://github.com/blader/humanizer) and is based on Wikipedia's "Signs of AI writing" guide.
+
+Apply this to the published copy of every blog (1 through 9). The meta sections (Schedule, Image Suggestions, Formatting Tips) don't need it.
+
+The tells it removes, worth scanning for by hand:
+- **Em and en dashes** (`—`, `–`): hard cut. Replace with a period, comma, colon, or parentheses.
+- **Arrow-formatted lists** (`→`) and decorative emojis (`🔗`, `✅`, `🚀`): use plain bullets and plain text.
+- **Rule of three**: "real math, real code, and zero hand-waving" becomes two items or prose.
+- **Em-dash asides and inline `→` chains**: "intuition → derivation → example → code" becomes a sentence.
+- **Significance inflation / promo words**: pivotal, vibrant, testament, landscape, showcase, delve, crucial.
+- **Copula avoidance**: "serves as / stands as" becomes "is".
+- **Negative parallelism**: "It's not just X, it's Y" becomes the direct claim.
+- **Filler and hedging**: "in order to" becomes "to"; "could potentially possibly" becomes "may".
+
+After rewriting, scan once more for any remaining `—`/`–` and emojis. A hit means it isn't done.
+
+How to apply: read `~/.cursor/skills/humanizer/SKILL.md`, then rewrite each post following the draft -> audit -> final loop. Keep the author's voice (varied sentence length, opinions, concrete detail); the goal is natural, not sterile.
+
+---
+
 ## Virality Playbook (2026, data-backed)
 
 Both platforms now rank primarily on **dwell time** and **early engagement velocity**, not likes. The mechanics below come from LinkedIn's LiRank papers and xAI's open-sourced X algorithm.

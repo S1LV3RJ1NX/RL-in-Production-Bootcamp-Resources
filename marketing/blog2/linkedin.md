@@ -8,36 +8,32 @@
 
 ## Post Text
 
-Last week I shared the 5 math foundations behind RL.
+Last week I shared the five math foundations behind RL.
 
-This week: the equation that the entire field solves.
+This week, the equation the whole field spends its time solving.
 
-Blog 2 is live: "MDPs and the Bellman Equation — One Recursive Idea, Unpacked Completely"
+Blog 2 is live: "MDPs and the Bellman Equation: One Recursive Idea, Unpacked Completely."
 
-The Bellman equation in plain English:
+Here's the Bellman equation in plain English:
 
-"The value of where I am = weighted average over my actions of [reward I get + discounted value of where I land]."
+"The value of where I am is the weighted average, over my actions, of the reward I get plus the discounted value of where I land."
 
-That's it. Every RL algorithm (value iteration, policy gradient, PPO, RLHF) is a different way of solving or approximating this one recursion.
+That's it. Value iteration, policy gradients, PPO, RLHF: each one is just a different way of solving or approximating that one recursion.
 
 What the post covers:
-→ What an MDP actually is (states, actions, transitions, rewards — with a dynamics table you can read)
-→ V vs Q: two ways to measure "how good" (state-value vs action-value)
-→ The V-Q bridge: how one converts to the other
-→ Bellman expectation equation: step-by-step derivation with both symbolic reading AND intuitive interpretation
-→ Bellman optimality: what changes when you pick the best action instead of averaging
-→ Typed Python code mapping every equation term to a line of code
 
-Every equation follows the same format:
-1. The math
-2. "Read as:" (symbol-by-symbol)
-3. "Interpretation:" (what it means intuitively)
+- What an MDP actually is: states, actions, transitions, and rewards, with a dynamics table you can read line by line
+- V versus Q, the two ways to measure "how good" (state-value and action-value)
+- The bridge between them, and how to convert one into the other
+- The Bellman expectation equation, derived step by step, with both the symbolic reading and the plain-English meaning
+- Bellman optimality, and what changes when you pick the best action instead of averaging
+- Typed Python that maps every term in the equation to a line of code
 
-This is the format I wish textbooks used.
+Every equation gets the same treatment: the math first, then how to read it symbol by symbol, then what it actually means. It's the format I kept wishing textbooks used.
 
-I'm working through the @VizuraAI RL-for-LLMs bootcamp and writing these as notes for anyone following the same path.
+I'm working through the @VizuraAI RL-for-LLMs bootcamp and writing these up for anyone on the same path.
 
-🔗 Link in comments
+Link in comments.
 
 #ReinforcementLearning #BellmanEquation #MachineLearning #RLHF #LearningInPublic
 
@@ -45,12 +41,12 @@ I'm working through the @VizuraAI RL-for-LLMs bootcamp and writing these as note
 
 ## Comment (post immediately after)
 
-🔗 Read the full post: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
+Read the full post: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
 
 Series so far:
-1. ✅ RL from First Principles
-2. ✅ MDPs & Bellman Equations (this one)
-3. Coming next: DP, Monte Carlo & TD
+1. RL from First Principles
+2. MDPs and Bellman Equations (this one)
+3. Coming next: DP, Monte Carlo, and TD
 
 Each post has typed Python, worked examples, and figures.
 
