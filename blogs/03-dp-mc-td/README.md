@@ -443,7 +443,10 @@ Without slip, crater-adjacent cells have _positive_ values: they're safe if you 
 An alternative to value iteration: alternate between _evaluating_ a policy (sweeping the Bellman expectation backup from [MDPs & Bellman](../02-mdps-and-bellman/README.md) until its values settle) and _improving_ it greedily. Often converges in fewer outer loops, but each inner step is more expensive.
 
 $$
-\text{improve: } \pi'(s) = \arg\max_a Q^\pi(s,a)
+\begin{aligned}
+&\textbf{evaluate (sweep to convergence): } && V^\pi(s) \leftarrow \sum_{s',r} p(s',r\mid s,\pi(s))\big[r + \gamma\, V^\pi(s')\big] \\[4pt]
+&\textbf{improve (act greedily): } && \pi'(s) = \arg\max_a Q^\pi(s,a)
+\end{aligned}
 $$
 
 For our Mars Rover (25 states), both methods converge near-instantly. The distinction matters at scale: policy iteration invests more per step but takes fewer steps.
