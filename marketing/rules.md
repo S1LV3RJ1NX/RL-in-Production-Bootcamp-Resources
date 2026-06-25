@@ -216,6 +216,16 @@ Use these naturally in copy (not stuffed):
 - **LinkedIn hashtags** (3–5 max): `#ReinforcementLearning` `#MachineLearning` `#LLMs` `#RLHF` `#AI` `#DeepLearning` `#LearningInPublic`
 - **X**: skip hashtags (they hurt reach); instead name the concepts in plain text and tag relevant accounts/papers.
 
+### Quote-repost your own article the same day
+
+A few hours after the X article goes live (aim for ~5:30-6:00 PM, roughly 4-6 hours after publishing), quote-repost it with a fresh one-line hook. This gives the article a second pass through the feed and catches people who missed the morning slot.
+
+- Hit repost on your own article, choose "Quote," and type a new hook above the embedded post.
+- Use a *different* hook than the article's opener (a new angle, not a repeat).
+- Stack the usual tactics: open loop, a number, or a pattern interrupt. No emojis, no em dashes.
+- Reply to anyone who engages with the quote-repost, same as the first hour of the original.
+- Keep per-blog hook options saved in that blog's `x-article.md` under "Quote-repost hooks".
+
 ### Ride trending waves
 When a new RLHF/GRPO/DPO paper or model drops, quote-post it within hours with: "Here's the foundational math behind this →" + your blog. Attaching expertise to an active discussion beats standalone posts.
 

@@ -109,4 +109,15 @@ The algorithm scores heavily on early engagement. After publishing:
 
 1. Reply to your own article with a question: "Which of these 5 concepts tripped you up when you first learned RL?"
 2. DM 3-5 people in ML who might find it useful
-3. Quote-repost with a one-line hook 4-6 hours later
+3. Quote-repost with a one-line hook 4-6 hours later (options below)
+
+## Quote-repost hooks (pick one, post ~5:30-6:00 PM the same day)
+
+Hit repost on your own article, choose "Quote," and put one of these on top:
+
+1. "Every RL algorithm you've heard of, from PPO to RLHF to GRPO, is a variation on one sentence. Here's the sentence, and the five pieces of math behind it." (recommended: leads with the open loop + names)
+2. "If RLHF papers feel like they skipped a chapter, it's because they did. Here are the five ideas that chapter would've covered."
+3. "You don't need a PhD to read RLHF papers. You need five ideas. A fair die explains the first one."
+4. "Wrote the RL intro I wish I'd had before touching a single alignment paper. Five concepts, real code, no hand-waving."
+
+Then reply to anyone who engages, same as the first hour of the original.
