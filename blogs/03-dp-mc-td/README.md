@@ -440,6 +440,8 @@ Without slip, crater-adjacent cells have _positive_ values: they're safe if you 
 
 Value iteration is one DP route, but not the only one. The classic alternative, _policy iteration_, splits the work in two: fully **evaluate** a fixed policy (Bellman expectation sweeps from [MDPs & Bellman](../02-mdps-and-bellman/README.md) until its values settle), then **improve** it greedily with $\pi'(s) = \arg\max_a Q^\pi(s,a)$, and repeat. On a 25-state grid both land on the same $V^*$, so we won't re-derive it here. **The part worth remembering is the pattern: this evaluate ↔ improve loop, _generalized policy iteration_, is the skeleton that Monte Carlo and TD control will reuse once we drop the model.**
 
+> **One setup detail before MC and TD.** The next two methods do **prediction**: they estimate $V^\pi$ for a _given_ policy $\pi$, so they each need a policy handed to them. We deliberately reuse the **optimal policy $\pi^*$ that DP just computed**. Why? So all three methods estimate the _same_ target. DP gives us $V^* = V^{\pi^*}$ exactly; MC and TD then try to reach those same numbers from sampled experience alone. That makes the comparison apples-to-apples and turns DP's output into a ground-truth answer key we can check MC and TD against. (MC and TD don't _need_ DP, they can evaluate any policy with no model; we just borrow $\pi^*$ so "same value, three different ways" is verifiable.)
+
 ### 2.2 Monte Carlo Prediction
 
 MC doesn't need the model, only the ability to _play episodes_. Run the policy, record what happens, and average the realized returns:
