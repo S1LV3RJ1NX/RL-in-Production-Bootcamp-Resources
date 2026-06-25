@@ -11,6 +11,7 @@
 ## Why Article instead of Thread?
 
 With X Premium, you get:
+
 - **2-4x visibility multiplier** over free accounts (documented in algorithm source)
 - **Articles** are favored by the algorithm — they maximize dwell time (the #1 signal)
 - Articles with code blocks, images, and sections outperform threads for tutorials
@@ -28,7 +29,7 @@ Use Articles for deep-dive tutorials. Use threads for listicles and live comment
 
 ## Article Body (~1,200 words target)
 
-Everyone's shipping RLHF and GRPO. When I tried to actually *read* those papers, I hit a wall. It wasn't the algorithms. It was the foundations underneath them.
+Everyone's shipping RLHF and GRPO. When I tried to actually _read_ those papers, I hit a wall. It wasn't the algorithms. It was the foundations underneath them.
 
 So I started writing the series I wish I'd had: RL from scratch, with real math and real code, and none of the hand-waving.
 
@@ -44,13 +45,15 @@ Q-learning, DQN, PPO, RLHF, GRPO. Every one of them is a variation on that line.
 
 **1. Expectation: "how good" means "how good on average"**
 
-A single trajectory is noise. Value is the *average* over all possible futures, weighted by probability. For a fair die, E[X] = 3.5. You never roll a 3.5, but it's what the rolls average to.
+A single trajectory is noise. Value is the _average_ over all possible futures, weighted by probability. For a fair die, E[X] = 3.5. You never roll a 3.5, but it's what the rolls average to.
 
 That's how an RL agent estimates value: collect episodes, average the returns, trust the mean.
 
+[EMBED IMAGE HERE: fig-lln.svg — running average of die rolls converging to 3.5 as samples grow]
+
 **2. The Markov property: only the present matters**
 
-What happens next depends only on where you are *now*, not how you got here. That is what keeps RL tractable. You don't have to carry the whole history around.
+What happens next depends only on where you are _now_, not how you got here. That is what keeps RL tractable. You don't have to carry the whole history around.
 
 **3. Variance: why a single episode is noise**
 
@@ -90,12 +93,12 @@ Full post with all the code: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequis
 
 ## Header Image
 
-- Use **`blog1-x-banner.png`** (5:2 aspect ratio, what X recommends for the article header)
-- Embed `fig-lln.svg` inline in the body (shows convergence visually)
+- Use `**blog1-x-banner.png`\*\* (5:2 aspect ratio, what X recommends for the article header)
+- Embed `fig-lln.svg` inline right after the Expectation section (point 1), where the text talks about averaging die rolls / returns (marked `[EMBED IMAGE HERE]` in the body)
 
 ## Formatting Tips for X Articles
 
-- Use **bold** and *italics* (Premium feature) for emphasis
+- Use **bold** and _italics_ (Premium feature) for emphasis
 - Keep paragraphs to 1-3 sentences
 - Add generous line breaks between sections
 - First 280 chars are what shows in feed — make them count
@@ -103,6 +106,7 @@ Full post with all the code: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequis
 ## First 30 Minutes Strategy
 
 The algorithm scores heavily on early engagement. After publishing:
+
 1. Reply to your own article with a question: "Which of these 5 concepts tripped you up when you first learned RL?"
 2. DM 3-5 people in ML who might find it useful
 3. Quote-repost with a one-line hook 4-6 hours later
