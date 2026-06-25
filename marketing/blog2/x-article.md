@@ -25,10 +25,10 @@ Every RL algorithm you've heard of, from Q-learning and SARSA to PPO, RLHF, and 
 
 Before the equation, you need the framework. A Markov Decision Process has four parts:
 
-- **States $S$**: where you can be
-- **Actions $A$**: what you can do
-- **Dynamics $p(s' \mid s,a)$**: the probability of landing in $s'$ after taking action $a$ in state $s$
-- **Rewards $R(s,a,s')$**: what you get for that transition
+- **States (S)**: where you can be
+- **Actions (A)**: what you can do
+- **Dynamics p(s'|s,a)**: the probability of landing in s' after taking action a in state s
+- **Rewards R(s,a,s')**: what you get for that transition
 
 The Markov property says what happens next depends only on where you are *now*, not how you got here. That's what makes the recursion possible.
 
@@ -36,9 +36,9 @@ The Markov property says what happens next depends only on where you are *now*, 
 
 ### Two ways to measure "how good"
 
-**$V(s)$**, the state-value, answers "how good is it to *be* in state $s$?" It's the expected total return from $s$ onward, following policy $\pi$.
+**V(s)**, the state-value, answers "how good is it to *be* in state s?" It's the expected total return from s onward, following policy π.
 
-**$Q(s,a)$**, the action-value, answers "how good is it to *do* action $a$ in state $s$?" It's the expected total return after taking $a$, then following $\pi$.
+**Q(s,a)**, the action-value, answers "how good is it to *do* action a in state s?" It's the expected total return after taking a, then following π.
 
 The bridge from Q back to V:
 
@@ -72,19 +72,23 @@ Every RL algorithm is a different way of solving that recursion. Dynamic program
 
 ### From "good" to "optimal"
 
-Replace the policy average $\sum_a \pi(a \mid s)\, Q(s,a)$ with a max, and you get the Bellman *optimality* equation:
+Replace the policy average (the weighted sum over actions) with a max, and you get the Bellman *optimality* equation:
 
 $$V^*(s) = \max_a \sum_{s'} p(s' \mid s,a)\, \big[R + \gamma V^*(s')\big]$$
 
 Pick the best action instead of averaging over a policy.
 
-The optimal policy then falls out for free: $\pi^*(s) = \arg\max_a Q^*(s,a)$. Once you have the optimal Q-values, acting optimally is just looking up the largest number.
+The optimal policy then falls out for free:
+
+$$\pi^*(s) = \arg\max_a Q^*(s,a)$$
+
+Once you have the optimal Q-values, acting optimally is just looking up the largest number.
 
 ---
 
 ### Why this matters for LLMs
 
-If you're working with RLHF or GRPO, you're using algorithms that approximate value functions and optimize policies. The Bellman equation is the backbone underneath all of it. Once it clicks, you can read PPO papers without getting lost, debug a reward signal that isn't working, and see why the KL penalty is there in the first place: it bounds how far $\pi$ is allowed to drift from $\pi_{\text{ref}}$.
+If you're working with RLHF or GRPO, you're using algorithms that approximate value functions and optimize policies. The Bellman equation is the backbone underneath all of it. Once it clicks, you can read PPO papers without getting lost, debug a reward signal that isn't working, and see why the KL penalty is there in the first place: it bounds how far the policy is allowed to drift from the reference policy.
 
 ---
 
