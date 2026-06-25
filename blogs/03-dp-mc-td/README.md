@@ -157,13 +157,13 @@ class MarsRoverEnv(gym.Env):
                 intended = self._move(current_state, action)
 
                 # It lands there with probability 1 - 2*SLIP
-                # outcomes.get(intended, 0) + ... accumulates into a dict instead of overwriting.
+                # outcomes.get() -> gives probability of the intended outcome, or 0 if it's not in the dictionary. This accumulates into a dict instead of overwriting.
                 # This matters because near walls several of these directions can resolve to the same tile (since _move clamps at the edges), and their probabilities must add up rather than clobber each other.
                 outcomes[intended] = outcomes.get(intended, 0) + (1 - 2 * SLIP)
 
                 # Add the probability of the perpendicular outcomes
                 # PERP[action] are the two directions perpendicular to the intended one.
-                # The rover "slips" to each of those with probability SLIP = 0.1 each. (0.8 + 0.1 + 0.1 = 1.0)
+                # The rover "slips" to each of those with probability SLIP = 0.1 each.
                 for slip_action in PERP[action]:
                     slipped = self._move(current_state, slip_action)
                     outcomes[slipped] = outcomes.get(slipped, 0) + SLIP
@@ -300,17 +300,27 @@ $$
 \|V_k - V^*\|_\infty \leq \gamma^k \|V_0 - V^*\|_\infty
 $$
 
+Let's read that term by term:
+
+- $V_k$ is your value estimate after $k$ sweeps; $V^*$ is the true optimal value we're chasing.
+- $\|V_k - V^*\|_\infty$ is the **worst error across all states**. The $\infty$ subscript is the max-norm: compute the absolute gap $|V_k(s) - V^*(s)|$ at every state $s$, then keep the single largest one. So if this number is small, *every* state is close, not just the average state.
+- The inequality says that worst error is at most $\gamma^k$ times the error you began with ($\|V_0 - V^*\|_\infty$). Each sweep multiplies your remaining error by a factor of at most $\gamma$, so it shrinks geometrically: $\gamma, \gamma^2, \gamma^3, \dots$
+
+Because $\gamma < 1$, that bound is **guaranteed to reach 0** no matter how wrong your starting guess $V_0$ was. That is exactly what "contraction" means: the Bellman backup always pulls any value estimate closer to $V^*$, so there's a single fixed point everything funnels into. Your starting guess only affects *how many* sweeps you need, never *whether* you arrive.
+
 ![Error shrinking by gamma each sweep: the contraction mapping guarantee](./images/fig-contraction.svg)
 
-With $\gamma = 0.95$, error halves roughly every 14 sweeps, guaranteed convergence to the exact answer.
+The figure plots that upper bound $\gamma^k$ against the sweep number $k$. It starts at $1$ (at sweep $0$ you could be 100% of your initial error off) and decays smoothly toward $0$, the shaded area underneath showing the error budget vanishing. With $\gamma = 0.95$ the decay is gentle: the marked point shows the error halving roughly every 14 sweeps. A smaller $\gamma$ (a more myopic agent) would plunge to zero much faster, while a $\gamma$ near $1$ flattens the curve and needs more sweeps. Either way, convergence to the exact answer is guaranteed.
 
 ```python
 def value_iteration(env, gamma=GAMMA, theta=1e-6):
     """Bellman optimality backup: V(s) ← max_a Σ p(s'|s,a)[r + γ·V(s')]
     Sweeps all states repeatedly until values stop changing (< theta)."""
-    V = np.zeros(env.observation_space.n)        # start every state's value at 0 (arbitrary guess)
+    # start every state's value at 0 (arbitrary guess)
+    V = np.zeros(env.observation_space.n)
     while True:
-        delta = 0                                # track largest change this sweep for convergence check
+        # Track largest change this sweep for convergence check
+        delta = 0
         for s in range(env.observation_space.n):
             v_old = V[s]
             q_values = []
@@ -318,16 +328,21 @@ def value_iteration(env, gamma=GAMMA, theta=1e-6):
                 # Q(s,a) = Σ p · [r + γ·V(s')·(1-done)]
                 # The (1-done) factor ensures terminal states contribute 0 future value,
                 # because once the episode ends there's nothing more to collect.
-                q = sum(p * (r + gamma * V[s_next] * (1 - done))
-                        for p, s_next, r, done in env.P[s][a])
+                q = 0
+                for probability, s_next, r, done in env.P[s][a]:
+                    q += probability * (r + gamma * V[s_next] * (1 - done))
+                # Add the Q-value for this action to the list
                 q_values.append(q)
+
             # Bellman optimality: the value of a state under the BEST policy is the max over actions
             V[s] = max(q_values)
+            # Track the change for convergence check
             delta = max(delta, abs(v_old - V[s]))
         # Convergence: when the biggest value change in a full sweep is negligible,
         # we've found V* (guaranteed by the contraction mapping theorem).
         if delta < theta:
             break
+
     # Extract the greedy policy: π*(s) = argmax_a Q(s,a).
     # Given the optimal values, the best action is the one with the highest expected return.
     policy = np.zeros(env.observation_space.n, dtype=int)
