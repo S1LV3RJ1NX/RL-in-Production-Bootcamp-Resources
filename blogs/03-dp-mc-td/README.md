@@ -59,7 +59,8 @@ The rules:
 - **Goal:** $(4,4)$, reward $+10$, episode ends.
 - **Craters:** $(2,2)$ and $(1,3)$, reward $-10$, episode ends.
 - **Step cost:** $-1$ everywhere else.
-- **Slip:** the rover moves in the intended direction with probability $0.8$, and slips to each perpendicular direction with probability $0.1$.
+- **Actions:** four moves, encoded as $0=\text{up}$, $1=\text{right}$, $2=\text{down}$, $3=\text{left}$ (these are the `[a=…]` tags in the trace below).
+- **Slip:** the rover moves in the intended direction with probability $0.8$, and slips to each of the two perpendicular directions (the ones $90°$ from the intended move) with probability $0.1$ each. Moves into a wall keep the rover in place.
 - **Discount:** $\gamma = 0.95$.
 
 Let's build it and watch a random policy fumble around:
@@ -264,6 +265,10 @@ Corner (wall): from (0, 0) taking a=0
 ```
 
 In open space you get the textbook split: 80% to the intended tile, 10% to each perpendicular. Against the top wall, "up" (0.8) and the leftward slip (0.1) both clamp back onto `(0,0)`, so their probabilities **add** to 0.9. This is why `_build_model` accumulates with `outcomes.get(next_state, 0) + p` instead of overwriting: whenever wall-clamping sends several directions to the same tile, their mass must pool so each row still sums to 1.
+
+Here's the grid once more, so you can read the traces above against the map without scrolling back up:
+
+![Recap of the 5x5 Mars Rover grid: start at (0,0), goal at (4,4) with +10, craters at (2,2) and (1,3) with -10, all other tiles cost -1](./images/fig-rover-grid.svg)
 
 ### The video-game-level analogy
 
