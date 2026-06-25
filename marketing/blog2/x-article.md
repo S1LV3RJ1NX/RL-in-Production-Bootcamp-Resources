@@ -50,7 +50,17 @@ And from V back to Q:
 
 $$Q(s,a) = \sum_{s'} p(s' \mid s,a)\, \big[R + \gamma V(s')\big]$$
 
-Average the outcomes, weighted by how likely each next state is.
+Average the outcomes, weighted by how likely each next state is. That sum is a single loop in code, and each line maps straight onto a term in the equation:
+
+```python
+def q_from_v(V: np.ndarray, s: int, a: int) -> float:
+    q_value: float = 0.0
+    # P[s][a] lists the possible outcomes of taking action a in state s
+    for prob, next_state, reward, done in P[s][a]:
+        # p(s'|s,a) · [ r + γ · V(s') ]
+        q_value += prob * (reward + gamma * V[next_state])
+    return q_value
+```
 
 ---
 

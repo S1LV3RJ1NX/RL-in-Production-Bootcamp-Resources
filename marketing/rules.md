@@ -85,6 +85,8 @@ rsvg-convert -z 2 path/to/fig.svg -o marketing/blogN/fig.png
 - X plain tweets / self-replies / quote-reposts: no LaTeX, keep equations as plain text (`V*(s) = max_a Q*(s,a)`).
 - LinkedIn: no LaTeX either; keep equations as readable plain text or embed an image of the equation.
 
+**X Articles support fenced code blocks.** For code-heavy posts (most of this series), drop a short, self-contained snippet in the Article body with a ```` ```python ```` fence. Keep it tight (10-15 lines), keep the type hints, and add a one-line comment mapping the code to the equation it implements. This reinforces the "typed Python, line by line" angle. LinkedIn does not render code blocks well, so for LinkedIn either screenshot the code (use ray.so / carbon.sh) or describe it in prose.
+
 For carousels (LinkedIn):
 - 4-6 slides max
 - Slide 1: hook question
