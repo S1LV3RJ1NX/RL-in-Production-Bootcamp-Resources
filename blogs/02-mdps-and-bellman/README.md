@@ -517,20 +517,19 @@ The Bellman equation is the universal backbone. Everything else is engineering t
 
 ---
 
-## 3. Putting it all together: solving Bellman exactly on FrozenLake
+## 3. Putting it all together
 
-We've seen each idea in isolation. Here's the whole vocabulary as a quick reference, then one runnable program that solves the Bellman expectation equation as a linear system: no iteration, no sampling, just linear algebra.
+We've seen each idea in isolation. Here's the whole vocabulary as a quick reference.
 
-| Concept          | Math                                    | In code                            |
-| ---------------- | --------------------------------------- | ---------------------------------- | -------------------- |
-| Dynamics         | $p(s', r \mid s, a)$                    | `P[s][a] -> [(prob, s', r, done)]` |
-| Return           | $G_t = \sum_k \gamma^k R_{t+k+1}$       | `G += gamma**k * r`                |
-| Recursive return | $G_t = R_{t+1} + \gamma G_{t+1}$        | (defines the Bellman structure)    |
-| State-value      | $V^\pi(s) = \mathbb{E}[G_t \mid s]$     | `V[s]`                             |
-| Action-value     | $Q^\pi(s,a) = \mathbb{E}[G_t \mid s,a]$ | `q_from_v(V, s, a)`                |
-| V from Q         | $V = \sum_a \pi(a                       | s)\,Q(s,a)$                        | `(pi * Q_row).sum()` |
-
-| Optimal policy | $\pi^* = \arg\max_a Q^*$ | `np.argmax(Q, axis=1)` |
+| Concept          | Math                                              | In code                            |
+| ---------------- | ------------------------------------------------- | ---------------------------------- |
+| Dynamics         | $p(s', r \mid s, a)$                              | `P[s][a] -> [(prob, s', r, done)]` |
+| Return           | $G_t = \sum_k \gamma^k R_{t+k+1}$                | `G += gamma**k * r`                |
+| Recursive return | $G_t = R_{t+1} + \gamma G_{t+1}$                 | (defines the Bellman structure)    |
+| State-value      | $V^\pi(s) = \mathbb{E}[G_t \mid s]$              | `V[s]`                             |
+| Action-value     | $Q^\pi(s,a) = \mathbb{E}[G_t \mid s,a]$          | `q_from_v(V, s, a)`               |
+| V from Q         | $V = \sum_a \pi(a \mid s)\,Q(s,a)$               | `(pi * Q_row).sum()`              |
+| Optimal policy   | $\pi^* = \arg\max_a Q^*$                         | `np.argmax(Q, axis=1)`            |
 
 ---
 
