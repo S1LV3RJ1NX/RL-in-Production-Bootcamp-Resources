@@ -438,20 +438,9 @@ Without slip, crater-adjacent cells have _positive_ values: they're safe if you 
 
 </details>
 
-### 2.2 Policy Iteration
+Value iteration is one DP route, but not the only one. The classic alternative, _policy iteration_, splits the work in two: fully **evaluate** a fixed policy (Bellman expectation sweeps from [MDPs & Bellman](../02-mdps-and-bellman/README.md) until its values settle), then **improve** it greedily with $\pi'(s) = \arg\max_a Q^\pi(s,a)$, and repeat. On a 25-state grid both land on the same $V^*$, so we won't re-derive it here. **The part worth remembering is the pattern: this evaluate ↔ improve loop, _generalized policy iteration_, is the skeleton that Monte Carlo and TD control will reuse once we drop the model.**
 
-An alternative to value iteration: alternate between _evaluating_ a policy (sweeping the Bellman expectation backup from [MDPs & Bellman](../02-mdps-and-bellman/README.md) until its values settle) and _improving_ it greedily. Often converges in fewer outer loops, but each inner step is more expensive.
-
-$$
-\begin{aligned}
-&\textbf{evaluate (sweep to convergence): } && V^\pi(s) \leftarrow \sum_{s',r} p(s',r\mid s,\pi(s))\big[r + \gamma\, V^\pi(s')\big] \\[4pt]
-&\textbf{improve (act greedily): } && \pi'(s) = \arg\max_a Q^\pi(s,a)
-\end{aligned}
-$$
-
-For our Mars Rover (25 states), both methods converge near-instantly. The distinction matters at scale: policy iteration invests more per step but takes fewer steps.
-
-### 2.3 Monte Carlo Prediction
+### 2.2 Monte Carlo Prediction
 
 MC doesn't need the model, only the ability to _play episodes_. Run the policy, record what happens, and average the realized returns:
 
@@ -524,7 +513,7 @@ MC final grid (20k episodes):
 
 The MC estimates are close to the DP values but still noisy: $V(0,0)$ fluctuates because the start state is far from the goal, giving high-variance returns.
 
-### 2.4 TD(0) Prediction: The Breakthrough
+### 2.3 TD(0) Prediction: The Breakthrough
 
 TD doesn't wait for the episode to end. After each step, it updates using the _observed reward plus the estimated value of the next state_:
 
@@ -533,6 +522,19 @@ V(s) \leftarrow V(s) + \alpha \left[ R + \gamma \, V(s') - V(s) \right]
 $$
 
 The term $\delta = R + \gamma V(s') - V(s)$ is the **TD error**: "how much more (or less) I got than I expected." If my estimate was perfect, $\delta = 0$.
+
+> **Remember the running average from [RL intro & prerequisites](../01-rl-intro-and-prerequisites/README.md)?** This update isn't new, it's that exact rule. Blog 1 called $\mu \leftarrow \mu + \alpha\,(x - \mu)$ "the template for every learning rule in RL," and TD(0) is that template with the pieces renamed:
+>
+> $$
+> \underbrace{V(s)}_{\mu} \leftarrow \underbrace{V(s)}_{\mu} + \alpha\Big[\underbrace{R + \gamma V(s')}_{x\ (\text{target})} - \underbrace{V(s)}_{\mu}\Big]
+> $$
+>
+> So the **TD error $\delta$ is just the $(x - \mu)$ error term** from blog 1, "how far the target is from what I currently believe," and we step a fraction $\alpha$ of the way toward it. The *only* thing that changes between methods is what plays the role of the target $x$:
+>
+> - **Monte Carlo:** $x = G_t$, the **actual, fully-observed** return. You wait for the episode to end, then average toward a real sample (exactly the law-of-large-numbers averaging from blog 1).
+> - **TD(0):** $x = R + \gamma V(s')$, a **bootstrapped** target, one real reward plus your *current estimate* of the rest. No waiting required.
+>
+> That single substitution $G_t \to R + \gamma V(s')$ is the entire difference between MC and TD. It's also why $\delta = 0$ when your estimate is already self-consistent: the target equals the current value, so there's nothing left to nudge.
 
 **Properties:**
 
@@ -549,17 +551,18 @@ def td_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.05, max_step
     for _ in range(episodes):
         s, _ = env.reset()
         for _ in range(max_steps):
-            a = policy[s]                          # follow the fixed policy we are evaluating
+            # follow the fixed policy we are evaluating
+            a = policy[s]
             s_next, reward, terminated, truncated, _ = env.step(a)
             # Bootstrap: V(s') is our current (imperfect) estimate of future value.
             # At a terminal state, there IS no future, so bootstrap = 0.
             bootstrap = V[s_next] if not terminated else 0.0
             # TD target = r + γ·V(s'): one real reward + discounted estimate of the rest.
             # TD error δ = target - V(s): how much better/worse reality was than predicted.
-            target = reward + gamma * bootstrap
+            td_error = reward + gamma * bootstrap - V[s]
             # TD(0) update: V(s) ← V(s) + α·δ — nudge value by a fraction of the surprise.
             # Unlike MC, this fires EVERY step, so information propagates much faster.
-            V[s] = V[s] + alpha * (target - V[s])
+            V[s] = V[s] + alpha * td_error
             s = s_next
             if terminated or truncated:
                 break
@@ -612,7 +615,7 @@ TD converges closer to the DP answer with less noise: it updates 25 states per e
 
 </details>
 
-### 2.5 The DP / MC / TD Tradeoff
+### 2.4 The DP / MC / TD Tradeoff
 
 | Property                     | DP                       | MC                          | TD                                |
 | ---------------------------- | ------------------------ | --------------------------- | --------------------------------- |
@@ -652,7 +655,7 @@ And here they are side by side as heatmaps:
 
 </details>
 
-### 2.6 Prediction vs Control: The Bridge to Q-Learning
+### 2.5 Prediction vs Control: The Bridge to Q-Learning
 
 Everything above is **prediction**: estimate $V^\pi$ for a given policy $\pi$. But we want **control**: find the _best_ policy.
 
