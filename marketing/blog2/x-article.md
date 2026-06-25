@@ -105,6 +105,11 @@ Learning RL for LLMs through @VizuraAI bootcamp. Follow for the rest of the seri
 
 ---
 
+## Header Image
+
+- Use **`blog2-x-banner.png`** (5:2 aspect ratio, what X recommends for the article header)
+- Embed `fig-backup-diagram.svg` inline in the body
+
 ## First 30 Minutes Strategy
 
 After publishing:

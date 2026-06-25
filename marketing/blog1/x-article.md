@@ -88,12 +88,16 @@ Full post with all code examples: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prer
 
 ---
 
+## Header Image
+
+- Use **`blog1-x-banner.png`** (5:2 aspect ratio, what X recommends for the article header)
+- Embed `fig-lln.svg` inline in the body (shows convergence visually)
+
 ## Formatting Tips for X Articles
 
 - Use **bold** and *italics* (Premium feature) for emphasis
 - Keep paragraphs to 1-3 sentences
 - Add generous line breaks between sections
-- Embed the `fig-lln.svg` image inline (shows convergence visually)
 - First 280 chars are what shows in feed — make them count
 
 ## First 30 Minutes Strategy
