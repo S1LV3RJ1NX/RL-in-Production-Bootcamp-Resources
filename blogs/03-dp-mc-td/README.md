@@ -663,9 +663,13 @@ Everything so far has been **prediction**: someone hands you a policy $\pi$, and
 
 But scoring a fixed policy was never the real goal. What we actually want is **control**: not "how good is this policy?" but "what is the _best_ policy?", the one that earns the most return from every state.
 
-DP closed that gap with policy improvement (the $\arg\max$ step). But MC and TD as described only predict: they evaluate a fixed policy using samples.
+So why not just reuse a tool we already have? Each one hits a wall.
 
-To get control without a model, we need to learn $Q(s,a)$ for all actions (not just the one the policy takes), then pick the best:
+**DP can do control, but only with a model.** Value iteration already found $\pi^*$ through its $\arg\max$ step, so DP _is_ a control method. The catch is what it demands: the full transition model $p(s',r\mid s,a)$ _and_ a sweep over every state on every iteration. We had both for a 25-cell grid, but real problems usually offer neither, no god's-eye model of the world, and far too many states (often continuous) to enumerate. DP control is exact only when you can afford to read and iterate the entire model, which is almost never.
+
+**Pure MC and TD predict, but can't improve as described.** Estimating $V^\pi$ from samples removes the model requirement, which fixes DP's first problem, but two gaps remain. First, $V(s)$ alone can't tell you _which action_ to take: turning a state value into a greedy choice means looking one step ahead with $p(s',r\mid s,a)$, the very model we just said we don't have. Second, they only ever follow the fixed policy $\pi$, so they only see the actions $\pi$ already takes and never gather evidence about the _alternatives_ you'd need in order to improve.
+
+The fix closes both gaps at once: learn $Q(s,a)$ for _every_ action (not just the one the policy takes), so the best action is a direct lookup with no model needed, and keep exploring so those alternative actions actually get visited. Then pick the best:
 
 $$
 \pi'(s) = \arg\max_a Q(s,a)
