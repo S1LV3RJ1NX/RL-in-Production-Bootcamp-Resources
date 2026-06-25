@@ -687,7 +687,7 @@ That leap (TD + Q-values + $\max_{a'}$) is **Q-learning**, the subject of [SARSA
 
 ---
 
-### 2.6. Putting it all together: All three on Mars Rover
+### 2.6 Putting it all together: All three on Mars Rover
 
 | Concept                   | Math                                              | In code                           |
 | ------------------------- | ------------------------------------------------- | --------------------------------- |
