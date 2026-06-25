@@ -2,7 +2,7 @@
 
 ## Schedule
 
-- **Date:** Tuesday, July 7, 2026
+- **Date:** Tuesday, June 30, 2026
 - **Time:** 10:00 AM IST
 - **Follow-up comment:** Post immediately after publishing
 

@@ -129,18 +129,58 @@ Best posting times (IST):
 
 ## Series Progress Tracker
 
-Cadence: **one blog per week** (LinkedIn on Tuesday, X Article on Wednesday).
-Offsite: Jul 8–14 (no posts that week).
+Cadence: **one blog per week**. Offsite: Jul 8–14 (no posts that week).
 
-| Blog | Title | LinkedIn (Tue 10 AM) | X Article (Wed 9 AM) |
+| Blog | Title | LinkedIn | X Article |
 |------|-------|------|------|
-| 01 | RL from First Principles | ☐ Tue Jun 30 | ☐ Wed Jul 1 |
-| 02 | MDPs & Bellman Equations | ☐ Tue Jul 7 | ☐ Wed Jul 8 |
-| — | *Offsite Jul 8–14* | — | — |
+| 01 | RL from First Principles | ☐ Thu Jun 25 (~12:45 PM) | ☐ Thu Jun 25 (~12:45 PM) |
+| 02 | MDPs & Bellman Equations | ☐ Tue Jun 30 (10 AM) | ☐ Tue Jun 30 (10 AM) |
 | 03 | DP, Monte Carlo & TD | ☐ Tue Jul 15 | ☐ Wed Jul 16 |
 | 04 | SARSA, Q-learning & DQN | ☐ Tue Jul 22 | ☐ Wed Jul 23 |
 | 05 | Policy Gradients | ☐ Tue Jul 29 | ☐ Wed Jul 30 |
 | 06 | TRPO & PPO | ☐ Tue Aug 5 | ☐ Wed Aug 6 |
+
+---
+
+## Virality Playbook (2026, data-backed)
+
+Both platforms now rank primarily on **dwell time** and **early engagement velocity**, not likes. The mechanics below come from LinkedIn's LiRank papers and xAI's open-sourced X algorithm.
+
+### The single most important rule
+**Reply to every comment in the first 60 minutes.** On X, an author-engaged reply is weighted **~150x a like** (+75 vs +0.5). On LinkedIn, substantive comments (15+ words) plus the first-hour velocity decide whether you escape your own network. Be online and present the moment you post.
+
+### LinkedIn: stack 4+ hook tactics in the first 200 characters
+Viral posts average 4–6 stacked tactics. The highest-leverage combo:
+1. **Pattern interrupt** — an unexpected opening line
+2. **Quantified proof** — a specific number ("only 1 in 100 episodes reaches the goal")
+3. **Open loop** — tease a payoff you resolve later ("here's the one sentence the whole field hangs on")
+4. **Memorable quote** — a line worth screenshotting
+
+Rules:
+- First line must earn the "see more" tap (140 chars mobile / 210 desktop). This tap *is* the dwell-time signal.
+- NO hedging ("I think", "maybe", "kind of") — it kills the hook.
+- 150–300 words, line breaks every 1–2 sentences.
+- **Optimize for saves** — saves are a lasting quality signal, higher-weighted than likes. End with something worth saving (a cheat-sheet, a formula).
+- Links in comments, never the body (external links suppress reach).
+- CTA = a specific question that invites thoughtful replies.
+
+### X: engineer "cognitive friction" + the Show More click
+- First 280 chars = the whole game. Use a **shocking question** ("Is the math behind RLHF actually simple?") or a **terrifying metric** ("90% of people skip the one equation all of RL is built on").
+- Make the Article long enough to trigger truncation; put a cliffhanger right at the cut so people click "Show More" (registered as high-intent engagement).
+- Reply substantively to 5–10 larger AI/ML accounts (2–10x your followers) daily — earn a like/reply back. This is the #1 growth lever under 1K followers.
+- Bookmarks and quote-posts > likes (they signal "I'll come back to this").
+- A single new **follow from a post** outweighs dozens of likes — pin your strongest post.
+- Keep links out of the main post; drop in a reply.
+- Don't burst-post: space posts hours apart (author-diversity decay).
+
+### Keywords / hashtags that surface in RL-for-LLMs discovery
+Use these naturally in copy (not stuffed):
+- **Topic terms** (help LinkedIn's topic-relevance retrieval): `Reinforcement Learning`, `RLHF`, `GRPO`, `PPO`, `DPO`, `LLM alignment`, `reward modeling`, `policy gradients`, `Bellman equation`, `value function`
+- **LinkedIn hashtags** (3–5 max): `#ReinforcementLearning` `#MachineLearning` `#LLMs` `#RLHF` `#AI` `#DeepLearning` `#LearningInPublic`
+- **X**: skip hashtags (they hurt reach); instead name the concepts in plain text and tag relevant accounts/papers.
+
+### Ride trending waves
+When a new RLHF/GRPO/DPO paper or model drops, quote-post it within hours with: "Here's the foundational math behind this →" + your blog. Attaching expertise to an active discussion beats standalone posts.
 
 ---
 

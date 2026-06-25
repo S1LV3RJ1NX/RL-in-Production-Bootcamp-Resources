@@ -2,8 +2,8 @@
 
 ## Schedule
 
-- **Date:** Wednesday, July 8, 2026
-- **Time:** 9:00 AM IST
+- **Date:** Tuesday, June 30, 2026
+- **Time:** 10:00 AM IST
 - **Self-reply:** Post within 5 minutes of publishing
 - **Quote-repost:** Same day, 3:00 PM IST (different hook)
 

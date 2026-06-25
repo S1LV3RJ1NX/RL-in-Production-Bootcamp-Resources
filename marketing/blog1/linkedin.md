@@ -2,9 +2,10 @@
 
 ## Schedule
 
-- **Date:** Tuesday, June 30, 2026
-- **Time:** 10:00 AM IST
+- **Date:** Thursday, June 25, 2026 (today)
+- **Time:** ~12:45 PM IST (within the 10 AM–2 PM peak window)
 - **Follow-up comment:** Post immediately after publishing
+- **Be online:** stay available to reply for the first 60 minutes
 
 ## Post Text
 

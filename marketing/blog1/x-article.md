@@ -2,10 +2,11 @@
 
 ## Schedule
 
-- **Date:** Wednesday, July 1, 2026
-- **Time:** 9:00 AM IST
+- **Date:** Thursday, June 25, 2026 (today)
+- **Time:** ~12:45 PM IST
 - **Self-reply:** Post within 5 minutes of publishing
-- **Quote-repost:** Same day, 3:00 PM IST (different hook)
+- **Quote-repost:** Same day, ~5:30 PM IST (different hook)
+- **Note:** posting LinkedIn + X together is fine — keep both tabs open for first-hour replies
 
 ## Why Article instead of Thread?
 
