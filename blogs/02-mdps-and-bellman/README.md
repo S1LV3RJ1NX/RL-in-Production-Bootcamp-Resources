@@ -454,7 +454,7 @@ Read: "Pi-star of s equals the action a that maximizes Q-star(s, a)."
 
 Interpretation: once you have the optimal Q-values, the optimal policy is trivial: just pick the action with the highest Q. Every RL algorithm is, at its core, a way of computing or approximating these optimal values.
 
-One more relation connects $V^*$ and $Q^*$ directly (compare this to the V-Q bridge from §2.4, which used a policy-weighted *average*; here the average becomes a *max*):
+One more relation connects $V^*$ and $Q^*$ directly (compare this to the V-Q bridge from §2.4, which used a policy-weighted _average_; here the average becomes a _max_):
 
 $$
 V^*(s) = \max_a\, Q^*(s, a)
@@ -464,7 +464,7 @@ Read: "V-star of s equals the max over actions a of Q-star(s, a)."
 
 Interpretation: the optimal value of a state is simply the Q-value of the best action available there. Under the optimal policy you always take the best action, so V and the best Q coincide.
 
-**Where did $\pi(a|s)$ go?** Recall the general V-Q bridge: $V^\pi(s) = \sum_a \pi(a|s)\,Q^\pi(s,a)$ — a weighted average. For the *optimal* policy, the weighting is degenerate: $\pi^*(a|s) = 1$ for the best action and $0$ for all others. When you substitute that one-hot distribution into the sum, every term vanishes except the maximum. A weighted average with a one-hot weight vector *is* "pick the max."
+**Where did $\pi(a|s)$ go?** Recall the general V-Q bridge: $V^\pi(s) = \sum_a \pi(a|s)\,Q^\pi(s,a)$ — a weighted average. For the _optimal_ policy, the weighting is degenerate: $\pi^*(a|s) = 1$ for the best action and $0$ for all others. When you substitute that one-hot distribution into the sum, every term vanishes except the maximum. A weighted average with a one-hot weight vector _is_ "pick the max."
 
 <details>
 <summary><strong>Check:</strong> The relation V*(s) = max_a Q*(s, a) looks innocent. What does it quietly assume about how the agent behaves after the first step?</summary>
@@ -521,136 +521,16 @@ The Bellman equation is the universal backbone. Everything else is engineering t
 
 We've seen each idea in isolation. Here's the whole vocabulary as a quick reference, then one runnable program that solves the Bellman expectation equation as a linear system: no iteration, no sampling, just linear algebra.
 
-| Concept          | Math                                          | In code                                |
-| ---------------- | --------------------------------------------- | -------------------------------------- |
-| Dynamics         | $p(s', r \mid s, a)$                          | `P[s][a] -> [(prob, s', r, done)]`     |
-| Return           | $G_t = \sum_k \gamma^k R_{t+k+1}$             | `G += gamma**k * r`                    |
-| Recursive return | $G_t = R_{t+1} + \gamma G_{t+1}$              | (defines the Bellman structure)        |
-| State-value      | $V^\pi(s) = \mathbb{E}[G_t \mid s]$           | `V[s]`                                 |
-| Action-value     | $Q^\pi(s,a) = \mathbb{E}[G_t \mid s,a]$       | `q_from_v(V, s, a)`                    |
-| V from Q         | $V = \sum_a \pi\,Q$                           | `(pi * Q_row).sum()`                   |
-| Bellman equation | $V = \sum_a \pi \sum_{s'} p\,[r + \gamma V']$ | `np.linalg.solve(I - gamma * T, r_pi)` |
-| Optimal policy   | $\pi^* = \arg\max_a Q^*$                      | `np.argmax(Q, axis=1)`                 |
+| Concept          | Math                                    | In code                            |
+| ---------------- | --------------------------------------- | ---------------------------------- |
+| Dynamics         | $p(s', r \mid s, a)$                    | `P[s][a] -> [(prob, s', r, done)]` |
+| Return           | $G_t = \sum_k \gamma^k R_{t+k+1}$       | `G += gamma**k * r`                |
+| Recursive return | $G_t = R_{t+1} + \gamma G_{t+1}$        | (defines the Bellman structure)    |
+| State-value      | $V^\pi(s) = \mathbb{E}[G_t \mid s]$     | `V[s]`                             |
+| Action-value     | $Q^\pi(s,a) = \mathbb{E}[G_t \mid s,a]$ | `q_from_v(V, s, a)`                |
+| V from Q         | $V = \sum_a \pi(a|s)\,Q(s,a)$           | `(pi * Q_row).sum()`               |
 
-**Why can we solve this with linear algebra?** Look at the Bellman equation for one state:
-
-$$
-V(s) = \sum_a \pi(a \mid s) \sum_{s'} p(s' \mid s, a)\;\big[r + \gamma\,V(s')\big]
-$$
-
-The unknowns are $V(0), V(1), \dots, V(15)$, one per state. Notice that $V$ appears on both sides, but only as a **weighted sum** of other $V$ values (no $V^2$, no $\log V$, no $V \cdot V'$). That makes it **linear**. Each state gives one equation, and we have 16 states, so it's a system of 16 linear equations in 16 unknowns, like you'd solve in high-school algebra.
-
-Concretely, expand the equation for one state (say state 6):
-
-$$
-V(6) = \underbrace{0.25 \times \tfrac{1}{3} \times \gamma}_{}\,V(2) + \underbrace{\cdots}_{}\,V(7) + \cdots + \text{(constant reward terms)}
-$$
-
-Every term is either a **constant** (reward) or a **constant $\times V(\text{some state})$**. Collect all the $V$-multiplying constants into a matrix $\mathbf{T}_\pi$ and all the reward constants into a vector $\mathbf{r}_\pi$:
-
-- $\mathbf{T}_\pi[s, s']$ = probability of going from $s$ to $s'$ under policy $\pi$ (summing over actions).
-- $\mathbf{r}_\pi[s]$ = expected immediate reward at state $s$ under policy $\pi$.
-
-Then the whole system in matrix form is:
-
-$$
-\mathbf{V} = \mathbf{r}_\pi + \gamma\,\mathbf{T}_\pi\,\mathbf{V}
-$$
-
-Rearrange to get all the $V$'s on one side:
-
-$$
-(\mathbf{I} - \gamma\,\mathbf{T}_\pi)\,\mathbf{V} = \mathbf{r}_\pi
-$$
-
-This is just $A\mathbf{x} = \mathbf{b}$: solve with `np.linalg.solve`. No iteration, no guessing, just one matrix inversion. The catch: you need the full model $p$ (to build $\mathbf{T}_\pi$) and the state space must be small enough to fit in a matrix. When either condition fails, you iterate or sample: that's [DP, MC & TD](../03-dp-mc-td/README.md).
-
-```python
-import gymnasium as gym
-import numpy as np
-
-env = gym.make("FrozenLake-v1", is_slippery=True)
-P = env.unwrapped.P
-nS, nA = env.observation_space.n, env.action_space.n  # 16 states, 4 actions
-gamma = 0.99
-
-# === Step 1: Build the matrix form of the Bellman equation ===
-# The Bellman eq V = r_π + γ·T_π·V is linear in V, so we can express
-# the entire 16-state system as one matrix equation and solve it directly.
-
-pi = np.full((nS, nA), 1.0 / nA)  # uniform random policy: π(a|s) = 0.25 ∀ a,s
-
-# T_π[s, s'] = probability of transitioning from s to s' under policy π
-#            = Σ_a π(a|s) · p(s'|s,a)
-# This "marginalizes out" the action: what's the overall s→s' transition prob?
-T_pi = np.zeros((nS, nS))
-
-# r_π[s] = expected immediate reward at state s under policy π
-#         = Σ_a π(a|s) · Σ_{s'} p(s',r|s,a) · r
-r_pi = np.zeros(nS)
-
-for s in range(nS):
-    for a in range(nA):
-        for prob, s2, reward, done in P[s][a]:
-            # Accumulate policy-weighted transition probabilities and rewards
-            T_pi[s, s2] += pi[s, a] * prob
-            r_pi[s]     += pi[s, a] * prob * reward
-
-# === Step 2: Solve the Bellman linear system exactly ===
-# V = r_π + γ·T_π·V  →  (I - γ·T_π)·V = r_π  →  V = (I - γ·T_π)⁻¹ · r_π
-# This is a standard Ax = b linear system: one matrix solve gives V^π for ALL states.
-V_pi = np.linalg.solve(np.eye(nS) - gamma * T_pi, r_pi)  # V^π(s) for all s
-
-# === Step 3: Extract Q(s,a) from V, then derive the greedy (improved) policy ===
-# Q^π(s,a) = Σ_{s'} p(s'|s,a) · [r + γ·V^π(s')]
-# This uses the V→Q bridge: knowing V for all states, compute Q for each action.
-Q = np.zeros((nS, nA))
-for s in range(nS):
-    for a in range(nA):
-        Q[s, a] = sum(p * (r + gamma * V_pi[s2]) for p, s2, r, d in P[s][a])
-
-# The greedy policy picks the best action at each state: π(s) = argmax_a Q(s,a).
-# No model needed at decision time — just compare 4 numbers per state.
-greedy_policy = np.argmax(Q, axis=1)  # π*(s) = argmax_a Q(s,a)
-action_names = ["Left", "Down", "Right", "Up"]
-
-# Display V^π as a 4x4 grid matching the FrozenLake layout
-print("V^π(s) under random policy:")
-print(np.round(V_pi.reshape(4, 4), 4))
-print()
-
-# Visualize the greedy policy as directional arrows on the grid.
-# Holes (H) and goal (G) are shown as letters since no action is taken there.
-print("Greedy policy from Q (argmax_a Q(s,a)):")
-grid = np.array(list("SFFF" "FHFH" "FFFH" "HFFG"))
-for s in range(nS):
-    arrow = ["←", "↓", "→", "↑"][greedy_policy[s]]
-    if grid[s] in ("H", "G"):
-        arrow = grid[s]
-    print(arrow, end="  " if (s + 1) % 4 else "\n")
-
-env.close()
-```
-
-```text title="Output"
-V^π(s) under random policy:
-[[ 0.0124  0.0104  0.0193  0.0095]
- [ 0.0148 -0.      0.0389  0.    ]
- [ 0.0326  0.0843  0.1378  0.    ]
- [ 0.      0.1703  0.4336  0.    ]]
-
-Greedy policy from Q (argmax_a Q(s,a)):
-←  ↑  ←  ↑
-←  H  →  H
-↑  ↓  ←  H
-H  →  ↓  G
-```
-
-The values under a random policy are tiny: most episodes fall into a hole before reaching the goal. But the greedy policy extracted from $Q$ already points arrows toward the goal, showing that even noisy value estimates can yield a sensible policy when passed through $\arg\max$. The arrows trace a path: from the start (top-left), go left/up to avoid holes, then navigate toward the goal (bottom-right). (The `-0.` at hole states is a harmless floating-point display artifact.)
-
-Note: this greedy policy was extracted from $V^\pi$ under a _random_ policy, so it's better than random but not yet optimal. To find $V^*$ and $\pi^*$, you'd iterate this process (policy improvement), which is exactly what we'll do in the next post.
-
-> Run it with `uv run python this_script.py` (needs `gymnasium` and `numpy`). Try changing $\gamma$: with $\gamma = 0$ the agent becomes completely myopic and every state's value collapses to zero (no immediate reward at most states).
+| Optimal policy | $\pi^* = \arg\max_a Q^*$ | `np.argmax(Q, axis=1)` |
 
 ---
 
