@@ -151,9 +151,7 @@ def q_learning_update(
 # State 2 "already looks good" — we'll see that value flow backward.
 Q = np.zeros((3, 2)); Q[2, 1] = 10.0
 
-# Even with r=0, Q(0,1) jumps from 0 → 4.5:
-# target = 0 + 0.9·10 = 9, and we move halfway (α=0.5) from 0 to 9.
-# This is value propagating backward from a promising future state.
+# Here we assume that from state 0, it takes action 1 to reach state 2, which has a value of 10.
 print(q_learning_update(Q, s=0, a=1, r=0.0, s2=2, done=False, alpha=0.5, gamma=0.9))
 ```
 
@@ -168,7 +166,10 @@ Even with **zero immediate reward**, $Q(0,1)$ jumped from 0 to 4.5: the target $
 A purely greedy agent repeats the first okay path it finds and never discovers a better one. The fix, carried over from [RL Foundations](../01-rl-intro-and-prerequisites/README.md): act greedily _most_ of the time, but with probability $\epsilon$ take a random action.
 
 ```python
-def epsilon_greedy(Q, s, eps):
+import numpy as np
+# set seed for reproducibility
+np.random.seed(52)
+def epsilon_greedy(Q: np.ndarray, s: int, eps: float) -> int:
     # ε-greedy exploration: with probability ε pick a random action (explore),
     # otherwise pick the action with the highest Q-value (exploit).
     # This is the simplest way to balance learning about new actions
@@ -182,13 +183,15 @@ Q = np.zeros((1, 4)); Q[0, 2] = 1.0
 
 # With eps=0, exploration is off → always returns the greedy choice (action 2).
 print("greedy action (eps=0):", epsilon_greedy(Q, 0, 0.0))
+print("explore action (eps=1):", epsilon_greedy(Q, 0, 1.0))
 ```
 
 ```text title="Output"
 greedy action (eps=0): 2
+explore action (eps=1): 3
 ```
 
-With $\epsilon=0$ it always returns the `argmax`. In training we usually **decay** $\epsilon$ from $1.0$ toward a small floor so the agent explores early and exploits later.
+With $\epsilon=0$ it always returns the `argmax`. With $\epsilon=1$ it always returns a random action. In training we usually **decay** $\epsilon$ from $1.0$ toward a small floor so the agent explores early and exploits later.
 
 <details>
 <summary><strong>Check:</strong> If &epsilon; never decayed to 0, would tabular Q-learning's Q-values still converge to Q*? Would its behaviour be optimal? Are those the same question?</summary>
