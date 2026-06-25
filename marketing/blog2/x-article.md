@@ -121,4 +121,15 @@ Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the 
 
 After publishing:
 1. Self-reply with: "The moment it clicked for me: V*(s) = max_a Q*(s,a). The policy probabilities don't vanish, they collapse to a one-hot. A weighted average with a one-hot weight just is 'pick the max.'"
-2. Quote-repost 5 hours later with: "One equation sits under every RL algorithm. Here's how to read it without flinching."
+2. Quote-repost with a one-line hook 4-6 hours later (options below).
+
+## Quote-repost hooks (pick one, post ~5:30-6:00 PM the same day)
+
+Hit repost on your own article, choose "Quote," and put one of these on top:
+
+1. "Q-learning, PPO, RLHF, GRPO: they're all solving the same equation. Once you see it, you can't unsee it." (recommended: open loop + names)
+2. "One equation sits under every RL algorithm ever shipped. Most people never actually read it. Here it is, line by line."
+3. "The Bellman equation looks terrifying. It says something a five-year-old understands: good now, plus good later."
+4. "Wrote the MDP and Bellman explainer I wish I'd had: the math, how to read it symbol by symbol, and the typed Python behind it."
+
+Then reply to anyone who engages, same as the first hour of the original.
