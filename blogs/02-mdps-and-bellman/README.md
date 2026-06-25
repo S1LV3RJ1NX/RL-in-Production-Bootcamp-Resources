@@ -464,6 +464,8 @@ Read: "V-star of s equals the max over actions a of Q-star(s, a)."
 
 Interpretation: the optimal value of a state is simply the Q-value of the best action available there. Under the optimal policy you always take the best action, so V and the best Q coincide.
 
+**Where did $\pi(a|s)$ go?** Recall the general V-Q bridge: $V^\pi(s) = \sum_a \pi(a|s)\,Q^\pi(s,a)$ — a weighted average. For the *optimal* policy, the weighting is degenerate: $\pi^*(a|s) = 1$ for the best action and $0$ for all others. When you substitute that one-hot distribution into the sum, every term vanishes except the maximum. A weighted average with a one-hot weight vector *is* "pick the max."
+
 <details>
 <summary><strong>Check:</strong> The relation V*(s) = max_a Q*(s, a) looks innocent. What does it quietly assume about how the agent behaves after the first step?</summary>
 
