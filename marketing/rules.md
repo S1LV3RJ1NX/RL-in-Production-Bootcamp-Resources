@@ -80,6 +80,11 @@ rsvg-convert -z 2 path/to/fig.svg -o marketing/blogN/fig.png
 
 (`-z 2` doubles the resolution so it stays sharp.) LinkedIn handles PNG fine too, so PNG is the safe default for both platforms.
 
+**X Articles render LaTeX.** Write equations as real LaTeX in the article body: inline with `$...$` and display with `$$...$$` (e.g. `$$V(s) = \sum_a \pi(a \mid s)\, Q(s,a)$$`). Use `\mid` for the conditioning bar so it doesn't read as a table pipe, and spell out `\pi`, `\gamma`, `\sum`, `\max`, `\arg\max`, `V^*`, etc. This only applies to **Articles** and **LinkedIn does not render LaTeX**, so:
+- X Article: use LaTeX.
+- X plain tweets / self-replies / quote-reposts: no LaTeX, keep equations as plain text (`V*(s) = max_a Q*(s,a)`).
+- LinkedIn: no LaTeX either; keep equations as readable plain text or embed an image of the equation.
+
 For carousels (LinkedIn):
 - 4-6 slides max
 - Slide 1: hook question
