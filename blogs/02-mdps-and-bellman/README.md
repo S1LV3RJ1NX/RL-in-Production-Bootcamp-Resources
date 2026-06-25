@@ -522,13 +522,13 @@ The Bellman equation is the universal backbone. Everything else is engineering t
 We've seen each idea in isolation. Here's the whole vocabulary as a quick reference, then one runnable program that solves the Bellman expectation equation as a linear system: no iteration, no sampling, just linear algebra.
 
 | Concept          | Math                                    | In code                            |
-| ---------------- | --------------------------------------- | ---------------------------------- |
+| ---------------- | --------------------------------------- | ---------------------------------- | -------------------- |
 | Dynamics         | $p(s', r \mid s, a)$                    | `P[s][a] -> [(prob, s', r, done)]` |
 | Return           | $G_t = \sum_k \gamma^k R_{t+k+1}$       | `G += gamma**k * r`                |
 | Recursive return | $G_t = R_{t+1} + \gamma G_{t+1}$        | (defines the Bellman structure)    |
 | State-value      | $V^\pi(s) = \mathbb{E}[G_t \mid s]$     | `V[s]`                             |
 | Action-value     | $Q^\pi(s,a) = \mathbb{E}[G_t \mid s,a]$ | `q_from_v(V, s, a)`                |
-| V from Q         | $V = \sum_a \pi(a|s)\,Q(s,a)$           | `(pi * Q_row).sum()`               |
+| V from Q         | $V = \sum_a \pi(a                       | s)\,Q(s,a)$                        | `(pi * Q_row).sum()` |
 
 | Optimal policy | $\pi^* = \arg\max_a Q^*$ | `np.argmax(Q, axis=1)` |
 
@@ -536,10 +536,10 @@ We've seen each idea in isolation. Here's the whole vocabulary as a quick refere
 
 ## Where this goes next
 
-We've formalized the environment as an MDP, defined $V$ and $Q$, derived the Bellman equation, and solved it exactly with linear algebra. But that exact solve needs the model $p$ and scales poorly (inverting an $|\mathcal{S}| \times |\mathcal{S}|$ matrix). The next post introduces three ways to solve or approximate the Bellman equation without those limitations:
+We've formalized the environment as an MDP, defined $V$ and $Q$, and derived the Bellman equation. But writing the equation is not the same as solving it: finding the actual values requires either exact linear algebra (feasible only for tiny state spaces) or iterative/sampling methods. The next post introduces three classical approaches:
 
 - **Dynamic Programming**: iterate the Bellman backup with the model (no sampling needed).
 - **Monte Carlo**: sample full episodes and average the returns (no model needed).
 - **Temporal Difference**: blend the two, updating after every step using a bootstrapped estimate.
 
-All three converge to the same $V^\pi$, but they trade off bias, variance, and data efficiency in different ways. We'll build a custom Mars Rover environment and watch all three converge on it from scratch.
+All three converge to the same $V^\pi$, but they trade off bias (how far from the true value), variance (how noisy the estimates are), and data efficiency (how many samples are needed to converge). We'll build a custom Mars Rover environment and watch all three converge on it from scratch.
