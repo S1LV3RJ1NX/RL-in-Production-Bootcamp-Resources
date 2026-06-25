@@ -529,10 +529,10 @@ The term $\delta = R + \gamma V(s') - V(s)$ is the **TD error**: "how much more 
 > \underbrace{V(s)}_{\mu} \leftarrow \underbrace{V(s)}_{\mu} + \alpha\Big[\underbrace{R + \gamma V(s')}_{x\ (\text{target})} - \underbrace{V(s)}_{\mu}\Big]
 > $$
 >
-> So the **TD error $\delta$ is just the $(x - \mu)$ error term** from blog 1, "how far the target is from what I currently believe," and we step a fraction $\alpha$ of the way toward it. The *only* thing that changes between methods is what plays the role of the target $x$:
+> So the **TD error $\delta$ is just the $(x - \mu)$ error term** from blog 1, "how far the target is from what I currently believe," and we step a fraction $\alpha$ of the way toward it. The _only_ thing that changes between methods is what plays the role of the target $x$:
 >
 > - **Monte Carlo:** $x = G_t$, the **actual, fully-observed** return. You wait for the episode to end, then average toward a real sample (exactly the law-of-large-numbers averaging from blog 1).
-> - **TD(0):** $x = R + \gamma V(s')$, a **bootstrapped** target, one real reward plus your *current estimate* of the rest. No waiting required.
+> - **TD(0):** $x = R + \gamma V(s')$, a **bootstrapped** target, one real reward plus your _current estimate_ of the rest. No waiting required.
 >
 > That single substitution $G_t \to R + \gamma V(s')$ is the entire difference between MC and TD. It's also why $\delta = 0$ when your estimate is already self-consistent: the target equals the current value, so there's nothing left to nudge.
 
@@ -657,7 +657,9 @@ And here they are side by side as heatmaps:
 
 ### 2.5 Prediction vs Control: The Bridge to Q-Learning
 
-Everything above is **prediction**: estimate $V^\pi$ for a given policy $\pi$. But we want **control**: find the _best_ policy.
+Everything so far has been **prediction**: someone hands you a policy $\pi$, and you answer one question, "how good is it?", by estimating $V^\pi$. DP, MC, and TD all chased that same number, just from different information. Notice what prediction never does: it never changes how the rover behaves. The policy is frozen; we only score it.
+
+But scoring a fixed policy was never the real goal. What we actually want is **control**: not "how good is this policy?" but "what is the _best_ policy?", the one that earns the most return from every state.
 
 DP closed that gap with policy improvement (the $\arg\max$ step). But MC and TD as described only predict: they evaluate a fixed policy using samples.
 
@@ -685,7 +687,7 @@ That leap (TD + Q-values + $\max_{a'}$) is **Q-learning**, the subject of [SARSA
 
 ---
 
-## 3. Putting it all together: All three on Mars Rover
+### 2.6. Putting it all together: All three on Mars Rover
 
 | Concept                   | Math                                              | In code                           |
 | ------------------------- | ------------------------------------------------- | --------------------------------- |
@@ -694,192 +696,6 @@ That leap (TD + Q-values + $\max_{a'}$) is **Q-learning**, the subject of [SARSA
 | MC update                 | $V(s) \leftarrow V(s) + \alpha[G - V(s)]$         | `V[s] += alpha * (G - V[s])`      |
 | TD target                 | $R + \gamma V(s')$                                | `reward + gamma * V[s_next]`      |
 | TD update                 | $V(s) \leftarrow V(s) + \alpha[\delta]$           | `V[s] += alpha * (target - V[s])` |
-
-The full program (environment, all three solvers, convergence comparison):
-
-```python
-import numpy as np
-import gymnasium as gym
-from gymnasium import spaces
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Complete self-contained program: Mars Rover environment + all three solvers
-# (DP, MC, TD) running on the same MDP to demonstrate they converge to the
-# same values from completely different algorithmic approaches.
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Environment constants
-GRID, GAMMA, SLIP = 5, 0.95, 0.1          # 5×5 grid, discount factor, slip probability per perpendicular
-GOAL, CRATERS = (4, 4), {(2, 2), (1, 3)}  # terminal states: +10 reward vs -10 reward
-MOVES = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}  # action encodings: up/right/down/left
-PERP = {0: [3, 1], 1: [0, 2], 2: [1, 3], 3: [2, 0]}      # perpendicular slip directions per action
-
-def rc(s): return divmod(s, GRID)          # flat state index → (row, col) tuple
-def idx(r, c): return r * GRID + c         # (row, col) → flat state index
-
-class MarsRoverEnv(gym.Env):
-    """5×5 stochastic gridworld: reach the goal (+10), avoid craters (-10), step cost -1."""
-    def __init__(self):
-        super().__init__()
-        self.observation_space = spaces.Discrete(GRID * GRID)  # 25 states (0..24)
-        self.action_space = spaces.Discrete(4)                 # 4 actions
-        self.goal = idx(*GOAL)
-        self.craters = {idx(*c) for c in CRATERS}
-        self.terminals = self.craters | {self.goal}
-        self.P = self._build_model()  # full transition model for DP
-
-    def _move(self, s, a):
-        """Move in direction a, clamping at grid edges (can't walk off the map)."""
-        r, c = rc(s)
-        dr, dc = MOVES[a]
-        return idx(min(max(r+dr, 0), GRID-1), min(max(c+dc, 0), GRID-1))
-
-    def _reward(self, sn):
-        """Reward depends only on where you land: goal=+10, crater=-10, else=-1."""
-        if sn == self.goal: return 10.0
-        if sn in self.craters: return -10.0
-        return -1.0
-
-    def _build_model(self):
-        """Construct P[s][a] = [(prob, next_state, reward, done), ...] for all s, a.
-        This IS the MDP model. DP reads it; MC/TD never touch it."""
-        P = {s: {a: [] for a in range(4)} for s in range(GRID*GRID)}
-        for s in range(GRID*GRID):
-            for a in range(4):
-                if s in self.terminals:
-                    # Terminal states are absorbing: the episode is over, no more rewards.
-                    P[s][a] = [(1.0, s, 0.0, True)]; continue
-                outcomes = {}
-                # Intended direction gets probability (1 - 2×SLIP) = 0.8
-                outcomes[self._move(s, a)] = 1 - 2*SLIP
-                # Each perpendicular direction gets probability SLIP = 0.1
-                for sa in PERP[a]:
-                    sn = self._move(s, sa)
-                    outcomes[sn] = outcomes.get(sn, 0) + SLIP
-                P[s][a] = [(p, sn, self._reward(sn), sn in self.terminals)
-                           for sn, p in outcomes.items()]
-        return P
-
-    def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
-        self.s = 0  # always start at top-left (0,0)
-        return self.s, {}
-
-    def step(self, action):
-        """Sample one transition from P[s][a] — this is the model-free interface."""
-        tr = self.P[self.s][action]
-        i = self.np_random.choice(len(tr), p=[t[0] for t in tr])
-        _, sn, r, done = tr[i]
-        self.s = sn
-        return sn, r, done, False, {}
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# METHOD 1: Value Iteration (Dynamic Programming)
-# Needs: full model P[s][a].  Updates: all states every sweep.
-# Guarantees exact V* via the contraction mapping theorem.
-# ═══════════════════════════════════════════════════════════════════════════════
-def value_iteration(env, gamma=GAMMA):
-    V = np.zeros(25)
-    while True:
-        delta = 0
-        for s in range(25):
-            v_old = V[s]
-            # Bellman optimality: V(s) = max_a Σ_s' p(s'|s,a)·[r + γ·V(s')·(1-done)]
-            V[s] = max(sum(p*(r + gamma*V[sn]*(1-d)) for p,sn,r,d in env.P[s][a]) for a in range(4))
-            delta = max(delta, abs(v_old - V[s]))
-        if delta < 1e-6: break  # converged when no state's value moves more than 1e-6
-    # Extract greedy policy: π*(s) = argmax_a Q(s,a)
-    policy = np.array([np.argmax([sum(p*(r+gamma*V[sn]*(1-d)) for p,sn,r,d in env.P[s][a]) for a in range(4)]) for s in range(25)])
-    return V, policy
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# METHOD 2: Monte Carlo Prediction
-# Needs: complete episodes (no model).  Updates: end of each episode.
-# Unbiased (uses true returns G_t) but high variance.
-# ═══════════════════════════════════════════════════════════════════════════════
-def mc_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.02):
-    V = np.zeros(25)
-    for _ in range(episodes):
-        ep, s = [], env.reset()[0]
-        # Phase 1: play one full episode under the policy
-        for _ in range(100):
-            sn, r, done, _, _ = env.step(policy[s])
-            ep.append((s, r)); s = sn
-            if done: break
-        # Phase 2: walk backward computing G_t = r + γ·G_{t+1} (true return)
-        # then do the MC update: V(s) ← V(s) + α·[G_t - V(s)]
-        G = 0.0
-        for s, r in reversed(ep):
-            G = r + gamma * G
-            V[s] += alpha * (G - V[s])
-    return V
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# METHOD 3: TD(0) Prediction
-# Needs: single transitions (no model, no full episodes).  Updates: every step.
-# Bootstraps off V(s') — biased early but low variance, fast propagation.
-# ═══════════════════════════════════════════════════════════════════════════════
-def td_prediction(env, policy, episodes=20000, gamma=GAMMA, alpha=0.05):
-    V = np.zeros(25)
-    for _ in range(episodes):
-        s = env.reset()[0]
-        for _ in range(100):
-            sn, r, done, _, _ = env.step(policy[s])
-            # TD(0) update: V(s) ← V(s) + α·[r + γ·V(s')·(1-done) - V(s)]
-            # The term (1-done) zeroes the bootstrap at terminals.
-            V[s] += alpha * (r + gamma * V[sn] * (1 - done) - V[s])
-            s = sn
-            if done: break
-    return V
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Run all three methods and compare their outputs.
-# All should converge toward the same V* values.
-# ═══════════════════════════════════════════════════════════════════════════════
-env = MarsRoverEnv()
-V_dp, policy = value_iteration(env)           # exact answer (ground truth)
-V_mc = mc_prediction(env, policy, episodes=20000)  # sample-based, full episodes
-V_td = td_prediction(env, policy, episodes=20000)  # sample-based, one-step bootstrap
-
-print("=== DP (exact) ===")
-print(V_dp.reshape(5,5).round(2))
-print("\n=== MC (20k episodes) ===")
-print(V_mc.reshape(5,5).round(2))
-print("\n=== TD(0) (20k episodes) ===")
-print(V_td.reshape(5,5).round(2))
-# Max absolute error shows how close the sample-based methods are to the exact DP answer.
-# Both errors shrink toward 0 with more episodes — proof they solve the same equation.
-print(f"\nMax |MC - DP|  = {np.max(np.abs(V_mc - V_dp)):.3f}")
-print(f"Max |TD - DP|  = {np.max(np.abs(V_td - V_dp)):.3f}")
-```
-
-```text title="Output"
-=== DP (exact) ===
-[[-1.42 -1.5  -1.52 -0.21  2.24]
- [-0.18 -0.29 -2.26  0.    4.02]
- [ 1.13  1.25  0.    4.56  7.28]
- [ 2.51  4.    5.73  7.59  9.42]
- [ 3.8   5.53  7.4   9.42  0.  ]]
-
-=== MC (20k episodes) ===
-[[-1.35 -1.11 -1.4   0.22  2.87]
- [-0.16 -0.25 -1.57  0.    4.71]
- [ 1.31  1.58  0.    2.54  7.38]
- [ 2.4   4.12  5.75  7.11  9.25]
- [ 3.9   5.56  7.27  9.12  0.  ]]
-
-=== TD(0) (20k episodes) ===
-[[-1.49 -1.7  -0.54 -0.01  1.79]
- [-0.08 -0.87 -1.84  0.    2.62]
- [ 1.18  1.08  0.    1.9   7.05]
- [ 2.62  3.83  5.83  7.55  9.69]
- [ 3.9   5.6   7.32  9.05  0.  ]]
-
-Max |MC - DP|  = 2.022
-Max |TD - DP|  = 2.666
-```
-
-Both MC and TD are converging toward the DP answer: states near the goal (bottom-right) are already tight, while distant states (top-left) still carry estimation noise. With more episodes (100k+), both errors shrink below 0.5.
 
 ---
 
