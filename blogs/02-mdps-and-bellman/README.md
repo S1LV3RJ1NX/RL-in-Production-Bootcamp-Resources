@@ -251,13 +251,13 @@ V[15] = 1.0  # goal state has high value (reward +1 for arriving)
 V[[5, 7, 11, 12]] = 0.0  # holes are absorbing with zero value
 
 
-def q_from_v(V, s, a):
+def q_from_v(V: np.ndarray, s: int, a: int) -> float:
     """Q^π(s,a) = Σ_{s'} p(s',r|s,a) · [r + γ·V(s')]
 
     Given I take action a in state s, what's my expected return?
     Averages over environment randomness (where do I land?).
     """
-    q_value = 0.0
+    q_value: float = 0.0
     # P[s][a] is the dynamics table: each entry is one possible outcome
     # of taking action a in state s.
     for prob, next_state, reward, done in P[s][a]:
@@ -267,13 +267,13 @@ def q_from_v(V, s, a):
     return q_value
 
 
-def v_from_q(Q_values, pi_probs):
+def v_from_q(Q_values: list[float], pi_probs: list[float]) -> float:
     """V^π(s) = Σ_a π(a|s) · Q(s,a)
 
     What's the value of state s under policy π?
     Averages over agent randomness (which action do I pick?).
     """
-    v_value = 0.0
+    v_value: float = 0.0
     # Loop over every action: weight each Q-value by the policy probability
     for pi_a, q_a in zip(pi_probs, Q_values):
         # π(a|s) · Q(s,a)
@@ -377,7 +377,7 @@ P = env.unwrapped.P
 nS, nA = 16, 4
 gamma = 0.99
 
-def bellman_backup(V, s, pi):
+def bellman_backup(V: np.ndarray, s: int, pi: list[float]) -> float:
     """One Bellman expectation backup for state s:
     V^π(s) = Σ_a π(a|s) · Σ_{s'} p(s'|s,a) · [r + γ·V(s')]
 
@@ -385,7 +385,7 @@ def bellman_backup(V, s, pi):
     for each action (weighted by policy), for each next state (weighted
     by dynamics), accumulate [immediate reward + discounted future value].
     """
-    total = 0.0
+    total: float = 0.0
     for a in range(nA):
         for prob, s2, r, done in P[s][a]:
             # π(a|s) · p(s'|s,a) · [r + γ·V(s')]
@@ -453,6 +453,16 @@ $$
 Read: "Pi-star of s equals the action a that maximizes Q-star(s, a)."
 
 Interpretation: once you have the optimal Q-values, the optimal policy is trivial: just pick the action with the highest Q. Every RL algorithm is, at its core, a way of computing or approximating these optimal values.
+
+One more relation connects $V^*$ and $Q^*$ directly (compare this to the V-Q bridge from §2.4, which used a policy-weighted *average*; here the average becomes a *max*):
+
+$$
+V^*(s) = \max_a\, Q^*(s, a)
+$$
+
+Read: "V-star of s equals the max over actions a of Q-star(s, a)."
+
+Interpretation: the optimal value of a state is simply the Q-value of the best action available there. Under the optimal policy you always take the best action, so V and the best Q coincide.
 
 <details>
 <summary><strong>Check:</strong> The relation V*(s) = max_a Q*(s, a) looks innocent. What does it quietly assume about how the agent behaves after the first step?</summary>
