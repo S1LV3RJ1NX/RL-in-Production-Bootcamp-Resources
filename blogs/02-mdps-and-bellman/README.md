@@ -117,18 +117,6 @@ p(s', r | s=6, a=2):
 
 Because the ice is slippery, action "Right" from state 6 has only a 1/3 chance of actually going right (to state 7, a hole!). The other 2/3 of the time the agent slides down or up. This is the stochasticity that makes the problem an MDP rather than a deterministic puzzle.
 
-#### Worked example: reading the dynamics table
-
-FrozenLake state 6, action Right (2). From `env.unwrapped.P[6][2]`:
-
-| $p$ | $s'$             | $r$ | done |
-| --- | ---------------- | --- | ---- |
-| 1/3 | 10 (down)        | 0   | no   |
-| 1/3 | 7 (right, hole!) | 0   | yes  |
-| 1/3 | 2 (up)           | 0   | no   |
-
-Probabilities sum to 1. The agent intended to go right, but on slippery ice it slides down or up with equal probability: that's the stochasticity encoded in $p(s', r \mid s, a)$.
-
 ### 2.2 Returns: what exactly are we maximizing?
 
 The agent doesn't maximize a single reward; it maximizes the **return** $G_t$, the cumulative discounted reward from time $t$ onward:
@@ -328,22 +316,6 @@ $Q(6, \text{Left})$ is highest (tied with Right), so the greedy policy says "go 
 
 </details>
 
-#### Worked example: verifying the V-Q bridge
-
-From a simplified deterministic FrozenLake: $Q(14, \cdot) = [0, 0, 1, 0]$ (Left, Down, Right, Up). Under a uniform policy:
-
-$$
-V(14) = \sum_a \pi(a)\,Q(14, a) = 0.25 \times 0 + 0.25 \times 0 + 0.25 \times 1 + 0.25 \times 0 = 0.25
-$$
-
-Check the other direction:
-
-$$
-Q(14, \text{Right}) = \sum_{s'} p(s' \mid 14, \text{Right})\,[r + \gamma V(s')] = 1 \times [1 + 0] = 1.0 \quad\checkmark
-$$
-
-Both bridges agree. $V$ is the policy average of $Q$; $Q$ is the dynamics average of $[r + \gamma V']$.
-
 ### 2.5 The Bellman expectation equation
 
 Now the payoff. Start from the recursive return $G_t = R_{t+1} + \gamma\,G_{t+1}$ and take the expectation conditioned on $S_t = s$:
@@ -358,7 +330,7 @@ Interpretation: **the value of a state is the expected immediate reward plus the
 
 **Step 1: expand the expectation over the agent's action randomness (policy $\pi$).**
 
-The expectation $\mathbb{E}_\pi[\cdots \mid S_t = s]$ is an average over *everything random* that can happen from state $s$. The first random thing is: which action does the agent pick? The probability of picking action $a$ is $\pi(a \mid s)$. By the law of total expectation ("split an average into cases and weight each case by its probability"):
+The expectation $\mathbb{E}_\pi[\cdots \mid S_t = s]$ is an average over _everything random_ that can happen from state $s$. The first random thing is: which action does the agent pick? The probability of picking action $a$ is $\pi(a \mid s)$. By the law of total expectation ("split an average into cases and weight each case by its probability"):
 
 $$
 \mathbb{E}_\pi[\cdots \mid S_t = s] \;=\; \sum_a \underbrace{\pi(a \mid s)}_{\text{prob of case } a} \;\cdot\; \underbrace{\mathbb{E}[\cdots \mid S_t = s,\, A_t = a]}_{\text{average within that case}}
@@ -370,7 +342,7 @@ $$
 V^\pi(s) = \sum_a \pi(a \mid s)\;\mathbb{E}\big[R_{t+1} + \gamma\,V^\pi(S_{t+1}) \mid S_t = s, A_t = a\big]
 $$
 
-Why is there still an $\mathbb{E}$ inside? Because even after fixing the action, there is still randomness left: the *environment* hasn't rolled its dice yet. We know the state ($s$) and the action ($a$), but the next state $S_{t+1}$ is still random (the ice is slippery!). The inner expectation averages over that remaining environment randomness.
+Why is there still an $\mathbb{E}$ inside? Because even after fixing the action, there is still randomness left: the _environment_ hasn't rolled its dice yet. We know the state ($s$) and the action ($a$), but the next state $S_{t+1}$ is still random (the ice is slippery!). The inner expectation averages over that remaining environment randomness.
 
 **Step 2: expand the remaining expectation over the environment's state randomness (dynamics $p$).**
 
@@ -450,57 +422,6 @@ With all states at zero except the goal, the backup at state 6 gives zero becaus
 
 </details>
 
-#### Worked example: computing $V^\pi$ and $Q^\pi$ on a tiny slice
-
-Consider a simplified **deterministic** FrozenLake near the goal. Focus on state 14 (one cell left of the goal at state 15). Under a uniform random policy ($\pi = 0.25$ for each action), with $\gamma = 0.99$:
-
-For simplicity, assume deterministic transitions (no slipping) and that states 5, 7, 11, 12 are holes ($V = 0$), state 15 is the goal ($V = 0$ after absorbing, reward $+1$ for arriving).
-
-**$Q^\pi(14, a)$ for each action (deterministic):**
-
-- $Q(14, \text{Right}) = r + \gamma V(15) = 1 + 0.99 \times 0 = 1.00$ (reaches goal, gets reward!)
-- $Q(14, \text{Left}) = 0 + 0.99 \times V(13) \approx 0$ (state 13, far from goal)
-- $Q(14, \text{Down}) = 0 + 0.99 \times V(14) = 0.99 \times V(14)$ (stays put in some layouts)
-- $Q(14, \text{Up}) = 0 + 0.99 \times V(10) \approx 0$ (state 10, far from goal)
-
-**$V^\pi(14)$ under the uniform policy:**
-
-$$
-V^\pi(14) = \sum_a \pi(a \mid 14)\,Q(14, a) = 0.25 \times 1.00 + 0.25 \times 0 + 0.25 \times 0 + 0.25 \times 0 = 0.25
-$$
-
-(Approximating the less-certain directions as near-zero for this hand calculation.)
-
-**Optimal value and policy:**
-
-$$
-V^*(14) = \max_a Q^*(14, a) = Q^*(14, \text{Right}) = 1.00
-$$
-
-$$
-\pi^*(14) = \arg\max_a Q^*(14, a) = \text{Right}
-$$
-
-The optimal policy at state 14 simply says "go Right", because that action leads directly to the $+1$ reward.
-
-#### Worked example: how the slippery version changes things
-
-On the actual slippery FrozenLake, "Right" from state 14 has three outcomes:
-
-| $p$ | $s'$       | $r$ |
-| --- | ---------- | --- |
-| 1/3 | 14 (stay!) | 0   |
-| 1/3 | 15 (goal!) | 1   |
-| 1/3 | 10 (up)    | 0   |
-
-So:
-
-$$
-Q(14, \text{Right}) = \tfrac{1}{3}(0 + 0.99\,V(14)) + \tfrac{1}{3}(1 + 0.99 \times 0) + \tfrac{1}{3}(0 + 0.99\,V(10))
-$$
-
-The value of going Right is no longer a clean 1.0: it's diluted by the 2/3 chance of sliding elsewhere (or staying put). This is why the Bellman equation averages over environment randomness.
-
 ### 2.6 The Bellman optimality equation
 
 Replace the policy's weighted average $\sum_a \pi(a \mid s)\,(\cdots)$ with a **maximum** $\max_a\,(\cdots)$, and you get the equation for the **optimal** value:
@@ -523,7 +444,7 @@ Read: "Q-star of s, a equals the sum over next states s' of p(s'|s,a) times [R(s
 
 Interpretation: the optimal value of taking action $a$ in state $s$ is the expected reward plus the discounted value of the next state, _assuming you act optimally from that next state onward_ (that's where the inner $\max_{a'}$ comes from).
 
-And the optimal policy falls out for free:
+Now notice what $Q^*$ gives you: a number for every action in every state, and that number already accounts for optimal behavior in the entire future. So if you had $Q^*$ in hand, choosing the best action would require zero planning: just compare the numbers and pick the largest. The optimal policy falls out for free:
 
 $$
 \pi^*(s) = \arg\max_a\, Q^*(s, a)
