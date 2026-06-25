@@ -72,6 +72,14 @@ Priority order for images per post:
 3. **Code screenshot** (use a tool like ray.so or carbon.sh for styled code blocks)
 4. **AI-generated image** (only if no good blog figure exists)
 
+**X does not support SVG.** Most blog figures are SVG, so export a PNG before embedding in an X article. Convert with:
+
+```
+rsvg-convert -z 2 path/to/fig.svg -o marketing/blogN/fig.png
+```
+
+(`-z 2` doubles the resolution so it stays sharp.) LinkedIn handles PNG fine too, so PNG is the safe default for both platforms.
+
 For carousels (LinkedIn):
 - 4-6 slides max
 - Slide 1: hook question

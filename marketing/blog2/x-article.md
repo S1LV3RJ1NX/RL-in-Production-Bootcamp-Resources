@@ -64,7 +64,7 @@ In words: the value of state s is, over all the actions I might take (weighted b
 
 It's recursive. V shows up on both sides. The value of *this* state depends on the value of the *next* states, which depend on the states after that, all the way down.
 
-[EMBED IMAGE HERE: fig-backup-diagram.svg — the V → Q → V' tree showing one step of the Bellman backup]
+[EMBED IMAGE HERE: fig-backup-diagram.png — the V to Q to V' tree showing one step of the Bellman backup]
 
 Every RL algorithm is a different way of solving that recursion. Dynamic programming iterates the backup with the full model. Monte Carlo samples complete episodes and averages them. TD learning updates after every step using a bootstrap.
 
@@ -101,7 +101,7 @@ Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the 
 ## Header Image
 
 - Use **`blog2-x-banner.png`** (5:2 aspect ratio, what X recommends for the article header)
-- Embed `fig-backup-diagram.svg` inline in the Bellman equation section, right after the "it's recursive" paragraph (marked `[EMBED IMAGE HERE]` in the body)
+- Embed `fig-backup-diagram.png` inline in the Bellman equation section, right after the "it's recursive" paragraph (marked `[EMBED IMAGE HERE]` in the body). X does not support SVG, so use this PNG (already exported in this folder).
 
 ## First 30 Minutes Strategy
 

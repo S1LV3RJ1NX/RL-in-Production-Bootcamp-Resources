@@ -49,7 +49,7 @@ A single trajectory is noise. Value is the _average_ over all possible futures, 
 
 That's how an RL agent estimates value: collect episodes, average the returns, trust the mean.
 
-[EMBED IMAGE HERE: fig-lln.svg — running average of die rolls converging to 3.5 as samples grow]
+[EMBED IMAGE HERE: fig-lln.png — running average of die rolls converging to 3.5 as samples grow]
 
 **2. The Markov property: only the present matters**
 
@@ -94,7 +94,7 @@ Full post with all the code: [YOUR_PORTFOLIO_URL/blogs/01-rl-intro-and-prerequis
 ## Header Image
 
 - Use `**blog1-x-banner.png`\*\* (5:2 aspect ratio, what X recommends for the article header)
-- Embed `fig-lln.svg` inline right after the Expectation section (point 1), where the text talks about averaging die rolls / returns (marked `[EMBED IMAGE HERE]` in the body)
+- Embed `fig-lln.png` inline right after the Expectation section (point 1), where the text talks about averaging die rolls / returns (marked `[EMBED IMAGE HERE]` in the body). X does not support SVG, so use this PNG (already exported in this folder).
 
 ## Formatting Tips for X Articles
 
