@@ -144,16 +144,16 @@ Best posting times (IST):
 
 ## Series Progress Tracker
 
-Cadence: **one blog per week**. Offsite: Jul 8–14 (no posts that week).
+Cadence: **one blog per week**.
 
 | Blog | Title | LinkedIn | X Article |
 |------|-------|------|------|
 | 01 | RL from First Principles | ☐ Thu Jun 25 (~12:45 PM) | ☐ Thu Jun 25 (~12:45 PM) |
 | 02 | MDPs & Bellman Equations | ☐ Tue Jun 30 (10 AM) | ☐ Tue Jun 30 (10 AM) |
-| 03 | DP, Monte Carlo & TD | ☐ Tue Jul 15 | ☐ Wed Jul 16 |
-| 04 | SARSA, Q-learning & DQN | ☐ Tue Jul 22 | ☐ Wed Jul 23 |
-| 05 | Policy Gradients | ☐ Tue Jul 29 | ☐ Wed Jul 30 |
-| 06 | TRPO & PPO | ☐ Tue Aug 5 | ☐ Wed Aug 6 |
+| 03 | DP, Monte Carlo & TD | ☐ Tue Jul 7 | ☐ Wed Jul 8 |
+| 04 | SARSA, Q-learning & DQN | ☐ Tue Jul 14 | ☐ Wed Jul 15 |
+| 05 | Policy Gradients | ☐ Tue Jul 21 | ☐ Wed Jul 22 |
+| 06 | TRPO & PPO | ☐ Tue Jul 28 | ☐ Wed Jul 29 |
 
 ---
 
