@@ -808,4 +808,4 @@ $$
 \nabla_\theta J(\theta) = \mathbb{E}\big[\nabla_\theta \log \pi(a\mid s;\theta)\, G_t\big]
 $$
 
-That's the **policy gradient**, and the on-policy price it pays (no replay buffer) is exactly what motivates TRPO and PPO. The next post builds it from scratch.
+That's the **policy gradient**, and the on-policy price it pays (no replay buffer) is exactly what motivates TRPO and PPO. The [Policy Gradients](../05-policy-gradients/README.md) post builds it from scratch.
