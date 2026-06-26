@@ -381,7 +381,7 @@ def compute_td_loss(
     # making it robust to the occasional wild outlier transition.
     return F.smooth_l1_loss(q, y)
 
-# --- Quick demo with a toy batch of 8 transitions ---
+# --- Quick demo with a toy batch of 3 transitions ---
 torch.manual_seed(0)
 policy = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 2))
 target = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 2))
@@ -389,30 +389,30 @@ target = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 2))
 # Target net starts as an exact copy of the policy net (θ⁻ = θ initially).
 target.load_state_dict(policy.state_dict())
 
-# Fake batch of B=8 transitions. Each field is stacked along the batch dimension,
+# Fake batch of B=3 transitions. Each field is stacked along the batch dimension,
 # exactly the shape the loss above expects (real training pulls this same 5-tuple
 # from the replay buffer instead of using randn):
-#   states      (8, 4)  — 8 observations, each a 4-feature state vector
-#   actions     (8,)    — the action index taken in each state (0 or 1; the net has 2 actions)
-#   rewards     (8,)    — the scalar reward seen for each transition
-#   next_states (8, 4)  — the state reached after each action
-#   dones       (8,)    — 1.0 if the transition ended the episode, else 0.0 (all 0.0 here)
+#   states      (3, 4)  — 3 observations, each a 4-feature state vector
+#   actions     (3,)    — the action index taken in each state (0 or 1; the net has 2 actions)
+#   rewards     (3,)    — the scalar reward seen for each transition
+#   next_states (3, 4)  — the state reached after each action
+#   dones       (3,)    — 1.0 if the transition ended the episode, else 0.0 (all 0.0 here)
 batch = (
-    torch.randn(8, 4),
+    torch.randn(3, 4),
     # Actions are discrete category indices. The network has 2 actions, so a valid action is the integer 0 or 1, nothing in between.
-    # torch.randint(0, 2, (8,)) draws 8 integers from {0, 1} (low 0 inclusive, high 2 exclusive).
-    torch.randint(0, 2, (8,)),
-    # Rewards are continuous real-valued signals. A reward can be any real number, positive or negative, with no fixed set of allowed values (think +1, -1, -100, 0.37). torch.randn(8) draws 8 floats from a standard normal distribution.
-    torch.randn(8),
-    torch.randn(8, 4),
-    torch.zeros(8)
+    # torch.randint(0, 2, (3,)) draws 3 integers from {0, 1} (low 0 inclusive, high 2 exclusive).
+    torch.randint(0, 2, (3,)),
+    # Rewards are continuous real-valued signals. A reward can be any real number, positive or negative, with no fixed set of allowed values (think +1, -1, -100, 0.37). torch.randn(3) draws 3 floats from a standard normal distribution.
+    torch.randn(3),
+    torch.randn(3, 4),
+    torch.zeros(3)
 )
 
 print("TD loss:", round(compute_td_loss(policy, target, batch).item(), 4))
 ```
 
 ```text title="Output"
-TD loss: 0.5282
+TD loss: 0.3225
 ```
 
 Let's trace that function once, line by line, on a tiny batch of **3 transitions** with **2 actions**. Suppose the two networks emit these Q-values, and the batch carries these actions, rewards, and done-flags ($\gamma = 0.99$):
@@ -460,7 +460,7 @@ $$
 \mathcal{L} = \tfrac{1}{3}\,(1.28 + 0.80 + 1.77) = \boxed{1.28}
 $$
 
-(These hand-picked numbers are just to read the steps; the runnable demo above uses random weights, hence its different `0.5282`.) Crucially, only $q$ carries gradients, $y$ is a frozen constant (the semi-gradient), so this loss nudges the three predictions toward their labels and nothing else. **This single function is the core of DQN; everything after it is plumbing that keeps it stable.**
+(These hand-picked numbers are just to read the steps; the runnable demo above uses random weights, hence its different `0.3225`.) Crucially, only $q$ carries gradients, $y$ is a frozen constant (the semi-gradient), so this loss nudges the three predictions toward their labels and nothing else. **This single function is the core of DQN; everything after it is plumbing that keeps it stable.**
 
 <details>
 <summary><strong>Check:</strong> If the label y is built from the network's own Q-values, how can minimizing this loss ever recover the optimal policy? Isn't it circular?</summary>
