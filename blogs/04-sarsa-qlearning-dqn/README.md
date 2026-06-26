@@ -397,8 +397,16 @@ target.load_state_dict(policy.state_dict())
 #   rewards     (8,)    — the scalar reward seen for each transition
 #   next_states (8, 4)  — the state reached after each action
 #   dones       (8,)    — 1.0 if the transition ended the episode, else 0.0 (all 0.0 here)
-batch = (torch.randn(8, 4), torch.randint(0, 2, (8,)),
-         torch.randn(8), torch.randn(8, 4), torch.zeros(8))
+batch = (
+    torch.randn(8, 4),
+    # Actions are discrete category indices. The network has 2 actions, so a valid action is the integer 0 or 1, nothing in between.
+    # torch.randint(0, 2, (8,)) draws 8 integers from {0, 1} (low 0 inclusive, high 2 exclusive).
+    torch.randint(0, 2, (8,)),
+    # Rewards are continuous real-valued signals. A reward can be any real number, positive or negative, with no fixed set of allowed values (think +1, -1, -100, 0.37). torch.randn(8) draws 8 floats from a standard normal distribution.
+    torch.randn(8),
+    torch.randn(8, 4),
+    torch.zeros(8)
+)
 
 print("TD loss:", round(compute_td_loss(policy, target, batch).item(), 4))
 ```
@@ -407,7 +415,52 @@ print("TD loss:", round(compute_td_loss(policy, target, batch).item(), 4))
 TD loss: 0.5282
 ```
 
-The `gather` picks out $Q(s,a)$ for the action _actually stored_ in the batch; the `max(1)` over the target net is the off-policy $\max_{a'}$. Everything inside `no_grad()` is the frozen label. This single function is the core of DQN. The rest is plumbing that keeps it stable.
+Let's trace that function once, line by line, on a tiny batch of **3 transitions** with **2 actions**. Suppose the two networks emit these Q-values, and the batch carries these actions, rewards, and done-flags ($\gamma = 0.99$):
+
+$$
+\underbrace{Q_\theta(s)}_{\texttt{policy\_net(states)}}=\begin{bmatrix}0.5 & 1.2\\ 0.3 & -0.1\\ 2.0 & 0.7\end{bmatrix},\qquad
+\underbrace{Q_{\theta^-}(s')}_{\texttt{target\_net(next\_states)}}=\begin{bmatrix}0.0 & 2.0\\ 1.0 & 0.5\\ -1.0 & 3.0\end{bmatrix}
+$$
+
+$$
+a=\begin{bmatrix}1\\0\\1\end{bmatrix},\qquad r=\begin{bmatrix}1.0\\-1.0\\0.0\end{bmatrix},\qquad \text{done}=\begin{bmatrix}0\\1\\0\end{bmatrix}
+$$
+
+**Line 1, the prediction (`gather`).** From each row of $Q_\theta(s)$, keep only the column named by the action $a$ (bold), then flatten to a vector:
+
+$$
+\begin{bmatrix}0.5 & \mathbf{1.2}\\ \mathbf{0.3} & -0.1\\ 2.0 & \mathbf{0.7}\end{bmatrix}
+\;\xrightarrow{\text{gather by } a}\;
+q=\begin{bmatrix}1.2\\0.3\\0.7\end{bmatrix}
+$$
+
+**Line 2, the best next value (`max(1)`).** From each row of the _frozen_ target net, keep the largest entry (bold), the off-policy $\max_{a'}$:
+
+$$
+\begin{bmatrix}0.0 & \mathbf{2.0}\\ \mathbf{1.0} & 0.5\\ -1.0 & \mathbf{3.0}\end{bmatrix}
+\;\xrightarrow{\max_{a'}}\;
+\texttt{max\_next}=\begin{bmatrix}2.0\\1.0\\3.0\end{bmatrix}
+$$
+
+**Line 3, the label.** $y = r + \gamma\,(1-\text{done})\cdot\texttt{max\_next}$, row by row. Row 1 is terminal, so its future term is switched off and $y_1=r_1$:
+
+$$
+\begin{aligned}
+y_0 &= 1.0 + 0.99\cdot 1\cdot 2.0 = 2.98\\
+y_1 &= -1.0 + 0.99\cdot \mathbf{0}\cdot 1.0 = -1.0 \quad(\text{terminal})\\
+y_2 &= 0.0 + 0.99\cdot 1\cdot 3.0 = 2.97
+\end{aligned}
+$$
+
+**Line 4, the loss.** Take the error $\delta = y - q$, apply the Huber penalty per element, then average:
+
+$$
+\delta = y - q = \begin{bmatrix}1.78\\-1.30\\2.27\end{bmatrix}
+\;\xrightarrow{\text{Huber, then mean}}\;
+\mathcal{L} = \tfrac{1}{3}\,(1.28 + 0.80 + 1.77) = \boxed{1.28}
+$$
+
+(These hand-picked numbers are just to read the steps; the runnable demo above uses random weights, hence its different `0.5282`.) Crucially, only $q$ carries gradients, $y$ is a frozen constant (the semi-gradient), so this loss nudges the three predictions toward their labels and nothing else. **This single function is the core of DQN; everything after it is plumbing that keeps it stable.**
 
 <details>
 <summary><strong>Check:</strong> If the label y is built from the network's own Q-values, how can minimizing this loss ever recover the optimal policy? Isn't it circular?</summary>
