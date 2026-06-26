@@ -276,10 +276,12 @@ That one symbol has a name:
 
 CliffWalking has 48 states, so a $48\times4$ table fits easily. But a real robot sees a camera image; a single $84\times84$ Atari frame has more possible values than there are atoms in the universe. **You cannot store a row per state.**
 
-The fix is the leap into deep RL, and it changes only the _container_ for $Q$, not the update rule. Replace the lookup table with a function $Q(s,a;\theta)$, a neural network with weights $\theta$, that takes a state in and emits one Q-value per action. A table _memorizes_; a network _generalizes_, predicting sensible values for states it has never seen.
+The fix is the leap into deep RL, and the surprising part is how little has to change: the update rule stays exactly the same, only the _container_ for $Q$ is swapped out. In place of the lookup table we use a function $Q(s,a;\theta)$, a neural network with weights $\theta$, that reads a state in and emits one Q-value per action. The difference is what each can do with an _unfamiliar_ state: a table can only return a value it has already stored, so a state it never visited is a blank cell, while a network _generalizes_, producing a sensible Q-value by interpolating from the similar states it has seen.
 
 ```python
 import torch, torch.nn as nn
+
+torch.manual_seed(0)  # reproducible random weights for this demo
 
 # Replace the Q-table with a neural network Q(s, a; θ).
 # Input: a state vector (here dim=7). Output: one Q-value per action (here 3 actions).
@@ -287,19 +289,33 @@ import torch, torch.nn as nn
 # so the network can generalize to states it has never seen (a table cannot).
 net = nn.Sequential(nn.Linear(7, 64), nn.ReLU(),
                     nn.Linear(64, 64), nn.ReLU(),
-                    nn.Linear(64, 3))      # linear head — no activation on output,
-                                           # because Q-values are unbounded expected returns
+                    # linear head — no activation on output,
+                    # because Q-values are unbounded expected returns
+                    nn.Linear(64, 3))
 
-# One forward pass maps a state → all action-values at once,
-# so acting is still just argmax over the output vector.
-print("one forward pass ->", tuple(net(torch.zeros(1, 7)).shape), "(a Q-value per action)")
+# Feed TWO different states at once. A table would need a stored row for each;
+# the network just runs a forward pass and emits a Q-value per action for both.
+states = torch.tensor([[0.00,  0.00,  0.00, 0.00,  0.00, 0.00,  0.00],
+                       [0.87, -1.22, -1.41, 1.01, -0.20, 0.79, -1.49]])
+with torch.no_grad():
+    q = net(states)                       # shape (2, 3): 2 states × 3 actions
+print("Q-values (2 states x 3 actions):")
+print(q.round(decimals=2))
+# Acting is still a single argmax over each row — even though the net has never
+# trained on these exact states, it produces a usable value for every action.
+print("greedy action per state:", q.argmax(dim=1).tolist())
 ```
 
 ```text title="Output"
-one forward pass -> (1, 3) (a Q-value per action)
+Q-values (2 states x 3 actions):
+tensor([[-0.1600, -0.1200, -0.0600],
+        [-0.2200,  0.0200, -0.0500]])
+greedy action per state: [2, 1]
 ```
 
-One forward pass gives every action-value at once, so acting is still a single `argmax`. The head is **linear** on purpose: Q-values are unbounded expected returns, so a sigmoid (capping to $(0,1)$) or softmax (forcing a probability distribution) would silently distort them.
+The point of the demo is what the table could never do: two states it has never seen still get a full set of action-values from one forward pass, and the two rows differ enough to imply _different_ greedy moves (action 2 for the first state, action 1 for the second). The weights are random here, so the numbers are meaningless, training is what makes them approximate $Q^*$, but the _mechanism_ is already complete: state in, a Q-value per action out, act with `argmax`. The head is **linear** on purpose; the next paragraph says why.
+
+**Why the head must stay linear.** A Q-value is an _expected return_, a sum of discounted rewards, so it is an unbounded real number with no fixed scale: it is frequently negative (CliffWalking returns run to $-13$ on the safe path and $-100$ on a cliff fall) and can grow large on high-reward tasks. The output activation has to be able to represent that whole range. A **sigmoid** squashes every output into $(0,1)$, so it literally cannot produce a value like $-100$, and regression to the Bellman label would be impossible. A **softmax** forces the action outputs to be positive and sum to $1$, turning independent action-values into a probability distribution, which destroys both their scale and the genuine gaps between them. The greedy `argmax` and the squared-error fit to $r + \gamma \max_{a'} Q(s',a')$ both depend on those raw magnitudes, so the **identity (linear) head** is the only choice that leaves them intact.
 
 <details>
 <summary><strong>Check:</strong> A network buys you generalization. What new danger does it bring that a table never had?</summary>
