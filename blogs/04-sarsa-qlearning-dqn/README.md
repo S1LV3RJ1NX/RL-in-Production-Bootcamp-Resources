@@ -523,7 +523,7 @@ graph TD
 ```
 
 <details>
-<summary><strong>Check:</strong> Replay and the target network both stabilize DQN. Why do we need *both*, and couldn't one mechanism do it?</summary>
+<summary><strong>Check:</strong> Replay and the target network both stabilize DQN. Why do we need both, and couldn't one mechanism do it?</summary>
 
 **Answer.** They fix different problems. Replay decorrelates the _input distribution_ (a data/SGD issue); the target network stabilizes the _regression target_ (a bootstrapping issue). Both pathologies are present at once, so you need both fixes.
 
@@ -533,37 +533,7 @@ graph TD
 
 One last piece specific to pixels. A single Pong frame is a static snapshot: you cannot tell which way the ball is moving or how fast. The optimal action depends on information not in the observation, so the environment is **non-Markovian** (recall the [Markov property](../02-mdps-and-bellman/README.md) from MDPs & Bellman).
 
-The fix is the "enlarge the state" trick: **stack the last 4 frames** as a $4\times84\times84$ input. Differences across the stack encode velocity and acceleration, restoring the Markov property so the network has what it needs. The DQN front-end is then three convolutions feeding a 512-unit dense layer. The only change from the vector network in §2.5 is the convolutional input.
-
-```python
-from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation as FrameStack
-
-def make_env(render_mode=None):
-    # Raw Pong with no built-in frame skip — we control preprocessing ourselves.
-    env = gym.make("PongNoFrameskip-v4", render_mode=render_mode)
-
-    # Standard Atari preprocessing pipeline (Mnih et al., 2015):
-    #  • noop_max=30:  start each episode with up to 30 random no-ops for variety
-    #  • frame_skip=4: repeat each action for 4 raw frames (saves compute)
-    #  • screen_size=84: downsample 210×160 RGB → 84×84
-    #  • grayscale:    3 color channels → 1 (color is irrelevant for Pong)
-    env = AtariPreprocessing(env, noop_max=30, frame_skip=4, screen_size=84,
-                             grayscale_obs=True, scale_obs=False)
-
-    # Stack the last 4 processed frames into one observation (4×84×84).
-    # A single frame is a snapshot — you can't tell ball direction or speed.
-    # Stacking restores the Markov property by encoding velocity/acceleration
-    # as pixel differences across consecutive frames.
-    env = FrameStack(env, stack_size=4)
-    return env
-```
-
-```text title="Output"
-Observation shape: (4, 84, 84)
-Number of actions: 6
-```
-
-The observation is now four stacked grayscale frames, and Pong exposes six joystick actions. _(Output captured from a notebook that runs the full Atari stack.)_
+The fix is the "enlarge the state" trick, and it has two steps. **First, each raw frame is preprocessed.** Atari hands us a $210\times160$ RGB image; we throw away color (it carries no extra game logic) and shrink it to a single $84\times84$ grayscale square. The $84\times84$ size is just a practical choice from the DQN paper: small enough to keep the network fast, big enough to still see the ball and paddles. **Second, we stack the last 4 of those preprocessed frames** into one $4\times84\times84$ input. A single frame is still motionless, but differences _across_ the 4-frame stack encode velocity and acceleration, restoring the Markov property so the network has what it needs. The DQN front-end is then three convolutions feeding a 512-unit dense layer; the only change from the vector network in §2.5 is that the input is now a stack of images read by convolutions instead of a flat feature vector.
 
 <details>
 <summary><strong>Check:</strong> Why stack 4 frames instead of feeding a single 84&times;84 image?</summary>
@@ -581,19 +551,31 @@ The observation is now four stacked grayscale frames, and Pong exposes six joyst
 
 ### 2.10 The deadly triad: why DQN lives dangerously
 
-Every trick in §2.7 and §2.8 exists to tame one specific danger. DQN combines three ingredients, and _each one alone is safe_, but the three together can make the learned values spiral toward infinity instead of converging. Sutton &amp; Barto call this the **deadly triad**:
-
-- **Bootstrapping** (the target is built from other $Q$-estimates, not from real returns). Errors don't stay local: a wrong value gets copied into its neighbors' targets on the next update.
-- **Function approximation** (one network, shared weights). You cannot nudge one state's value without shifting thousands of similar-looking states too. That is generalization, and it means an error injected at one state _leaks_ to states you may never have visited.
-- **Off-policy data** (the target uses $\max_{a'}$, the greedy action, while the data was collected by a different, exploratory policy). You keep pushing an action's value toward the max without ever being forced to actually take it and let reality correct it.
-
-**Why the combination explodes.** Picture one $Q$-value that is accidentally too high. (1) The shared weights _generalize_ that overestimate to similar states. (2) Bootstrapping then _feeds_ those inflated values into the targets of still other states, raising them too. (3) Because the updates are off-policy, nothing forces the agent to actually visit that inflated state-action and discover, from a real reward, that it was wrong. So the one correcting force, the grain of truth $r$, never arrives there, while the error keeps amplifying itself through (1) and (2). The feedback loop has a gain above 1, and the values diverge. This is also why the $\max$ overestimation from §3.4 is so corrosive here: the triad takes that small upward bias and pumps it back into its own targets.
-
-**The cure is to remove any one leg, and DQN keeps all three.** Drop bootstrapping (use Monte Carlo returns) and the targets are real, so errors can't compound. Drop function approximation (use a table) and an update touches exactly one cell, so errors can't leak to neighbors. Drop off-policy (use on-policy SARSA) and you only ever evaluate the distribution you actually follow, so every inflated value gets visited and corrected. DQN deliberately keeps all three: a network for pixels, a max-bootstrap for control, replay for data efficiency. It sits squarely in the danger zone.
-
-That is the real reason for the plumbing. **Experience replay** decorrelates the data and **the target network** freezes the bootstrap target for a stretch. Neither removes a leg of the triad, but together they lower the loop's gain enough that the grain of truth wins in practice. It works empirically; there is no convergence theorem. DQN is excellent engineering, not a proof.
-
 ![Venn diagram of the deadly triad: function approximation, bootstrapping, and off-policy data overlapping, with the center marked as diverging](./images/fig-deadly-triad.svg)
+
+Every trick in §2.7 and §2.8 exists to tame one specific danger. DQN mixes three ingredients. Any one or two of them is perfectly safe; **all three at once can make the learned $Q$-values blow up toward infinity instead of settling down.** Sutton &amp; Barto call this trio the **deadly triad**:
+
+- **Bootstrapping.** The target is built from the network's _own_ guess about the next state ($\max_{a'} Q(s',a')$), not from a real, measured return. So if that guess is wrong, the mistake gets baked into other states' targets on the next update.
+- **Function approximation.** One network with shared weights stands in for millions of states. Nudging the value of one state automatically drags every similar-looking state along with it. So a single error doesn't stay put; it spreads to states you may never have visited.
+- **Off-policy data.** The target always uses $\max_{a'}$, the action the network _thinks_ is best, but the agent is off exploring with a different policy. So a value can keep climbing without the agent ever actually taking that action and letting a real reward prove it wrong.
+
+**Why all three together explode.** Think of it as a rumor with no fact-checker. Say one $Q$-value is accidentally too high:
+
+1. _Function approximation_ spreads the rumor: the shared weights copy that overestimate onto similar-looking states.
+2. _Bootstrapping_ amplifies it: those inflated values now become the targets for still other states, pulling them up too.
+3. _Off-policy_ fires the fact-checker: because the agent never has to actually take that over-valued action, no real reward $r$ ever arrives to say "that was wrong."
+
+The one correcting force, the grain of truth in $r$, never reaches the inflated value, while steps 1 and 2 keep feeding it back into itself. The loop amplifies faster than it corrects, and the numbers run away. (This is also why the small $\max$ overestimation from §3.4 is so dangerous here: the triad takes that tiny upward bias and pumps it straight back into its own targets.)
+
+**The cure: remove any one leg.** Take away a single ingredient and the loop can't close:
+
+- Drop **bootstrapping** (use real Monte Carlo returns): targets are actual outcomes, so a wrong guess has nothing to compound.
+- Drop **function approximation** (use a lookup table): an update touches exactly one cell, so an error can't leak to neighbors.
+- Drop **off-policy** (use on-policy SARSA): you only ever evaluate actions you actually take, so every inflated value eventually gets visited and corrected by a real reward.
+
+DQN deliberately keeps all three (a network for pixels, a max-bootstrap for control, replay for data efficiency), so it sits squarely in the danger zone.
+
+That is the real reason for the plumbing. **Experience replay** decorrelates the data and **the target network** holds the bootstrap target still for a stretch. Neither one actually removes a leg of the triad, but together they turn the loop's gain down far enough that the grain of truth wins in practice. It works empirically; there is no convergence proof. DQN is excellent engineering, not a theorem.
 
 ---
 
