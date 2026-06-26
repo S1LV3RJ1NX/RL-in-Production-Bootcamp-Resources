@@ -72,6 +72,22 @@ Priority order for images per post:
 3. **Code screenshot** (use a tool like ray.so or carbon.sh for styled code blocks)
 4. **AI-generated image** (only if no good blog figure exists)
 
+### Cover and banner template (per blog)
+
+Every blog gets two AI-generated lead images, kept in that blog's `marketing/blogN/` folder:
+
+- **`blogN-social-cover.png`** for LinkedIn (landscape, ~3:2): diagram on top, title centered below.
+- **`blogN-x-banner.png`** for the X article header (wide, ~5:2): diagram on the left, title and subtitle on the right.
+
+Keep them visually consistent across the whole series. The established style is a **flat 2D vector infographic** (not photographic, not painterly, no 3D, no people, no scenery):
+
+- Very dark navy background (around `#0a0e1a`) with a faint, subtle grid pattern.
+- A small node diagram of the blog's **one core concept**, built from neon-outlined rounded-rectangle nodes with bold uppercase labels (rotate blue, orange, green), connected by thin glowing arrows into a single glowing cyan-white target node. Examples so far: blog 2 = backup tree (s to a1/a2/a3 to s'), blog 3 = DP/MC/TD converging to V\*, blog 4 = SARSA/Q-learning/DQN converging to Q\*.
+- Crisp bold white title (the blog title) with a smaller lighter-gray subtitle beneath it. Modern image models render short titles cleanly, so put the real title in the prompt.
+- Generous negative space and soft neon glow.
+
+How to generate: use the image tool and **pass a previous blog's banner (e.g. `marketing/blog3/blog3-x-banner.png`) as a style reference** so the new one matches. Generate the X banner and the social cover as a pair, then drop both into `marketing/blogN/`.
+
 **X does not support SVG.** Most blog figures are SVG, so export a PNG before embedding in an X article. Convert with:
 
 ```

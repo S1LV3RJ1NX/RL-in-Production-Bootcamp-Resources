@@ -51,7 +51,7 @@ Each post has typed Python, worked examples, and figures.
 
 ## Image Suggestions
 
-1. **Social cover**: `marketing/blog4/blog4-social-cover.png` — generated cover with the hiker at the fork, the red Q-learning cliff path, the cyan SARSA safe path, a floating `max`, and a faint Pong screen (recommended hero, leaves room for an overlay headline)
+1. **Social cover**: `marketing/blog4/blog4-social-cover.png` — series-style diagram cover: dark navy with a faint grid, three neon nodes (SARSA, Q-learning, DQN) converging into a glowing Q\*, title and subtitle below (recommended hero)
 2. **The cliff paradox**: `marketing/blog4/fig-sarsa-vs-q-curves.png` — training curves plus the two learned paths, Q-learning on the edge and SARSA higher up (strongest proof image)
 3. **CliffWalking grid**: `marketing/blog4/fig-cliffwalking.png` — the 4x12 grid with the risky and safe routes drawn
 4. **Pong in motion**: `blogs/04-sarsa-qlearning-dqn/images/pong.gif` — the trained DQN agent playing (great for the "from a table to Atari" payoff)

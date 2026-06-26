@@ -112,7 +112,7 @@ Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the 
 
 ## Header Image
 
-- Use **`blog4-x-banner.png`** (this folder) for the article header. It is generated at a wide 3:2 and reads well as the X cover: the Q-learning edge path, the SARSA safe path, the floating `max`, and a Pong screen on the right. Crop to roughly 5:2 if X needs a tighter banner.
+- Use **`blog4-x-banner.png`** (this folder) for the article header. It matches the series template: dark navy with a faint grid, three neon nodes (SARSA, Q-learning, DQN) converging into a glowing Q\*, with the title and subtitle set on the right.
 - Embed `fig-sarsa-vs-q-curves.png` inline in the cliff section (marked `[EMBED IMAGE HERE]`). X does not support SVG, so use this PNG (already exported in this folder with `rsvg-convert -z 2`).
 - Optional inline images: `fig-cliffwalking.png` near the cliff setup, and `pong.gif` (from the blog's images folder) at the DQN section for the payoff.
 - Fallback header: `ai-hero.png` from `blogs/04-sarsa-qlearning-dqn/images/`.
