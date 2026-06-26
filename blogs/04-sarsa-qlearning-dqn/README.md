@@ -565,7 +565,7 @@ Every trick in §2.7 and §2.8 exists to tame one specific danger. DQN mixes thr
 2. _Bootstrapping_ amplifies it: those inflated values now become the targets for still other states, pulling them up too.
 3. _Off-policy_ fires the fact-checker: because the agent never has to actually take that over-valued action, no real reward $r$ ever arrives to say "that was wrong."
 
-The one correcting force, the grain of truth in $r$, never reaches the inflated value, while steps 1 and 2 keep feeding it back into itself. The loop amplifies faster than it corrects, and the numbers run away. (This is also why the small $\max$ overestimation from §3.4 is so dangerous here: the triad takes that tiny upward bias and pumps it straight back into its own targets.)
+The one correcting force, the grain of truth in $r$, never reaches the inflated value, while steps 1 and 2 keep feeding it back into itself. The loop amplifies faster than it corrects, and the numbers run away. (This is also why the $\max$ in the target is so dangerous here: taking the max of noisy estimates is biased slightly _upward_, and the triad takes that tiny upward bias and pumps it straight back into its own targets.)
 
 **The cure: remove any one leg.** Take away a single ingredient and the loop can't close:
 
@@ -579,106 +579,7 @@ That is the real reason for the plumbing. **Experience replay** decorrelates the
 
 ---
 
-## 3. Worked examples by hand
-
-### 3.1 SARSA vs Q-learning on one transition
-
-We are in state $s$, take $a$, get $r=0$, and land in $s'$ with current action-values $Q(s',\text{left})=2.0$, $Q(s',\text{stay})=5.0$, $Q(s',\text{right})=8.0$. Our $\epsilon$-greedy policy _explores_ and picks $a'=\text{left}$. With $\gamma=0.9$:
-
-$$
-\text{SARSA} = 0 + 0.9\cdot Q(s',\text{left}) = 0.9 \cdot 2.0 = \mathbf{1.8}
-$$
-
-$$
-\text{Q-learning} = 0 + 0.9\cdot \max(2,5,8) = 0.9 \cdot 8.0 = \mathbf{7.2}
-$$
-
-SARSA was honest about the exploratory "left" it is about to take; Q-learning assumed the greedy "right." **The two methods disagree only on steps where the behaviour policy explores**: on greedy steps both would use $8.0$ and the targets coincide. That is exactly why annealing $\epsilon\to 0$ (GLIE) makes SARSA converge to where Q-learning already aims.
-
-<details>
-<summary><strong>Check:</strong> On this transition, suppose the policy instead takes the greedy a′ = right. Compute both targets. When do SARSA and Q-learning produce identical updates?</summary>
-
-**Answer.** Both give $0 + 0.9\cdot 8.0 = 7.2$. They coincide on every step where the behaviour policy happens to act greedily, and diverge only on exploratory steps. As $\epsilon\to 0$ those exploratory steps vanish, precisely why GLIE-SARSA ends up where Q-learning already aimed.
-
-</details>
-
-### 3.2 The reward ringing backward (credit assignment)
-
-Most CliffWalking steps have reward $-1$; the only "good" event is reaching the goal. How does a move _several steps before_ the goal ever gain value? Through the $\max$ target, one bootstrap at a time. Take a $+10$ terminal gem instead, with $\alpha=0.5,\ \gamma=0.9$, both tiles starting at $Q=0$:
-
-![Three stacked cells showing the +10 reward propagating backward: tile one updates to 5.0, tile two to 1.75, with the update arithmetic annotated](./images/fig-max-propagation.svg)
-
-- **Update 1** (the agent steps from tile 1 onto the gem; terminal, so no future term):
-  $$
-  Q_1 \leftarrow 0 + 0.5\,(10 + 0 - 0) = 5.0
-  $$
-- **Update 2** (_later_, the agent steps from tile 2 onto tile 1, paying $-1$ and bootstrapping off the now-raised $Q_1=5.0$):
-  $$
-  Q_2 \leftarrow 0 + 0.5\,(-1 + 0.9\cdot 5.0 - 0) = 0.5 \cdot 3.5 = 1.75
-  $$
-
-**The reward is a bell that rings backward**, $\gamma$-discounted at each hop. Sparse reward plus bootstrapping equals automatic credit assignment, the same backward flow we saw numerically in §2.1.
-
-<details>
-<summary><strong>Check:</strong> A transition gives r = 0, γ = 0.99, frozen target outputs Q(s′, ·) = (5, 2, 7, 4), and the online net predicts Q(s, a) = 4.0. Compute the target y and the sign of the update. What does it carry, even though r = 0?</summary>
-
-**Answer.** $y = 0 + 0.99\cdot 7 = 6.93$. Since $6.93 > 4.0$, the update **raises** $Q(s,a)$. Even with zero immediate reward, the target carries the news that a good state ($\max Q = 7$) lies just ahead, value flowing backward one bootstrap at a time.
-
-</details>
-
-### 3.3 The DQN target on one minibatch transition
-
-From the lecture's Pong-style example: a transition with $r=+1$, $\gamma=0.97$, frozen target net outputs $Q(s',\cdot)=(\text{left }1.0,\ \text{stay }2.6,\ \text{right }1.9)$, online net predicts $Q(s,a)=3.8$ for the action $a$ read from the buffer.
-
-$$
-y = r + \gamma \max_{a'} Q(s',a';\theta^-) = 1 + 0.97\cdot 2.6 = \mathbf{3.52}
-$$
-
-$$
-\mathcal{L} = (3.8 - 3.52)^2 = 0.0784
-$$
-
-The prediction uses $a$ **read from the buffer**; the target's next action $a'=\text{stay}$ is the network's own `argmax`, _not stored anywhere_. **That is the off-policy step made concrete.** The frozen $\theta^-$ is what keeps $y$ from moving while we descend on $\mathcal{L}$.
-
-### 3.4 Why the max overestimates
-
-The $\max$ that powers control has a subtle cost. Suppose every action at a state is _truly_ worth $0$, but our estimates are noisy. Taking the $\max$ of noisy estimates is biased **upward** (by [Jensen's inequality](../01-rl-intro-and-prerequisites/README.md), $\mathbb{E}[\max] \ge \max \mathbb{E}$), and bootstrapping carries that optimism into earlier states.
-
-![Curve showing the expected max of noisy zero-mean estimates rising above zero as the number of actions grows](./images/fig-max-overestimation.svg)
-
-```python
-rng = np.random.default_rng(0)
-
-# Ground truth: all 4 actions are worth exactly 0. The true max is 0.
-true_values = np.zeros(4)
-
-# Simulate 100k episodes of noisy, unbiased Q-estimates (mean=0, std=1).
-# Each row is one set of 4 action-value estimates.
-est = rng.normal(0, 1, size=(100000, 4))
-
-# E[max of noisy estimates] ≈ 1.03, well above the true max of 0.
-# This is Jensen's inequality in action: E[max] ≥ max E.
-# The max operator picks the luckiest noise each time, creating
-# a systematic upward bias that bootstrapping then propagates backward.
-print("true max:", true_values.max(), "| E[max of estimates]:", round(est.max(1).mean(), 3))
-```
-
-```text title="Output"
-true max: 0.0 | E[max of estimates]: 1.031
-```
-
-The true max is $0$, but the expected max of the _estimates_ is $\approx 1.03$, pure optimistic bias, and it grows with the number of actions. **Double DQN** fixes it by selecting the action with the online network but _evaluating_ it with the target network, so the evaluator isn't the same noisy estimate that picked the max.
-
-<details>
-<summary><strong>Check:</strong> A state's action-values are Q = (4, 4, 9) and the policy splits evenly. Compute V^π(s) and max_a Q. After one greedy-improvement step, what is V(s), and why did it rise?</summary>
-
-**Answer.** $V^\pi = (4+4+9)/3 = 5.67$; the max is $9$. Greedy improvement puts all weight on the $9$, so $V=9$. The value rose by $3.33$: the average had been dragged down by the two worse actions. That gap is the price of acting sub-optimally.
-
-</details>
-
----
-
-## 4. Putting it all together
+## 3. Putting it all together
 
 ### Recap: concept → math → code
 
