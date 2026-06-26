@@ -361,8 +361,8 @@ def compute_td_loss(
     #   actions.unsqueeze(1) -> (B, 1): the single action index taken, as a column
     #   .gather(1, ...)      -> (B, 1): from each row, pluck the Q-value at that index
     #   .squeeze(1)          -> (B,): drop the extra dim, leaving one Q-value per transition
-    # We need only the action we actually took, because that's the one the
-    # observed reward r corresponds to.
+    # We need only the action we actually took, because that's the one the observed reward r corresponds to.
+    # In short, for each transition, we keep only the Q-value for the action actually taken.
     q = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
     # --- Build the frozen label y (the "semi-gradient" trick) ---
@@ -442,7 +442,7 @@ $$
 \texttt{max\_next}=\begin{bmatrix}2.0\\1.0\\3.0\end{bmatrix}
 $$
 
-**Line 3, the label.** $y = r + \gamma\,(1-\text{done})\cdot\texttt{max\_next}$, row by row. Row 1 is terminal, so its future term is switched off and $y_1=r_1$:
+**Line 3, the label.** $y = r + \gamma\,(1-\text{done})\times\texttt{max\_next}$, row by row. Row 1 is terminal, so its future term is switched off and $y_1=r_1$:
 
 $$
 \begin{aligned}
@@ -469,7 +469,9 @@ $$
 
 </details>
 
-#### Why the core loss isn't enough: the tricks that follow
+---
+
+### Why the core loss isn't enough: the tricks that follow
 
 That loss is the _entire_ learning rule, and on paper it converges. Run it **naively**, though, one fresh online transition at a time through a single network, and it diverges in practice. Two specific things break, and the next two sections each add one fix that leaves the objective untouched and only makes gradient descent on it behave:
 
