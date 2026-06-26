@@ -51,9 +51,10 @@ Each post has typed Python, worked examples, and figures.
 
 ## Image Suggestions
 
-1. **Hero from the blog**: `blogs/04-sarsa-qlearning-dqn/images/ai-hero.png` — a hiker at a fork, one branch hugging a cliff edge, an arcade screen faint in the background (recommended hero, it maps directly to the cliff story)
+1. **Social cover**: `marketing/blog4/blog4-social-cover.png` — generated cover with the hiker at the fork, the red Q-learning cliff path, the cyan SARSA safe path, a floating `max`, and a faint Pong screen (recommended hero, leaves room for an overlay headline)
 2. **The cliff paradox**: `marketing/blog4/fig-sarsa-vs-q-curves.png` — training curves plus the two learned paths, Q-learning on the edge and SARSA higher up (strongest proof image)
 3. **CliffWalking grid**: `marketing/blog4/fig-cliffwalking.png` — the 4x12 grid with the risky and safe routes drawn
 4. **Pong in motion**: `blogs/04-sarsa-qlearning-dqn/images/pong.gif` — the trained DQN agent playing (great for the "from a table to Atari" payoff)
+5. **Blog hero (fallback)**: `blogs/04-sarsa-qlearning-dqn/images/ai-hero.png`
 
-Recommended: lead with `ai-hero.png`, or use `fig-sarsa-vs-q-curves.png` if you want the cliff paradox front and center. A carousel works well here: slide 1 the one-symbol hook, slides 2-4 max vs argmax, the cliff paradox, table to network, final slide the Pong gif plus link.
+Recommended: lead with `blog4-social-cover.png`, or use `fig-sarsa-vs-q-curves.png` if you want the cliff paradox front and center. A carousel works well here: slide 1 the one-symbol hook, slides 2-4 max vs argmax, the cliff paradox, table to network, final slide the Pong gif plus link.

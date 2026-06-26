@@ -112,9 +112,10 @@ Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the 
 
 ## Header Image
 
-- Use **`ai-hero.png`** from `blogs/04-sarsa-qlearning-dqn/images/` for the article header (the hiker at a cliff fork, arcade screen in the background). For best fit on X, crop to roughly 5:2.
+- Use **`blog4-x-banner.png`** (this folder) for the article header. It is generated at a wide 3:2 and reads well as the X cover: the Q-learning edge path, the SARSA safe path, the floating `max`, and a Pong screen on the right. Crop to roughly 5:2 if X needs a tighter banner.
 - Embed `fig-sarsa-vs-q-curves.png` inline in the cliff section (marked `[EMBED IMAGE HERE]`). X does not support SVG, so use this PNG (already exported in this folder with `rsvg-convert -z 2`).
 - Optional inline images: `fig-cliffwalking.png` near the cliff setup, and `pong.gif` (from the blog's images folder) at the DQN section for the payoff.
+- Fallback header: `ai-hero.png` from `blogs/04-sarsa-qlearning-dqn/images/`.
 
 ## First 30 Minutes Strategy
 
