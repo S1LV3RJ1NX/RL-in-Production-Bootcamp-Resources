@@ -486,45 +486,6 @@ Run the network version online, one fresh transition at a time, and the first th
 
 The fix: a large circular buffer storing the last $N$ transitions $(s,a,r,s',\text{done})$, raw experience with no labels. Each gradient step samples a **uniformly random** minibatch from across the _whole_ buffer, mixing early-game, near-loss, and near-win moments so the samples are varied and nearly independent. Replay turns a time-series into a dataset.
 
-```python
-from collections import deque
-import random
-
-class ReplayBuffer:
-    """Circular buffer storing raw (s, a, r, s', done) transitions.
-    Breaks temporal correlation by letting each gradient step sample
-    a uniformly random minibatch from across the agent's entire history."""
-
-    def __init__(self, capacity):
-        # deque(maxlen=N) automatically drops the oldest transition when full,
-        # keeping the buffer a fixed-size sliding window over experience.
-        self.buffer = deque(maxlen=capacity)
-
-    def push(self, *transition):
-        # Store one transition tuple — no labels, just raw experience.
-        self.buffer.append(transition)
-
-    def sample(self, n):
-        # Draw n transitions uniformly at random (not sequential!).
-        # This breaks the near-identical-consecutive-frame correlation
-        # that would otherwise make SGD overfit the present moment.
-        return random.sample(self.buffer, n)
-
-    def __len__(self): return len(self.buffer)
-
-# Fill with 500 dummy transitions; the buffer holds up to 1000.
-buf = ReplayBuffer(1000)
-for i in range(500): buf.push(i, 0, 0.0, i + 1, False)
-
-# Each gradient step samples a random minibatch (here 64) from the whole buffer,
-# mixing early and late experience for decorrelated, approximately i.i.d. data.
-print("buffer size:", len(buf), "| sampled batch:", len(buf.sample(64)))
-```
-
-```text title="Output"
-buffer size: 500 | sampled batch: 64
-```
-
 Bonus: **data efficiency.** Real interactions are expensive; replay lets us learn from each transition many times instead of once-and-discard. _This is only legal because Q-learning is off-policy_ (§2.4): old, more-exploratory transitions are still valid samples.
 
 <details>
@@ -535,7 +496,7 @@ Bonus: **data efficiency.** Real interactions are expensive; replay lets us lear
 </details>
 
 <details>
-<summary><strong>Check:</strong> What does a *tiny* replay buffer (say the last 1,000 transitions) do to learning?</summary>
+<summary><strong>Check:</strong> What does a tiny replay buffer (say the last 1,000 transitions) do to learning?</summary>
 
 **Answer.** It undoes replay's whole job. The buffer holds only recent, highly-correlated transitions, so each minibatch is again a stream of near-duplicates: SGD's i.i.d. assumption breaks, and the network catastrophically forgets older situations as they're overwritten. Too large is also bad (full of stale, off-policy data); the size trades decorrelation against staleness.
 
@@ -547,18 +508,7 @@ The second thing that breaks is the label itself. If we compute $y$ with the sam
 
 The fix: keep a second, **frozen** copy $Q(\cdot;\theta^-)$ and compute the label with it. Now the target is stationary for a stretch, and the update becomes ordinary supervised regression toward a fixed number. Every $C$ steps, sync it: $\theta^- \leftarrow \theta$. The target lurches forward, then holds still again, and slow-moving goalposts are reachable.
 
-```python
-# Every C gradient steps, copy the online weights into the frozen target net:
-#   θ⁻ ← θ
-# Between syncs the target is stationary, so the DQN update is ordinary
-# regression toward a fixed label — no moving goalpost.
-# C trades stability (large C) against freshness of the target (small C).
-TARGET_UPDATE = 1000
-if grad_steps % TARGET_UPDATE == 0:
-    target_net.load_state_dict(policy_net.state_dict())
-```
-
-Both extremes break it: sync **every** step ($C=1$) and the target moves every update, so the original instability returns; freeze it **forever** ($C=\infty$) and you keep aiming at an old estimate that never improves, so learning stalls. $C$ trades steadiness against freshness.
+That sync interval $C$ is the one knob, and both extremes break it: sync **every** step ($C=1$) and the target moves every update, so the original instability returns; freeze it **forever** ($C=\infty$) and you keep aiming at an old estimate that never improves, so learning stalls. $C$ trades steadiness against freshness.
 
 Crucially, neither trick changes the objective; they only change _which data_ you train on and _which weights build the label_, so that gradient descent (built for fixed, i.i.d. data) can cope. **That is the entire jump from a wobbly idea to the network that learned 49 Atari games** (Mnih et al., Nature 2015).
 
