@@ -298,7 +298,9 @@ net = nn.Sequential(nn.Linear(7, 64), nn.ReLU(),
 states = torch.tensor([[0.00,  0.00,  0.00, 0.00,  0.00, 0.00,  0.00],
                        [0.87, -1.22, -1.41, 1.01, -0.20, 0.79, -1.49]])
 with torch.no_grad():
-    q = net(states)                       # shape (2, 3): 2 states × 3 actions
+    # no_grad() disables gradient computation, because we're just reading values
+    # and not training — the network is frozen in this forward pass.
+    q = net(states)
 print("Q-values (2 states x 3 actions):")
 print(q.round(decimals=2))
 # Acting is still a single argmax over each row — even though the net has never
@@ -333,9 +335,11 @@ y = r + \gamma\,(1-\text{done})\max_{a'} Q(s', a'; \theta^-), \qquad
 \mathcal{L}(\theta) = \big(y - Q(s,a;\theta)\big)^2
 $$
 
-This target is **not invented for convenience**. It is the right-hand side of the Bellman optimality equation, with the unknown $Q^*$ replaced by the network's current estimate. The label is mostly a guess, with one grain of truth baked in: the reward $r$, measured from the real environment. Every update injects that grain: _the network grades its own homework, but reality marks one question on every page._ Because the future is discounted by $\gamma<1$, each update swaps a little guesswork for a little truth, so information flows inward from real rewards.
+This target is **not invented for convenience**. It is the right-hand side of the Bellman optimality equation, with the unknown $Q^*$ replaced by the network's current estimate. Split the label into its two parts: the reward $r$ is **real**, measured from the environment, while $\gamma\max_{a'} Q(s',a';\theta^-)$ is the network's **own guess** about the future. So every update is "mostly my own opinion, plus one fact." That is the line _the network grades its own homework, but reality marks one question on every page._ Because the future is discounted by $\gamma<1$, the guessed part is shrunk relative to the solid reward, so each update swaps a little guesswork for a little truth. And at a terminal step the $(1-\text{done})$ factor switches the guess off entirely, leaving $y=r$, a fully solid anchor. Over many visits those real rewards propagate backward one hop at a time, which is how information flows inward from the environment rather than the network drifting off on its own.
 
-The catch is the **semi-gradient**: $y$ also depends on $\theta$, but we differentiate _only_ the prediction $Q(s,a;\theta)$ and treat $y$ as a fixed constant. Differentiating through both sides would optimize the network to make its own future predictions easy to hit, the tail-chasing we want to avoid. In code, that is exactly what `torch.no_grad()` enforces.
+The catch is the **semi-gradient**: $y$ also depends on $\theta$, but we differentiate _only_ the prediction $Q(s,a;\theta)$ and treat $y$ as a fixed constant. Here is why that matters. The squared error $\big(y - Q(s,a;\theta)\big)^2$ can be made smaller two ways: push the _prediction_ up toward $y$ (what we want), or drag the _target_ $y$ down toward the prediction (cheating). If gradients flowed through $y$, the optimizer would happily do the second, reshaping the network so its own future predictions are easy to hit. The loss would drop while the network learned nothing about real returns, the tail-chasing we must avoid. Freezing $y$ removes that escape hatch: the only way left to shrink the loss is to move the prediction toward the Bellman target, the side that actually carries the real reward $r$. In code, `torch.no_grad()` (equivalently `.detach()`) enforces this by building the label outside the autograd graph.
+
+This stop-gradient is a **separate** stabilizer from the frozen target network $\theta^-$. The stop-gradient stops the optimizer from chasing the target _within_ a single update; the target network stops the label from drifting _across_ updates by holding $\theta^-$ fixed for a stretch of steps (§2.8). DQN needs both.
 
 ```python
 import torch.nn.functional as F
