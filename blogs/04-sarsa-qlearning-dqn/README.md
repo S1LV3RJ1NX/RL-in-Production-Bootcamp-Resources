@@ -339,7 +339,7 @@ This target is **not invented for convenience**. It is the right-hand side of th
 
 The catch is the **semi-gradient**: $y$ also depends on $\theta$, but we differentiate _only_ the prediction $Q(s,a;\theta)$ and treat $y$ as a fixed constant. Here is why that matters. The squared error $\big(y - Q(s,a;\theta)\big)^2$ can be made smaller two ways: push the _prediction_ up toward $y$ (what we want), or drag the _target_ $y$ down toward the prediction (cheating). If gradients flowed through $y$, the optimizer would happily do the second, reshaping the network so its own future predictions are easy to hit. The loss would drop while the network learned nothing about real returns, the tail-chasing we must avoid. Freezing $y$ removes that escape hatch: the only way left to shrink the loss is to move the prediction toward the Bellman target, the side that actually carries the real reward $r$. In code, `torch.no_grad()` (equivalently `.detach()`) enforces this by building the label outside the autograd graph.
 
-This stop-gradient is a **separate** stabilizer from the frozen target network $\theta^-$. The stop-gradient stops the optimizer from chasing the target _within_ a single update; the target network stops the label from drifting _across_ updates by holding $\theta^-$ fixed for a stretch of steps (§2.8). DQN needs both.
+This stop-gradient is only the _first_ of two stabilizers DQN needs. It keeps the optimizer from chasing the target _within_ a single update, but the label still shifts _across_ updates, because it is computed from the same ever-changing network. Fixing that slower drift takes a second, separate mechanism, a **frozen target network**, which we build in §2.8.
 
 ```python
 import torch.nn.functional as F
@@ -397,6 +397,15 @@ The `gather` picks out $Q(s,a)$ for the action _actually stored_ in the batch; t
 **Answer.** It isn't circular, for two reasons. First, every label carries one **grain of real truth**, the measured reward $r$, so each update swaps a little guesswork for a little reality. Second, the equation we are forcing $Q$ to satisfy, $Q(s,a) = r + \gamma \max_{a'} Q(s',a')$, is the **Bellman optimality equation**, and because $\gamma < 1$ repeatedly applying its right-hand side is a _contraction_: it shrinks the gap to the unique solution $Q^*$ by a factor $\gamma$ every pass. Drive the loss to zero everywhere and $Q$ must equal $Q^*$; the optimal policy is then just $\arg\max_a Q^*(s,a)$. In a table this convergence is a theorem (Watkins, 1992); the network version is the same idea engineered to behave (see §2.10).
 
 </details>
+
+#### Why the core loss isn't enough: the tricks that follow
+
+That loss is the _entire_ learning rule, and on paper it converges. Run it **naively**, though, one fresh online transition at a time through a single network, and it diverges in practice. Two specific things break, and the next two sections each add one fix that leaves the objective untouched and only makes gradient descent on it behave:
+
+- **The data is too correlated.** Consecutive transitions are nearly identical, which violates the i.i.d. assumption SGD relies on. _Trick 1: experience replay_ (§2.7).
+- **The label keeps moving.** Computing $y$ from the same weights we update means the target shifts under us every step. _Trick 2: the target network_ (§2.8), the second stabilizer promised above.
+
+(These instabilities are a face of the well-known **deadly triad**: bootstrapping, function approximation, and off-policy learning together can diverge. The tricks below tame it.)
 
 ### 2.7 Trick 1: experience replay (fixes correlated data)
 
