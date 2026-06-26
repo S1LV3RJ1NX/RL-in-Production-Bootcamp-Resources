@@ -344,14 +344,25 @@ This is only the first of DQN's two stabilizers. It steadies the target _within_
 ```python
 import torch.nn.functional as F
 
-def compute_td_loss(policy_net, target_net, batch, gamma=0.99):
+def compute_td_loss(
+    policy_net: nn.Module,   # online network Q(·;θ), the one we train
+    target_net: nn.Module,   # frozen copy Q(·;θ⁻), used only to build the label
+    batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+    gamma: float = 0.99,     # discount factor
+) -> torch.Tensor:           # returns a scalar loss tensor (carries gradients)
     """Core DQN loss: L(θ) = (y − Q(s,a;θ))², where y = r + γ·max_a' Q(s',a';θ⁻).
     This is the Bellman optimality equation turned into a regression problem."""
 
     states, actions, rewards, next_states, dones = batch
 
     # Q(s, a; θ) — the online network's prediction for the action actually taken.
-    # gather picks out the Q-value at the stored action index from each row.
+    # Read the chain left to right (B = batch size):
+    #   policy_net(states)   -> (B, n_actions): a Q-value for EVERY action in each state
+    #   actions.unsqueeze(1) -> (B, 1): the single action index taken, as a column
+    #   .gather(1, ...)      -> (B, 1): from each row, pluck the Q-value at that index
+    #   .squeeze(1)          -> (B,): drop the extra dim, leaving one Q-value per transition
+    # We need only the action we actually took, because that's the one the
+    # observed reward r corresponds to.
     q = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
 
     # --- Build the frozen label y (the "semi-gradient" trick) ---
@@ -378,7 +389,14 @@ target = nn.Sequential(nn.Linear(4, 16), nn.ReLU(), nn.Linear(16, 2))
 # Target net starts as an exact copy of the policy net (θ⁻ = θ initially).
 target.load_state_dict(policy.state_dict())
 
-# Fake batch: 8 transitions of (state, action, reward, next_state, done).
+# Fake batch of B=8 transitions. Each field is stacked along the batch dimension,
+# exactly the shape the loss above expects (real training pulls this same 5-tuple
+# from the replay buffer instead of using randn):
+#   states      (8, 4)  — 8 observations, each a 4-feature state vector
+#   actions     (8,)    — the action index taken in each state (0 or 1; the net has 2 actions)
+#   rewards     (8,)    — the scalar reward seen for each transition
+#   next_states (8, 4)  — the state reached after each action
+#   dones       (8,)    — 1.0 if the transition ended the episode, else 0.0 (all 0.0 here)
 batch = (torch.randn(8, 4), torch.randint(0, 2, (8,)),
          torch.randn(8), torch.randn(8, 4), torch.zeros(8))
 
