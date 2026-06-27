@@ -23,15 +23,22 @@ from **intuition → math → a worked example → code**, with Gymnasium as the
    end — a few lines of runnable Python right under the equation it implements, with the
    line that maps to the math annotated. Code follows the explanation; never make the
    reader scroll to a code dump to connect a formula to its implementation.
-3. **Worked example(s) by hand** — concretise every important formula with real numbers,
-   solved step by step. Add a code-generated figure when the numbers tell a story.
-4. **A capstone in code** — one end-to-end **runnable Gymnasium program** that combines
-   the pieces introduced above, preceded by a short `Concept → Math → Code` recap table.
-   This is the only code that lives near the end, because it is *integrative* by nature;
-   every per-concept snippet has already appeared inline next to its explanation.
+3. **Worked example(s) by hand, placed inline.** Concretise every important formula with
+   real numbers, solved step by step, and add a code-generated figure when the numbers tell
+   a story. **Put each worked example directly in the section of the concept it illustrates**
+   (right after that concept's explanation and code), not collected in a separate section at
+   the end. A reader should meet the numbers while the idea is still fresh.
+4. **Putting it all together — a recap table, not a capstone code dump.** Close the math with
+   a short `Concept → Math → Code` table that summarises the pieces already shown inline. Do
+   **not** paste a large end-of-post program. The full end-to-end **runnable Gymnasium**
+   implementation lives in the post's GitHub assignment notebook; link to it from this section
+   (and from "Practice"). Every per-concept snippet has already appeared inline next to its
+   explanation, so the table plus the assignment link is enough.
 
-Close with a short **"Where this goes next"** that sets up the following post (and, if
-natural, states the next equation the reader will derive).
+Close with a short **"Where this goes next"** that sets up the following post, states the next
+equation the reader will derive when natural, and **ends with a markdown link to the next post
+by its `shortName`** (e.g. "the [TRPO & PPO](../06-trpo-ppo/README.md) post"), mirroring how
+each post links forward to the one after it.
 
 ### 1a. Depth rule — expand the new, recall-and-link the old
 
@@ -144,11 +151,13 @@ carries its own real publish date, so the series never shows every entry on the 
   $\pi$ policy, $r$/$R$ reward, $G_t$ return, $V$/$Q$ value, $\gamma$ discount,
   $\alpha$ step size, $\mathbb{E}$ expectation, $s,a,s'$ state/action/next-state.
 - Keep equations small and frequent rather than one giant block.
-- **Every display equation gets a plain-English interpretation.** Right after `$$…$$`, add a
-  sentence (or short paragraph) that reads the equation aloud: name each symbol, say what the
-  result *means*, and state what goes up or down when something changes. The reader should never
-  see a formula without a "Read it as: …" or equivalent explanation immediately below it.
-  (Intermediate algebra steps in a derivation chain can share one interpretation at the end.)
+- **Every display equation gets a two-step explanation: read it, then interpret it.** Right
+  after `$$…$$`, first **read the equation aloud symbol by symbol** (name each term: "the left
+  side is …; on the right, $r$ is …, $\gamma$ is …"), then give the **plain-English meaning**:
+  what the result *means* and what goes up or down when something changes. Teach the reader to
+  decode the notation first, then the takeaway. The reader should never see a formula without
+  this read-then-interpret pair immediately below it. (Intermediate algebra steps in a single
+  derivation chain can share one read-then-interpret pass at the end of the chain.)
 
 ---
 
@@ -170,6 +179,10 @@ Two kinds of images, two clear jobs. **Default to SVG; reserve interactivity.**
   and needs MDX + JS in the site, so use sparingly and never as the default.
 - Reference images with **relative paths**: `![alt text](./images/fig-foo.svg)`.
 - Every image needs **descriptive alt text** (a sentence, not "figure 1").
+- **Every diagram or figure gets an explanatory paragraph** right after it (this includes
+  Mermaid diagrams). Say what the picture shows and, explicitly, **how it ties back to the
+  concept just taught**. Never drop an image and move on; a figure with no prose around it
+  leaves the reader to guess why it is there.
 
 ### `figures.py` rules
 - Headless (`matplotlib.use("Agg")`), seaborn `whitegrid` theme, the shared `house_style()`.
@@ -185,19 +198,31 @@ Two kinds of images, two clear jobs. **Default to SVG; reserve interactivity.**
 
 - **Python only.** Every snippet must be **runnable** as written (test it before publishing).
 - **Code follows the explanation.** Put each snippet *immediately after* the concept it
-  implements (usually inside the relevant Section 2 / Section 3 subsection), so the reader
+  implements (usually inside the relevant Section 2 subsection), so the reader
   never has to scroll away to connect a formula to its code. Do **not** collect all code
   into one section at the end.
-- Keep the snippets small — a few lines per idea — and **annotate the line that maps to the
-  equation** (e.g. `G += discount * reward  # G_t = Σ γ^k r`).
+- Keep the snippets small (a few lines per idea).
+- **Comments go on the line above the code, never beside it.** Do not put trailing inline
+  comments after a statement; place the comment on its own line directly above. This includes
+  the comment that maps a line to its equation, e.g.:
+
+```python
+# G_t = Σ γ^k r  (accumulate the discounted return)
+G += discount * reward
+```
+
+- **Make output reproducible: seed everything.** Before any randomness, set the seeds
+  (`np.random.seed(...)`, `torch.manual_seed(...)`, and the env via `env.reset(seed=...)` /
+  `env.action_space.seed(...)`), so the captured output matches on a re-run. Note that
+  `env.action_space.sample()` uses its own RNG, so seed it explicitly when you use it.
 - **Show real output.** After every runnable snippet add a ` ```text title="Output" ` block
   containing the **actual stdout captured by running the code** (never hand-typed or guessed),
   followed by a **one-sentence interpretation** of the numbers. Result-value comments inside
-  the code (`# 3.5`, `# ≈ 3.5`) move into the Output block; equation-mapping comments stay.
-- The **one** allowed end-of-post code block is the **capstone**: a single runnable
-  **Gymnasium** program that combines the pieces, with the `reset()` / `step()` loop shown
-  explicitly. Precede it with a `Concept → Math → Code` **recap** table (the table is a
-  summary of code already shown inline, not a substitute for it).
+  the code (`# 3.5`, `# ≈ 3.5`) move into the Output block.
+- **No end-of-post capstone code block.** The integrative end-to-end **Gymnasium** program
+  lives in the post's GitHub assignment notebook, not in the post. "Putting it all together"
+  contains only the `Concept → Math → Code` **recap** table (a summary of code already shown
+  inline) plus a link to that assignment for the full runnable program.
 - Reuse the repo's runnable code where it exists: [`code/mars-rover/`](../code/mars-rover/),
   [`code/tic-tac-toe/`](../code/tic-tac-toe/). Link to it rather than duplicating.
 - Run snippets with `uv run python ...` (the repo is a `uv` project).
@@ -257,6 +282,12 @@ Geist / Geist Mono — so figures and site share one visual language.
 ## 8. Tone & style
 
 - Intuition-first, conversational but precise. Short paragraphs. One idea per paragraph.
+- **Keep sentences simple.** Prefer short, plain sentences over long, multi-clause ones. If a
+  sentence runs long or stacks several ideas, split it into two or three. Simple English beats
+  clever phrasing; the reader is here for the concept, not the prose.
+- **Flow between sections.** Each section should lead into the next: end a section by motivating
+  what is coming, or open one by recalling what just came, so the post reads as one thread of
+  thought rather than disconnected blocks.
 - Lead with the "why" before the "what." Use a vivid concrete example, then generalize.
 - Bold the one takeaway sentence per section. Don't pad.
 - No emojis unless asked. American spelling. Define jargon on first use.
@@ -277,14 +308,20 @@ Geist / Geist Mono — so figures and site share one visual language.
 - [ ] Check summaries are untagged (`Check:` + question only); revealed answers lead with a bold `Answer.`/`Explanation.` (§1b).
 - [ ] Frontmatter complete (`title`, `shortName`, `date`, `summary`, `tags`, `order`); `date` is today's real publish date, not copied from the skeleton or a sibling post (§3).
 - [ ] Every symbol defined on first use; one clean derivation, no proof dumps.
-- [ ] Every display equation has a plain-English interpretation right after it (§4).
-- [ ] At least one hand-worked numeric example per key formula.
+- [ ] Every display equation is read aloud symbol by symbol, then interpreted in plain English right after it (§4).
+- [ ] Long/complex sentences split into simple ones; sections flow into each other (§8).
+- [ ] At least one hand-worked numeric example per key formula, placed inline in that concept's section, not in a separate end section (§1).
 - [ ] Figures: `ai-*` for concepts, `fig-*.svg` for numbers; all have alt text and relative paths.
+- [ ] Every diagram and figure (including Mermaid) has an explanatory paragraph after it tying it to the concept (§5).
 - [ ] `figures.py` regenerates all `fig-*.svg` for the post with no errors.
 - [ ] Every code snippet runs (`uv run python ...`); equation-to-code mapping shown.
+- [ ] Code comments are on the line above, never trailing inline (§6).
+- [ ] Randomness is seeded so captured output is reproducible (§6).
+- [ ] No end-of-post capstone code; "Putting it all together" is the recap table only, with the runnable program linked from the GitHub assignment (§1, §6).
+- [ ] "Where this goes next" ends with a `shortName` link to the next post (§1).
 - [ ] Every snippet has a `text title="Output"` block with real, captured stdout + a one-line interpretation.
-- [ ] Code is placed inline next to the concept it implements; only the integrative Gymnasium capstone sits near the end.
-- [ ] "Where this goes next" sets up the following post.
+- [ ] Code is placed inline next to the concept it implements; no end-of-post code dump.
+- [ ] "Where this goes next" sets up the following post and links to it by `shortName`.
 - [ ] (If publishing) synced to the portfolio, image paths rewritten, `npm run build` passes.
 
 ---
@@ -313,12 +350,15 @@ order: N
 ## 2. The math you need
 ### 2.1 ...
 $$ ... $$
-... define symbols; one clean derivation; link back to the throughline ...
+... read the equation symbol by symbol, then interpret it; define symbols;
+one clean derivation; link back to the throughline ...
 ![fig alt](./images/fig-foo.svg)
+... a paragraph explaining the figure and how it ties to this concept ...
 
 ​```python
-# small runnable snippet for THIS concept, placed right under its explanation,
-# with the line that maps to the equation annotated
+# comment on the line above maps this line to the equation (G_t = Σ γ^k r)
+# seed all randomness so the output below is reproducible
+... small runnable snippet for THIS concept, right under its explanation ...
 ​```
 
 ​```text title="Output"
@@ -327,28 +367,20 @@ $$ ... $$
 
 One-sentence interpretation of the output.
 
+... then the hand-worked numeric example for THIS concept, inline ...
+
 ### 2.2 ...
-... and so on: every concept gets its code inline, next to the idea ...
+... and so on: every concept gets its code AND its worked example inline ...
 
-## 3. Worked example(s) by hand
-... step-by-step numbers ...
-
-## 4. Putting it all together (capstone)
+## 3. Putting it all together
 | Concept | Math | In code |
 |---|---|---|
 | ... | $...$ | `...` |   <- recap of code already shown inline above
 
-​```python
-# ONE end-to-end runnable Gymnasium program that combines the pieces,
-# with reset()/step() shown explicitly and lines annotated to the equations
-​```
-
-​```text title="Output"
-<actual stdout captured by running the capstone>
-​```
-
-One-sentence interpretation of the capstone output.
+The full end-to-end runnable Gymnasium program lives in the assignment:
+> **[Assignment — ...](https://github.com/.../assignments/...ipynb)**
 
 ## Where this goes next
-... one paragraph + the next equation ...
+... one paragraph + the next equation, ending with a link to the next post
+by its shortName, e.g. the [TRPO & PPO](../06-trpo-ppo/README.md) post ...
 ```
