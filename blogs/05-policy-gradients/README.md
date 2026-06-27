@@ -199,6 +199,18 @@ $\nabla_\theta \log \pi_\theta(a)$ is a **vector**: the direction in parameter s
 
 In the bandit there is no future, so the weight on the chosen angle is simply its reward $r$. No returns, no credit assignment. One shot, one reward, one push.
 
+**The Archer bandit, concretely.** Before the code, here is the exact problem the environment encodes.
+
+- **State space.** There is only one state, so there is nothing to observe. We still have to feed the network a fixed-size input, so the observation is a constant dummy: the length-1 vector $[0.]$ (declared as a `Box` of one float in $[0, 1]$). It never changes and carries no information.
+- **Action space.** Nine discrete release angles $a_1 \dots a_9$ (a `Discrete(9)`), indexed $0 \dots 8$ in code. Each episode the agent picks exactly one.
+- **Reward.** How close the arrow lands to the bullseye, shaped as a Gaussian bell over the angle:
+
+$$R(a) = \exp\!\left(-\frac{(a - a_\text{target})^2}{2\sigma^2}\right), \quad a_\text{target} = 4,\ \sigma = 1.5$$
+
+Read it aloud: the reward of angle $a$ is $e$ raised to minus the squared distance from the target angle $a_\text{target}$, divided by $2\sigma^2$. In plain English: shoot exactly at the bullseye and the exponent is $0$, so $R = e^0 = 1$ (a perfect score). Miss by a little and the reward dips a little; miss by a lot and it falls toward $0$. With $a_\text{target} = 4$ (angle $a_5$) and $\sigma = 1.5$, angle $a_5$ scores $1.00$, its neighbors $a_4$ and $a_6$ score about $0.80$, and the far edges $a_1$/$a_9$ score about $0.03$. A uniformly random angle averages about $0.42$, which is the baseline the policy has to beat.
+
+The episode ends after that single shot, so there is no next state and no future reward. That is exactly what the code below sets up: a `Box` observation, a `Discrete` action space, and this reward in `step`.
+
 Here is the core of the bandit training loop we build in this blog. The policy network maps a constant state to 9 logits, softmax turns them into probabilities, and we sample:
 
 ```python
