@@ -128,7 +128,11 @@ This is the naive gradient, and it has a fatal flaw. It needs $R(a)$ for _every_
 
 ### 2.3 The score-function trick (the one clean derivation)
 
-One identity does the job. Start from the chain rule applied to $\log$:
+**Why reach for the log at all?** Go back to what broke in Section 2.2. The naive gradient is a sum over every action, and we cannot evaluate it. The one thing we _can_ do in practice is sample actions from the policy and average what we see. A sum that we can estimate by sampling has a special name: an **expectation**. And an expectation under the policy always has the same shape, $\sum_a \pi_\theta(a) \cdot [\dots]$, with each term weighted by the probability of that action. That weight is what lets us replace "sum over all actions" with "average over the actions we actually drew."
+
+Now look at our sum, $\sum_a R(a) \cdot \nabla_\theta \pi_\theta(a)$. It has no $\pi_\theta(a)$ out front, so it is not yet an expectation we can sample. The whole job is to manufacture that missing $\pi_\theta(a)$ factor. The trick is to multiply and divide each term by $\pi_\theta(a)$, and the quantity $\nabla_\theta \pi_\theta(a) / \pi_\theta(a)$ is exactly the derivative of $\log \pi_\theta(a)$. That is the only reason the log appears: it is the identity that pulls a $\pi_\theta(a)$ to the front and leaves behind a sum we can sample.
+
+Here is that identity, from the chain rule applied to $\log$:
 
 $$\nabla_\theta \log \pi_\theta(a) = \frac{\nabla_\theta \pi_\theta(a)}{\pi_\theta(a)}$$
 
