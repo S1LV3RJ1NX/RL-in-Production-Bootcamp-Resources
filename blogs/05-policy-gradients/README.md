@@ -370,17 +370,44 @@ The loss uses only the sampled action $a_6$:
 
 $$L = -r \cdot \log \pi(a_6)$$
 
-A natural guess: "we only have a gradient for $a_6$." That guess is **wrong**. The softmax denominator ties all nine logits together:
+A natural guess: "we only have a gradient for $a_6$." That guess is **wrong**, and here is the derivation that shows why, one line at a time.
 
-$$\log \pi(a_6) = z_6 - \log \sum_k e^{z_k}$$
+**Step 1: rewrite $\log \pi(a_6)$ using the softmax.** The policy turns logits into probabilities with a softmax, $\pi(a_6) = \dfrac{e^{z_6}}{\sum_k e^{z_k}}$. Take the log of that fraction, using the rule $\log \frac{A}{B} = \log A - \log B$:
 
-That sum $\sum_k$ contains _all nine_ logits. So the loss depends on every $z_k$, and the gradient touches all nine:
+$$\log \pi(a_6) = \log e^{z_6} - \log \sum_k e^{z_k} = z_6 - \log \sum_k e^{z_k}$$
 
-$$\frac{\partial L}{\partial z_k} = -r \cdot \big(\mathbb{1}[k = a_6] - \pi(a_k)\big)$$
+The first term $z_6$ is just the taken logit. The second term, the log of the normalizer, contains **every** logit $z_1 \dots z_9$. That is the whole point: the instant you normalize, the loss is wired to all nine logits at once.
 
-For the **taken** angle $a_6$: gradient $\propto +(1 - \pi_6)$, push **up**.
-For each **other** angle: gradient $\propto -\pi_k$, push **down**.
-All nine pushes **sum to zero**: probability is conserved, only redistributed.
+**Step 2: differentiate with respect to one logit $z_k$.** Substitute that expansion into $L = -r\,(z_6 - \log \sum_j e^{z_j})$ and differentiate:
+
+$$\frac{\partial L}{\partial z_k} = -r\left(\frac{\partial z_6}{\partial z_k} - \frac{\partial}{\partial z_k}\log \sum_j e^{z_j}\right)$$
+
+Take the two pieces inside the bracket separately. The first one:
+
+$$\frac{\partial z_6}{\partial z_k} = \mathbb{1}[k = a_6]$$
+
+The logits are independent inputs, so $z_6$ only changes when we wiggle $z_6$ itself. This equals $1$ when $k = a_6$ and $0$ otherwise, which is exactly what the indicator $\mathbb{1}[\cdot]$ means. The second one:
+
+$$\frac{\partial}{\partial z_k}\log \sum_j e^{z_j} = \frac{e^{z_k}}{\sum_j e^{z_j}} = \pi(a_k)$$
+
+The derivative of a log is $1/(\text{inside})$ times the derivative of the inside, and the derivative of $\sum_j e^{z_j}$ with respect to $z_k$ is just $e^{z_k}$. The ratio that pops out is exactly the softmax probability of angle $k$.
+
+**Step 3: put the pieces back together.**
+
+$$\frac{\partial L}{\partial z_k} = -r\big(\mathbb{1}[k = a_6] - \pi(a_k)\big)$$
+
+This is nonzero for **every** $k$, because $\pi(a_k) > 0$ for all nine angles. One sampled action, nine gradients.
+
+**Step 4: read off the direction.** The optimizer moves each logit opposite the loss gradient (it subtracts it), so the actual push is $-\partial L / \partial z_k = r\big(\mathbb{1}[k = a_6] - \pi(a_k)\big)$:
+
+- **Taken angle $a_6$** ($\mathbb{1} = 1$): push $\propto +r(1 - \pi_6) > 0$, so its logit goes **up** and $a_6$ becomes more likely.
+- **Every other angle** ($\mathbb{1} = 0$): push $\propto -r\,\pi_k < 0$, so its logit goes **down** and that angle becomes less likely.
+
+**Step 5: the nine pushes sum to zero.**
+
+$$\sum_k \big(\mathbb{1}[k = a_6] - \pi(a_k)\big) = \underbrace{\sum_k \mathbb{1}[k = a_6]}_{=\,1} - \underbrace{\sum_k \pi(a_k)}_{=\,1} = 0$$
+
+The one-hot contributes $1$, the probabilities sum to $1$, and they cancel. Probability is conserved: whatever $a_6$ gains, the other eight give up. The update **redistributes** the fan, it never inflates it.
 
 ![The nine per-logit gradient pushes from one REINFORCE update, showing one positive bar for the taken action and eight negative bars that sum to zero](./images/fig-logit-gradients.svg)
 
@@ -418,6 +445,15 @@ for i, g in enumerate(grads):
 # all nine gradients sum to exactly zero: probability is conserved,
 # only redistributed among angles, never created or destroyed
 print(f"  sum: {grads.sum():.6f}")
+
+# one REINFORCE step (this is the fan in the figure below): the optimizer
+# subtracts the loss-gradient from the logits, so a6 rises and the other
+# eight fall; lr is the step size, here a small illustrative value
+lr = 0.16
+new_logits = logits - lr * grads
+after = np.exp(new_logits) / np.exp(new_logits).sum()
+print("\npolicy before:", [f"{p:.3f}" for p in probs])
+print("policy after :", [f"{p:.3f}" for p in after])
 ```
 
 ```text title="Output"
@@ -432,6 +468,9 @@ Per-logit gradients (r=0.9, taken=a6):
   a8: +0.057
   a9: +0.038
   sum: 0.000000
+
+policy before: ['0.042', '0.063', '0.094', '0.172', '0.256', '0.172', '0.094', '0.063', '0.042']
+policy after : ['0.042', '0.062', '0.093', '0.167', '0.246', '0.193', '0.093', '0.062', '0.042']
 ```
 
 (Note: the signs are the gradient of the _loss_ $L = -r \log\pi(a_6)$; the optimizer subtracts this from the logits, so a6's logit rises and the others fall, exactly as expected.)
@@ -442,11 +481,11 @@ $$\frac{\partial L}{\partial \theta_j} = \sum_{k=1}^{9} \frac{\partial L}{\parti
 
 Every logit $z_k$ is built from the same shared weights $\theta$, so the chain rule adds up all nine influences. The result is one gradient per weight and one Adam step, not nine.
 
-**One update, by hand.** Take the same fan the snippet used, $\pi = [0.042, 0.063, 0.094, 0.172, 0.256, 0.172, 0.094, 0.063, 0.042]$ (peaked at $a_5$), and suppose we sample $a_6$ and score $r = 0.9$. The per-logit gradients are exactly the ones printed above: $-0.745$ on the taken angle $a_6$, small positives on the other eight, summing to zero. Now take one optimizer step at learning rate $\alpha = 0.1$. Each logit moves by $-\alpha \cdot \partial L / \partial z_k$, so $a_6$ rises and every other angle drops a little. The fan tilts toward the shot that scored well.
+**One update, by hand.** Take the same fan the snippet used, $\pi = [0.042, 0.063, 0.094, 0.172, 0.256, 0.172, 0.094, 0.063, 0.042]$ (peaked at $a_5$), and suppose we sample $a_6$ and score $r = 0.9$. The per-logit gradients are exactly the ones printed above: $-0.745$ on the taken angle $a_6$, small positives on the other eight, summing to zero. Now take one optimizer step at learning rate $\alpha \approx 0.16$. Each logit moves by $-\alpha \cdot \partial L / \partial z_k$, so $a_6$ rises and every other angle drops a little. The fan tilts toward the shot that scored well.
 
 ![Policy fan before and after one REINFORCE update, showing the shift toward the taken action](./images/fig-policy-fan.svg)
 
-The figure shows the nine-angle fan before and after that single step: the bar on $a_6$ grows while the other eight shrink, and the total stays at 1. **A single sample moves all nine logits, not just the one you tried. Probability is redistributed, never created.**
+The figure shows the nine-angle fan before and after that single step: the bar on $a_6$ grows while the other eight shrink, and the total stays at 1. These are exactly the `policy before` and `policy after` rows the snippet prints (one step at `lr ≈ 0.16`). **A single sample moves all nine logits, not just the one you tried. Probability is redistributed, never created.**
 
 <details>
 <summary><strong>Check:</strong> The policy gave nine probabilities but we sampled only a6. Why does the update change all nine angles, not just a6?</summary>
@@ -486,26 +525,37 @@ $$\hat{g} = (R - b) \cdot \nabla_\theta \log \pi_\theta(a)$$
 
 We call the centered weight the **advantage** $A = R - b$. Better than baseline pushes up ($A > 0$); worse pushes down ($A < 0$). The estimator now takes both signs and mostly cancels, dramatically cutting variance.
 
-**Zero-bias proof.** We subtracted $b$, so we added a term $-b \cdot \nabla \log \pi(a)$. Does that bias the gradient? Take its expectation step by step:
+**Zero-bias proof.** We subtracted $b$, so we added a term $-b \cdot \nabla \log \pi(a)$. Does that bias the gradient? We show its expectation is zero, one equality at a time.
 
-$$\mathbb{E}_{a \sim \pi}[b \cdot \nabla \log \pi(a)] = b \cdot \sum_a \pi(a) \nabla \log \pi(a) = b \cdot \sum_a \nabla \pi(a) = b \cdot \nabla \underbrace{\sum_a \pi(a)}_{=1} = b \cdot \nabla(1) = 0$$
+Start from the term we added and turn the expectation into a sum. An expectation under $\pi$ is just "sum over all actions, each weighted by its probability $\pi(a)$," and the constant $b$ pulls out front:
 
-Walk through each `=` sign:
+$$\mathbb{E}_{a \sim \pi}[b \cdot \nabla \log \pi(a)] = b \cdot \sum_a \pi(a)\, \nabla \log \pi(a)$$
 
-1. **Expectation becomes a weighted sum.** $\mathbb{E}_{a \sim \pi}[\cdot]$ means "sum over all actions, each weighted by its probability $\pi(a)$." The constant $b$ pulls out of the sum.
-2. **Undo the log-derivative trick.** Recall $\pi(a) \cdot \nabla \log \pi(a) = \nabla \pi(a)$ (the identity from Section 2.3, just run in reverse). So $\pi(a) \nabla \log \pi(a)$ collapses back to $\nabla \pi(a)$.
-3. **Swap sum and gradient.** $\sum_a \nabla \pi(a) = \nabla \sum_a \pi(a)$. The sum of all action probabilities is 1 by definition (it is a probability distribution).
-4. **Gradient of a constant is zero.** $\nabla(1) = 0$. No matter how you change $\theta$, probabilities still sum to 1, so the derivative of that sum is always zero.
+Now undo the log-derivative trick. From Section 2.3 we have the identity $\pi(a)\, \nabla \log \pi(a) = \nabla \pi(a)$ (the same trick, just run in reverse), so the $\pi(a)$ and the $\nabla \log$ collapse into a single $\nabla \pi(a)$:
+
+$$b \cdot \sum_a \pi(a)\, \nabla \log \pi(a) = b \cdot \sum_a \nabla \pi(a)$$
+
+Swap the sum and the gradient. Both are linear operations, so adding up then differentiating equals differentiating then adding up:
+
+$$b \cdot \sum_a \nabla \pi(a) = b \cdot \nabla \sum_a \pi(a)$$
+
+Finally, the sum of all action probabilities is $1$ by definition (it is a probability distribution), and the gradient of the constant $1$ is $0$, no matter how you change $\theta$:
+
+$$b \cdot \nabla \underbrace{\sum_a \pi(a)}_{=\,1} = b \cdot \nabla(1) = 0$$
 
 The punchline: the baseline term vanishes _in expectation_. Subtracting $b$ changes the _variance_ of the estimator but not its _mean_. We still climb the same $J$, just with far less noise.
 
 **The push magnitude.** We know REINFORCE pushes good actions up and bad actions down. But _how hard_ does it push? That depends on how surprised the policy is by its own choice.
 
-For a softmax policy, the gradient of $\log \pi(a)$ with respect to the logit $z_a$ of the chosen action is:
+For a softmax policy, we can derive the gradient of $\log \pi(a)$ with respect to the logit $z_a$ of the chosen action directly. Start from the same softmax expansion we used in Section 2.5:
+
+$$\log \pi(a) = z_a - \log \sum_j e^{z_j}$$
+
+Differentiate with respect to $z_a$, one term at a time. The first term is simply $\partial z_a / \partial z_a = 1$. The second term is the log-normalizer again, whose derivative with respect to $z_a$ is $e^{z_a} / \sum_j e^{z_j} = \pi(a)$:
 
 $$\frac{\partial \log \pi(a)}{\partial z_a} = 1 - \pi(a)$$
 
-Read it as: "one minus the probability the policy already assigned to that action." This is the **score function** for the taken action, and it controls how big the parameter update is. Two concrete cases make the intuition click:
+This is just the $k = a$ case of the per-logit gradient from Section 2.5, where the indicator $\mathbb{1}[k = a]$ equals $1$. Read it as: "one minus the probability the policy already assigned to that action." This is the **score function** for the taken action, and it controls how big the parameter update is. Two concrete cases make the intuition click:
 
 - **Surprising action pays off.** The archer tries angle 7, which the policy thought was unlikely ($\pi(a_7) = 0.05$). It scores well. The push magnitude is $1 - 0.05 = 0.95$: a large update. The policy had a lot to learn from this surprise.
 - **Confident action pays off.** The archer tries angle 5, which the policy already favored ($\pi(a_5) = 0.80$). It scores well. The push magnitude is $1 - 0.80 = 0.20$: a small update. The policy already knew this was good; confirming it again does not warrant a big change.
