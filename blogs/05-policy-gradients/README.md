@@ -103,7 +103,7 @@ $$J(\theta) = \mathbb{E}_{a \sim \pi_\theta}[R(a)] = \sum_a \pi_\theta(a) \cdot 
 
 Read it aloud, symbol by symbol: "$J$ of $\theta$ equals the expected value ($\mathbb{E}$) of the reward $R(a)$, when the action $a$ is drawn from the policy $\pi_\theta$ (that is what $a \sim \pi_\theta$ means); and that expected value is the same thing as the sum, over every action $a$, of $\pi_\theta(a)$ times $R(a)$." The two halves are equal because an expectation _is_ a probability-weighted average: you weight each action's reward by how often the policy plays it.
 
-In plain English: for every action the agent could take, multiply the chance of taking it ($\pi_\theta(a)$) by the reward it would earn ($R(a)$), and add them all up. The result is the average reward you would see if you kept sampling from the current policy. $J$ is a function of the policy parameters $\theta$: change $\theta$, the probabilities shift, the weighted sum changes, and $J$ goes up or down. It goes up when we put more probability on higher-reward actions. **The whole goal: gradient ascent on $J$.**
+$J$ is a function of the policy parameters $\theta$: change $\theta$, the probabilities shift, the weighted sum changes, and $J$ goes up or down. It goes up when we put more probability on higher-reward actions. **The whole goal: gradient ascent on $J$.**
 
 $$\theta \leftarrow \theta + \alpha \cdot \nabla_\theta J(\theta)$$
 
@@ -147,8 +147,6 @@ $$\nabla_\theta J = \sum_a R(a) \cdot \nabla_\theta \pi_\theta(a) = \sum_a \pi_\
 The leading $\pi_\theta(a)$ is exactly the probability of sampling $a$, so the sum becomes an expectation:
 
 $$\boxed{\nabla_\theta J = \mathbb{E}_{a \sim \pi_\theta}\big[R(a) \cdot \nabla_\theta \log \pi_\theta(a)\big]}$$
-
-**That is why $\log \pi$ appears in every policy-gradient method.** The score-function trick rewrites a sum over all actions as an expectation over the agent's own behavior. We never need the reward of an action we did not try. One sampled action gives one unbiased gradient estimate.
 
 <details>
 <summary><strong>Check:</strong> The naive gradient needed the reward of every possible action. After the score-function trick, we only need the reward of the one action we sampled. Where did the other actions go?</summary>
@@ -195,7 +193,9 @@ The estimator from Section 2.3 is REINFORCE. Each episode: sample an action, see
 
 $$\hat{g} = R(a) \cdot \nabla_\theta \log \pi_\theta(a), \quad a \sim \pi_\theta$$
 
-Read it as: "sample one action $a$ from the current policy, observe its reward $R(a)$, compute how to nudge the parameters to make $a$ more likely ($\nabla_\theta \log \pi_\theta(a)$), and scale that nudge by how good the reward was." Good reward, big push toward that action; bad reward, small push (or a push away if $R$ is negative). One sample gives one noisy estimate $\hat{g}$ of the true gradient.
+Read it aloud, symbol by symbol: "the gradient estimate $\hat{g}$ equals the reward $R(a)$ times the gradient with respect to $\theta$ of $\log \pi_\theta(a)$, for an action $a$ sampled from the policy $\pi_\theta$ ($a \sim \pi_\theta$)."
+
+The scaling lives in that multiplication. $\nabla_\theta \log \pi_\theta(a)$ is a **vector**: the direction in parameter space that makes action $a$ more likely (the "nudge"). $R(a)$ is a single **number** sitting in front of it, so multiplying just stretches or shrinks that direction without rotating it. A big reward makes the nudge long (push hard toward $a$); a small reward makes it short; a negative reward flips the sign (push away from $a$). So in $\hat{g} = R(a) \cdot \nabla_\theta \log \pi_\theta(a)$, the "$\cdot$" _is_ the scaling and $R(a)$ is the scale factor. One sample gives one noisy estimate $\hat{g}$ of the true gradient.
 
 In the bandit there is no future, so the weight on the chosen angle is simply its reward $r$. No returns, no credit assignment. One shot, one reward, one push.
 
@@ -418,7 +418,7 @@ The figure shows the nine-angle fan before and after that single step: the bar o
 <details>
 <summary><strong>Check:</strong> In the example the reward was 0.9 (a big push on a6). Redo it for a near-miss that scored only 0.1: which way does a6 move, and by how much?</summary>
 
-**Answer.** The weight is just the reward, 0.1 > 0, so a6 still moves UP, only about a ninth as far ((1-.172)*0.1 ≈ +0.083 on its logit, versus +0.745 before), with the other eight nudged down proportionally. The catch: with the reward alone, _every_ shot pushes the taken angle up. Only the size changes. That one-sidedness is wasteful, and it is exactly what the baseline in Section 2.6 fixes.
+**Answer.** The weight is just the reward, 0.1 > 0, so a6 still moves UP, only about a ninth as far ((1-.172)\*0.1 ≈ +0.083 on its logit, versus +0.745 before), with the other eight nudged down proportionally. The catch: with the reward alone, _every_ shot pushes the taken angle up. Only the size changes. That one-sidedness is wasteful, and it is exactly what the baseline in Section 2.6 fixes.
 
 </details>
 
