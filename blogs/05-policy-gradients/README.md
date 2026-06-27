@@ -211,7 +211,9 @@ Read it aloud: the reward of angle $a$ is $e$ raised to minus the squared distan
 
 The episode ends after that single shot, so there is no next state and no future reward. That is exactly what the code below sets up: a `Box` observation, a `Discrete` action space, and this reward in `step`.
 
-Here is the core of the bandit training loop we build in this blog. The policy network maps a constant state to 9 logits, softmax turns them into probabilities, and we sample:
+**One training knob: the entropy bonus.** The policy is a probability distribution over the 9 angles, and its _entropy_ $H(\pi) = -\sum_a \pi(a) \log \pi(a)$ measures how spread out it is: high when the nine probabilities are even (the policy is still exploring), near zero when one angle dominates (the policy has committed). Each call to `act` returns this entropy next to the log-probability, straight from the `Categorical` distribution. We add a small $+\,\texttt{ent\_coef} \cdot H$ term to the objective so the policy pays a penalty for collapsing onto one angle too soon, which keeps it trying all nine until it has actually found the bullseye. It appears in the loss as the `- ent_coef * ent` piece, and Section 2.12 ablates it.
+
+Here is the full bandit training loop. The policy network maps the constant state to 9 logits, `Categorical` turns them into probabilities, and we sample one angle. Because the bandit always terminates after one shot, **each episode is a single step**, so there is no inner while-loop here (the MDP in Section 2.9 adds one):
 
 ```python
 import gymnasium as gym
@@ -223,7 +225,7 @@ class ArcherBandit(gym.Env):
     # 9 discrete angles (0-8), bullseye at index 4, spread 1.5
     N_ANGLES, TARGET, SIGMA = 9, 4, 1.5
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         # observation_space declares what a state looks like. spaces.Box is the
         # space for continuous values: Box(low, high, shape, dtype), so this is a
@@ -234,32 +236,36 @@ class ArcherBandit(gym.Env):
         # (here the 9 release angles a1..a9)
         self.action_space = spaces.Discrete(self.N_ANGLES)
 
-    def reset(self, *, seed=None, options=None):
+    def reset(self, *, seed: int | None = None, options: dict | None = None
+              ) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         # constant dummy state
         return np.array([0.], np.float32), {}
 
-    def step(self, a):
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict]:
         # reward = Gaussian bell curve exp(-(a - target)^2 / (2σ^2))
         # it peaks at 1.0 when a == TARGET (dead center) and falls
         # smoothly toward 0 as a moves away from the bullseye
-        r = float(np.exp(-((a - self.TARGET)**2) / (2*self.SIGMA**2)))
+        r = float(np.exp(-((action - self.TARGET)**2) / (2*self.SIGMA**2)))
         # terminated=True: bandit episodes are always one step
         return np.array([0.], np.float32), r, True, False, {}
 
 # ── Policy network ──────────────────────────────────────────────
 class Policy(nn.Module):
-    def __init__(self, obs_dim, n_act, h=64):
+    def __init__(self, obs_dim: int, n_act: int, h: int = 64) -> None:
         super().__init__()
         # two-layer MLP: obs -> hidden (tanh) -> one logit per action
         self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, n_act))
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # raw logits; softmax is applied by Categorical
         return self.net(x)
 
 # ── Action sampling ─────────────────────────────────────────────
-def act(policy, state_np):
+# state_np is the observation straight from the env: a NumPy array (here [0.]).
+# the _np suffix is a reminder it is NumPy and must be cast to a tensor first
+def act(policy: nn.Module, state_np: np.ndarray
+        ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     st = torch.tensor(state_np, dtype=torch.float32)
     # Categorical takes raw logits and applies softmax internally
     dist = torch.distributions.Categorical(logits=policy(st))
@@ -270,12 +276,14 @@ def act(policy, state_np):
     return action, dist.log_prob(action), dist.entropy()
 
 # ── Training loop ───────────────────────────────────────────────
-def train_bandit(episodes=1500, lr=0.01, ent_coef=0.1):
+def train_bandit(episodes: int = 1500, lr: float = 0.01, ent_coef: float = 0.1
+                 ) -> tuple[Policy, list[float]]:
     env = ArcherBandit()
     pol = Policy(1, env.N_ANGLES)
     opt = torch.optim.Adam(pol.parameters(), lr)
     hist = []
     for ep in range(episodes):
+        # one episode = one shot: reset, sample an angle, step once, then update
         s, _ = env.reset()
         a, logp, ent = act(pol, s)
         _, r, *_ = env.step(int(a))
