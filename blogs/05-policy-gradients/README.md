@@ -314,11 +314,25 @@ argmax = a5  (bullseye = a5)
 
 The fan sharpens onto the bullseye: all probability concentrates on angle 5 (the target, since TARGET=4 is zero-indexed). The loss line `-(r * logp) - ent_coef * ent` is the entire algorithm: weight the log-probability of the taken action by its reward (the REINFORCE estimator) and add an entropy bonus to keep exploring.
 
-**The important subtlety: that loss is the gradient we derived, in disguise.** What we worked out by hand was a _gradient_, not a loss: the estimator $\hat{g} = R(a)\,\nabla_\theta \log \pi_\theta(a)$, which we wanted to climb with gradient _ascent_, $\theta \leftarrow \theta + \alpha\,\hat{g}$. But PyTorch optimizers only ever _minimize_: `opt.step()` does $\theta \leftarrow \theta - \alpha\,\nabla_\theta L$. So we define a surrogate loss whose gradient is exactly $-\hat{g}$:
+**The important subtlety: that loss is the gradient we derived, in disguise.** What we worked out by hand was a _gradient_, not a loss. It was the estimator
 
-$$L(\theta) = -\,R(a)\,\log \pi_\theta(a) \quad\Rightarrow\quad \nabla_\theta L = -\,R(a)\,\nabla_\theta \log \pi_\theta(a) = -\hat{g}$$
+$$\hat{g} = R(a)\,\nabla_\theta \log \pi_\theta(a),$$
 
-Minimizing this $L$ then _is_ ascending $J$: $\theta \leftarrow \theta - \alpha\,\nabla_\theta L = \theta + \alpha\,\hat{g}$. That single minus sign is the "negated because optimizers minimize" in the comment, and in the bandit $R(a)$ is just the immediate reward `r`, so `-(r * logp)` is literally $-R(a)\log\pi_\theta(a)$. Two things make the match exact. First, `r` is a constant with respect to $\theta$ (it comes from the environment and carries no gradient), so the gradient flows _only_ through $\log \pi_\theta(a)$, the same reason the hand derivation treated $R(a)$ as a constant multiplier. Second, the numeric _value_ of `loss` is not meaningful and you should not read it as "how wrong we are": it is a stand-in whose only job is to make `backward()` produce $-\hat{g}$. The extra `- ent_coef * ent` term is not part of the derived gradient at all; it is a separate entropy regularizer bolted on to slow premature collapse.
+which we wanted to climb with gradient _ascent_:
+
+$$\theta \leftarrow \theta + \alpha\,\hat{g}.$$
+
+But PyTorch optimizers only ever _minimize_; `opt.step()` does $\theta \leftarrow \theta - \alpha\,\nabla_\theta L$. So we define a surrogate loss whose gradient is exactly $-\hat{g}$:
+
+$$L(\theta) = -\,R(a)\,\log \pi_\theta(a) \quad\Rightarrow\quad \nabla_\theta L = -\,R(a)\,\nabla_\theta \log \pi_\theta(a) = -\hat{g}.$$
+
+Minimizing this $L$ is therefore the same as ascending $J$:
+
+$$\theta \leftarrow \theta - \alpha\,\nabla_\theta L = \theta + \alpha\,\hat{g}.$$
+
+That single minus sign is the "negated because optimizers minimize" in the comment. In the bandit $R(a)$ is just the immediate reward `r`, so `-(r * logp)` is literally $-R(a)\log\pi_\theta(a)$.
+
+Two things make the match exact. First, `r` is a constant with respect to $\theta$ (it comes from the environment and carries no gradient), so the gradient flows _only_ through $\log \pi_\theta(a)$, the same reason the hand derivation treated $R(a)$ as a constant multiplier. Second, the numeric _value_ of `loss` is not meaningful, and you should not read it as "how wrong we are": it is a stand-in whose only job is to make `backward()` produce $-\hat{g}$. The extra `- ent_coef * ent` term is not part of the derived gradient at all; it is a separate entropy regularizer bolted on to slow premature collapse.
 
 <details>
 <summary><strong>Check:</strong> DQN happily trained on stale transitions from a replay buffer. Why can't REINFORCE do the same?</summary>
