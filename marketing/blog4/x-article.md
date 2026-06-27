@@ -2,7 +2,7 @@
 
 ## Schedule
 
-- **Date:** Wednesday, July 15, 2026
+- **Date:** Tuesday, July 14, 2026 (same day as the LinkedIn launch)
 - **Time:** 9:00 AM IST
 - **Self-reply:** Post within 5 minutes of publishing
 - **Quote-repost:** Same day, ~5:30-6:00 PM (different hook)

@@ -124,24 +124,34 @@ Skip hashtags in threads (they hurt engagement on X). Use them only in standalon
 
 ## Posting Schedule (data-backed for 2026)
 
+**The cadence: a new blog every Tuesday, a follow-up on the same blog every other day.**
+Tuesday is launch day (the strongest day for reach). The remaining six days each run one
+follow-up post about that same blog, on both LinkedIn and X, until the next Tuesday's launch.
+Post around **10:30 AM IST** daily.
+
 **Key findings from 4.8M+ posts analyzed:**
 - LinkedIn peak engagement: Tuesday–Thursday, 10 AM–2 PM or 3–5 PM local time
-- LinkedIn worst days: Monday (lowest engagement of the week), weekends
+- LinkedIn worst days: Monday (lowest), weekends (slow), so keep those days light follow-ups
 - Wednesday is consistently the #1 day across all studies
-- X algorithm rewards dwell time above all else — long-form Articles beat threads for tutorials
+- X algorithm rewards dwell time above all else: long-form Articles beat threads for tutorials
 
 | Day | Platform | Content |
 |-----|----------|---------|
-| Tuesday | LinkedIn | Main blog promotion post (10 AM–12 PM IST) |
-| Wednesday | X | Article (long-form) for the same blog (9 AM IST) |
-| Thursday | LinkedIn | Follow-up: "One equation explained" mini-post (3–5 PM IST) |
-| Friday | X | Quote-repost your Wednesday article with a new hook |
+| Tuesday | LinkedIn + X | **Launch the new blog**: long-form LinkedIn post + X Article (10:30 AM IST) |
+| Wednesday | LinkedIn + X | Follow-up 1 on the same blog |
+| Thursday | LinkedIn + X | Follow-up 2 |
+| Friday | LinkedIn + X | Follow-up 3 (also quote-repost Tuesday's X article with a new hook) |
+| Saturday | LinkedIn + X | Follow-up 4 (lighter angle) |
+| Sunday | LinkedIn + X | Follow-up 5 (lighter angle) |
+| Monday | LinkedIn + X | Follow-up 6 (last teaser before Tuesday's new blog) |
 
-**DO NOT post on:** Monday (ramp-up day, low engagement), Saturday/Sunday (dead).
+Each blog's follow-up posts (Wed–Mon) are pre-written in that blog's
+`marketing/blogN/follow-ups.md`, one numbered angle per day, ready to copy-paste.
 
 Best posting times (IST):
-- LinkedIn: 10:00 AM–12:00 PM or 3:00–5:00 PM (Tue–Thu)
-- X: 9:00–10:00 AM or 5:00–6:00 PM (any weekday)
+- LinkedIn: 10:00 AM–12:00 PM or 3:00–5:00 PM (the Tuesday launch and Wed–Thu follow-ups hit hardest)
+- X: 9:00–10:30 AM or 5:00–6:00 PM
+- Weekend/Monday follow-ups still go out, just treat them as lighter touches, not the big swings.
 
 ---
 
@@ -160,16 +170,20 @@ Best posting times (IST):
 
 ## Series Progress Tracker
 
-Cadence: **one blog per week**.
+Cadence: **one blog per week, launched every Tuesday** (LinkedIn post + X Article the same
+day). The other six days (Wed–Mon) run follow-ups on that same blog from its `follow-ups.md`.
 
-| Blog | Title | LinkedIn | X Article |
+| Blog | Title | LinkedIn (launch) | X Article (launch) |
 |------|-------|------|------|
 | 01 | RL from First Principles | ☐ Thu Jun 25 (~12:45 PM) | ☐ Thu Jun 25 (~12:45 PM) |
-| 02 | MDPs & Bellman Equations | ☐ Tue Jun 30 (10 AM) | ☐ Tue Jun 30 (10 AM) |
-| 03 | DP, Monte Carlo & TD | ☐ Tue Jul 7 | ☐ Wed Jul 8 |
-| 04 | SARSA, Q-learning & DQN | ☐ Tue Jul 14 | ☐ Wed Jul 15 |
-| 05 | Policy Gradients | ☐ Tue Jul 21 | ☐ Wed Jul 22 |
-| 06 | TRPO & PPO | ☐ Tue Jul 28 | ☐ Wed Jul 29 |
+| 02 | MDPs & Bellman Equations | ☐ Tue Jun 30 (10:30 AM) | ☐ Tue Jun 30 (10:30 AM) |
+| 03 | DP, Monte Carlo & TD | ☐ Tue Jul 7 | ☐ Tue Jul 7 |
+| 04 | SARSA, Q-learning & DQN | ☐ Tue Jul 14 | ☐ Tue Jul 14 |
+| 05 | Policy Gradients | ☐ Tue Jul 21 | ☐ Tue Jul 21 |
+| 06 | TRPO & PPO | ☐ Tue Jul 28 | ☐ Tue Jul 28 |
+
+> Blog 01 was already live (it is the prerequisites post), so it launched on a Thursday and
+> gets a short follow-up run; from Blog 02 onward, every launch lands on a Tuesday.
 
 ---
 
