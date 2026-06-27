@@ -3,7 +3,15 @@ title: "Policy Gradients: Learning the Policy Directly, from a Bandit to Actor-C
 shortName: "Policy Gradients"
 date: "2026-06-17"
 summary: "Stop learning values and reading a policy off them: parameterize the policy and climb expected reward directly. We derive the score-function trick on a one-state Archer bandit, watch one softmax update touch all nine logits, kill the variance with a baseline, add states and credit assignment, and end on an Actor-Critic that solves the Archer MDP."
-tags: ["reinforcement-learning", "policy-gradients", "reinforce", "actor-critic", "advantage", "gymnasium"]
+tags:
+  [
+    "reinforcement-learning",
+    "policy-gradients",
+    "reinforce",
+    "actor-critic",
+    "advantage",
+    "gymnasium",
+  ]
 order: 5
 ---
 
@@ -11,8 +19,8 @@ order: 5
 
 ![An archer mid-draw aiming at a distant target, with a coach standing just behind observing, in a flat editorial illustration style with terracotta accents](./images/ai-hero.png)
 
-> **The throughline:** *The value of where I am is the reward I just got, plus a discounted value of where I'll land next.*
-> The [SARSA, Q-learning & DQN](../04-sarsa-qlearning-dqn/README.md) post used that sentence to learn $Q(s,a)$ and read a policy off it by argmax. This post throws out the middleman: **learn the policy $\pi(a \mid s;\theta)$ directly** and climb expected reward by gradient ascent. The throughline becomes the critic's job, while the actor learns *what to do*.
+> **The throughline:** _The value of where I am is the reward I just got, plus a discounted value of where I'll land next._
+> The [SARSA, Q-learning & DQN](../04-sarsa-qlearning-dqn/README.md) post used that sentence to learn $Q(s,a)$ and read a policy off it by argmax. This post throws out the middleman: **learn the policy $\pi(a \mid s;\theta)$ directly** and climb expected reward by gradient ascent. The throughline becomes the critic's job, while the actor learns _what to do_.
 
 ## 1. The intuition
 
@@ -22,7 +30,7 @@ For two lectures we estimated a value and let it choose actions for us: learn $Q
 
 There are two routes to a policy:
 
-- **Value-based (DQN, last lecture).** Learn $Q(s,a)$, then read the policy off it: $\pi(s) = \arg\max_a Q(s,a)$. The policy is *implicit*, a by-product of the values.
+- **Value-based (DQN, last lecture).** Learn $Q(s,a)$, then read the policy off it: $\pi(s) = \arg\max_a Q(s,a)$. The policy is _implicit_, a by-product of the values.
 - **Policy-based (this post).** Parameterize the policy itself, $\pi_\theta(a \mid s)$ (a network that outputs action probabilities), and adjust $\theta$ to make good actions more likely. The policy is the thing you learn.
 
 Three concrete situations break the argmax:
@@ -33,13 +41,13 @@ Three concrete situations break the argmax:
 
 **3. Smooth, direct optimization.** A tiny change in $Q$ can flip the argmax from one action to another, a discontinuous jump. Policy gradients move smoothly: a small step in $\theta$ nudges $\pi$, it never snaps it. And they climb expected return $J(\theta)$ directly, not a Bellman-error surrogate. (Recall the deadly triad from the [SARSA, Q-learning & DQN](../04-sarsa-qlearning-dqn/README.md) post: function approximation + bootstrapping + off-policy data can diverge. Policy gradients avoid off-policy data entirely.)
 
-**The honest cost.** Policy gradients are *on-policy* (each batch of experience is used once, then thrown away, so no replay buffer) and *high-variance* (the gradient is estimated from noisy sampled returns). The rest of this post earns the method and then pays that cost down.
+**The honest cost.** Policy gradients are _on-policy_ (each batch of experience is used once, then thrown away, so no replay buffer) and _high-variance_ (the gradient is estimated from noisy sampled returns). The rest of this post earns the method and then pays that cost down.
 
 ### The Archer: the simplest possible RL problem
 
 For most of this post the world has exactly one state. The **Archer** stands at a fixed spot and picks one of 9 discrete release angles $a_1 \dots a_9$. After shooting, the episode is over: reward = how close the arrow lands to the target (+1 dead centre, falling off with distance).
 
-A one-state, one-shot problem is called a **bandit**. Your action changes the reward, but never the next state, because there is no next state. That single property strips away returns, discounting, and credit assignment. What is left is the pure policy-gradient mechanism. We add states back in Section 2.7, once the mechanism is airtight.
+A one-state, one-shot problem is called a **bandit**. Your action changes the reward, but never the next state, because there is no next state. That single property strips away returns, discounting, and credit assignment. What is left is the pure policy-gradient mechanism. We add states back in the later sections, once the mechanism is airtight.
 
 ```mermaid
 flowchart LR
@@ -59,24 +67,28 @@ This diagram is the destination. We start at the top-left (state in, action out)
 <summary><strong>Check:</strong> The best policy in rock-paper-scissors is randomized. In one line, why can a stochastic policy represent "play each move a third of the time" but an argmax-over-Q cannot?</summary>
 
 **Answer.** An argmax always returns one fixed action, so it can only play one move, which an opponent then exploits. A stochastic policy outputs a probability for every action, so it can literally encode 1/3, 1/3, 1/3. Representing randomness needs a distribution, and only the policy gives you one.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> With a softmax policy we said exploration is "built in." Where does that exploration actually come from?</summary>
 
 **Answer.** From sampling. The policy is a probability distribution over actions and we draw the action from it, so we sometimes try non-top actions on our own. The randomness lives inside the policy; there is no separate epsilon to schedule by hand.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> A robot arm's torque is a real number. Why does argmax-over-Q break here, and what does a policy output instead?</summary>
 
 **Answer.** You cannot take an argmax over infinitely many actions, so value-based control has nothing to maximize over. A policy sidesteps that by outputting a distribution you can sample. For continuous actions, it outputs the mean and spread of a Gaussian.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> For almost all of this post the world has just one state (a bandit). What does having "no next state" let us ignore?</summary>
 
 **Answer.** Everything about the future: returns, discounting, and credit assignment. With no next state your action only changes this one reward, so the policy-gradient mechanism appears in its purest form. We add states (and those three things) back in Section 2.7.
+
 </details>
 
 ---
@@ -93,7 +105,7 @@ Read it as: "for every action the agent could take, multiply the chance of takin
 
 $$\theta \leftarrow \theta + \alpha \cdot \nabla_\theta J(\theta)$$
 
-We *maximize* reward, so we move *along* the gradient (ascent, the **+** sign), not against it. In code, optimizers minimize, so we descend on the loss $-J$: the minus sign you will see in every REINFORCE loop.
+We _maximize_ reward, so we move _along_ the gradient (ascent, the **+** sign), not against it. In code, optimizers minimize, so we descend on the loss $-J$: the minus sign you will see in every REINFORCE loop.
 
 ### 2.2 The obstacle: you cannot just differentiate the sum
 
@@ -101,7 +113,7 @@ The naive gradient is:
 
 $$\nabla_\theta J = \sum_a R(a) \cdot \nabla_\theta \pi_\theta(a)$$
 
-This needs $R(a)$ for *every* action, including the ones we never tried, and the sum is huge or infinite for large or continuous action sets. **We cannot evaluate it. We need to turn it into something we can sample.**
+This needs $R(a)$ for _every_ action, including the ones we never tried, and the sum is huge or infinite for large or continuous action sets. **We cannot evaluate it. We need to turn it into something we can sample.**
 
 ### 2.3 The score-function trick (the one clean derivation)
 
@@ -127,24 +139,28 @@ $$\boxed{\nabla_\theta J = \mathbb{E}_{a \sim \pi_\theta}\big[R(a) \cdot \nabla_
 <summary><strong>Check:</strong> The naive gradient needed the reward of every possible action. After the score-function trick, we only need the reward of the one action we sampled. Where did the other actions go?</summary>
 
 **Answer.** They were absorbed into the sampling distribution. The trick rewrote the sum over all actions as an expectation under the policy. An expectation is estimated by sampling from the policy itself, so the actions we do not take are accounted for by how often we would sample them, not by an explicit sum. One sampled action gives one unbiased gradient estimate.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why can't we actually compute the "naive" gradient sum_a R(a) * grad pi(a)?</summary>
 
 **Answer.** It needs the reward R(a) of every action, including all the ones we never tried, and that sum is huge (or infinite) for large or continuous action sets. There is simply nothing to evaluate it from.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> The score-function trick rewrites that sum as an expectation. Why is an expectation something we can handle when the sum was not?</summary>
 
 **Answer.** An expectation is estimated by sampling from the policy. So instead of summing over all actions, we just take the one action we actually sampled and use its reward, which is exactly the data the agent already collects.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why does "log pi" turn up in every policy-gradient method you will ever see?</summary>
 
 **Answer.** Because of the single identity $\nabla \pi = \pi \cdot \nabla \log \pi$. Multiplying by $\pi$ is what converts the sum-over-actions into an expectation-under-$\pi$, and that step leaves a $\nabla \log \pi$ behind. Every method inherits it from this one move.
+
 </details>
 
 <details>
@@ -155,6 +171,7 @@ $$\boxed{\nabla_\theta J = \mathbb{E}_{a \sim \pi_\theta}\big[R(a) \cdot \nabla_
 $$\sum_a R(a)\,\nabla \pi(a) = \sum_a \pi(a)\,R(a)\,\nabla \log \pi(a) = \mathbb{E}_{a \sim \pi}\!\big[R(a)\,\nabla \log \pi(a)\big]$$
 
 The leading $\pi(a)$ turns the sum over actions into an expectation under the policy, which we can estimate by sampling.
+
 </details>
 
 ### 2.4 REINFORCE: sample, observe, push
@@ -255,25 +272,29 @@ The fan sharpens onto the bullseye: all probability concentrates on angle 5 (the
 <details>
 <summary><strong>Check:</strong> DQN happily trained on stale transitions from a replay buffer. Why can't REINFORCE do the same?</summary>
 
-**Answer.** Because the gradient is an expectation under the *current* policy. The samples must come from today's policy. The moment you update theta, the old shots were drawn from the wrong distribution, so reusing them would bias the estimate. That is what "on-policy" means, and it is why REINFORCE is sample-hungry: each batch of shots is used once and thrown away.
+**Answer.** Because the gradient is an expectation under the _current_ policy. The samples must come from today's policy. The moment you update theta, the old shots were drawn from the wrong distribution, so reusing them would bias the estimate. That is what "on-policy" means, and it is why REINFORCE is sample-hungry: each batch of shots is used once and thrown away.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> In the bandit, the gradient weight is just the reward r, not a return or a discount. What feature of the bandit makes that okay?</summary>
 
 **Answer.** The bandit has no next state, so your action has no future to influence. There are no later rewards to add up. The "return" is just the single reward r. Returns and discounting only appear once actions change what happens next (Section 2.7).
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> One shot gives one gradient that's "correct on average." Why is a single shot still a poor guide?</summary>
 
 **Answer.** It is one draw of a very noisy quantity; its direction can land almost anywhere. Only the average over many shots converges to the true gradient. That noise is exactly what Section 2.6 fixes.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> REINFORCE is on-policy and DQN is off-policy; both are "model-free." In one sentence each, say what "on/off-policy" and "model-free" actually mean.</summary>
 
 **Answer.** On/off-policy: whether you learn about the same policy that generated the data (on) or a different one (off). Model-free: you never learn or use the transition model P(s'|s,a); you learn purely from sampled experience. They are independent axes: REINFORCE is on-policy and model-free; DQN is off-policy and model-free.
+
 </details>
 
 ### 2.5 The backward pass: all nine logits move
@@ -288,7 +309,7 @@ A natural guess: "we only have a gradient for $a_6$." That guess is **wrong**. T
 
 $$\log \pi(a_6) = z_6 - \log \sum_k e^{z_k}$$
 
-That sum $\sum_k$ contains *all nine* logits. So the loss depends on every $z_k$, and the gradient touches all nine:
+That sum $\sum_k$ contains _all nine_ logits. So the loss depends on every $z_k$, and the gradient touches all nine:
 
 $$\frac{\partial L}{\partial z_k} = -r \cdot \big(\mathbb{1}[k = a_6] - \pi(a_k)\big)$$
 
@@ -344,7 +365,7 @@ Per-logit gradients (r=0.9, taken=a6):
   sum: 0.000000
 ```
 
-(Note: the signs are the gradient of the *loss* $L = -r \log\pi(a_6)$; the optimizer subtracts this from the logits, so a6's logit rises and the others fall, exactly as expected.)
+(Note: the signs are the gradient of the _loss_ $L = -r \log\pi(a_6)$; the optimizer subtracts this from the logits, so a6's logit rises and the others fall, exactly as expected.)
 
 The nine logit-gradients form a single vector $\partial L / \partial \mathbf{z}$. We backprop it **once** (not nine times). Each weight's gradient is the sum of all nine logits' contributions via the chain rule:
 
@@ -356,24 +377,28 @@ Every logit $z_k$ is built from the same shared weights $\theta$, so the chain r
 <summary><strong>Check:</strong> The policy gave nine probabilities but we sampled only a6. Why does the update change all nine angles, not just a6?</summary>
 
 **Answer.** Because the softmax ties them together: pi(a6) is e^{z6} divided by the sum of all nine exponentials. Touching any logit changes that shared denominator, so the gradient is nonzero for every angle. The taken angle is pushed up and the other eight are nudged down, all through the normalizer.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Those nine pushes added up to zero. Why must they always sum to zero?</summary>
 
 **Answer.** Because the nine probabilities must always add to 1. You cannot create probability, only move it. So whatever you add to one angle has to come off the others. The update redistributes the fan; it does not grow it.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> In the example the reward was 0.9 (a big push on a6). Redo it for a near-miss that scored only 0.1: which way does a6 move, and by how much?</summary>
 
-**Answer.** The weight is just the reward, 0.1 > 0, so a6 still moves UP, only about a ninth as far ((1-.172)*0.1 ≈ +0.083 on its logit, versus +0.745 before), with the other eight nudged down proportionally. The catch: with the reward alone, *every* shot pushes the taken angle up. Only the size changes. That one-sidedness is wasteful, and it is exactly what the baseline in Section 2.6 fixes.
+**Answer.** The weight is just the reward, 0.1 > 0, so a6 still moves UP, only about a ninth as far ((1-.172)*0.1 ≈ +0.083 on its logit, versus +0.745 before), with the other eight nudged down proportionally. The catch: with the reward alone, *every\* shot pushes the taken angle up. Only the size changes. That one-sidedness is wasteful, and it is exactly what the baseline in Section 2.6 fixes.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> We visualize the gradient on the logits, but the actual parameters are the network weights theta. What single tool bridges the two, and why don't we update the logits directly?</summary>
 
 **Answer.** Backpropagation (the chain rule) bridges them: the logit-gradient is the entry point, and backprop turns it into a gradient for every weight. We cannot update logits directly because they are not parameters; they are recomputed from theta on every forward pass. Only theta persists.
+
 </details>
 
 ### 2.6 The variance problem and the baseline
@@ -397,9 +422,9 @@ Walk through each `=` sign:
 3. **Swap sum and gradient.** $\sum_a \nabla \pi(a) = \nabla \sum_a \pi(a)$. The sum of all action probabilities is 1 by definition (it is a probability distribution).
 4. **Gradient of a constant is zero.** $\nabla(1) = 0$. No matter how you change $\theta$, probabilities still sum to 1, so the derivative of that sum is always zero.
 
-The punchline: the baseline term vanishes *in expectation*. Subtracting $b$ changes the *variance* of the estimator but not its *mean*. We still climb the same $J$, just with far less noise.
+The punchline: the baseline term vanishes _in expectation_. Subtracting $b$ changes the _variance_ of the estimator but not its _mean_. We still climb the same $J$, just with far less noise.
 
-**The push magnitude.** We know REINFORCE pushes good actions up and bad actions down. But *how hard* does it push? That depends on how surprised the policy is by its own choice.
+**The push magnitude.** We know REINFORCE pushes good actions up and bad actions down. But _how hard_ does it push? That depends on how surprised the policy is by its own choice.
 
 For a softmax policy, the gradient of $\log \pi(a)$ with respect to the logit $z_a$ of the chosen action is:
 
@@ -410,58 +435,66 @@ Read it as: "one minus the probability the policy already assigned to that actio
 - **Surprising action pays off.** The archer tries angle 7, which the policy thought was unlikely ($\pi(a_7) = 0.05$). It scores well. The push magnitude is $1 - 0.05 = 0.95$: a large update. The policy had a lot to learn from this surprise.
 - **Confident action pays off.** The archer tries angle 5, which the policy already favored ($\pi(a_5) = 0.80$). It scores well. The push magnitude is $1 - 0.80 = 0.20$: a small update. The policy already knew this was good; confirming it again does not warrant a big change.
 
-The policy automatically spends its learning budget where it matters most: on actions it was *wrong* about, not on ones it already had right. This is built into the math of $\nabla \log \pi$; you get it for free.
+The policy automatically spends its learning budget where it matters most: on actions it was _wrong_ about, not on ones it already had right. This is built into the math of $\nabla \log \pi$; you get it for free.
 
 ![The push magnitude 1 minus pi(a) plotted against current probability, showing that surprising actions get bigger updates](./images/fig-score-push.svg)
 
-The near-optimal constant baseline is approximately the average return, $b^* \approx \mathbb{E}[G_t]$. An even better baseline is a *learned, per-state* value $V(s)$, which we will see in Section 2.8.
+The near-optimal constant baseline is approximately the average return, $b^* \approx \mathbb{E}[G_t]$. An even better baseline is a _learned, per-state_ value $V(s)$, which we will see in Section 2.8.
 
 <details>
 <summary><strong>Check:</strong> We subtract a baseline b to cut variance. A skeptic worries: "you changed the gradient, now you're optimizing the wrong thing." Why is the skeptic wrong?</summary>
 
 **Answer.** The baseline term has expectation exactly zero: $\mathbb{E}[b \cdot \nabla \log \pi(a)] = b \sum_a \pi(a) \nabla \log \pi(a) = b \cdot \nabla(1) = 0$. Subtracting $b$ changes the variance of the estimator but not its mean, so we still optimize $J$, just with less noise.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Without a baseline, for an all-positive reward every shot pushes its action's probability UP. Why does that one-sidedness make the noise so destructive?</summary>
 
 **Answer.** Because every sample agrees in direction, they never cancel. You get one big, one-sided number whose swings drown out the small real differences between actions. Subtracting a baseline lets the weight take both signs, so the noise cancels.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> After the baseline, A = R − b can be negative. What does a negative advantage do to the angle you took, and when does that happen?</summary>
 
 **Answer.** A negative advantage ($A < 0$) pushes that angle's probability **down**. It happens whenever the shot scored below the baseline ($R < b$, worse than average), so a disappointing outcome makes the action you tried less likely. Better-than-average ($A > 0$) pushes up; worse-than-average ($A < 0$) pushes down. This two-sided signal is exactly why the baseline cuts variance: without it, every weight was positive and all actions got pushed up indiscriminately.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> A student proposes a "baseline" equal to the return of the same trajectory, b = G_t, so the advantage is always 0. What goes wrong, and which rule does it violate?</summary>
 
 **Answer.** If $b = G_t$, then $A = G_t - G_t = 0$ for every sample, so the gradient is always zero and the policy never updates. There is no learning signal at all. More fundamentally, $G_t$ depends on the action taken (different actions lead to different trajectories and different returns), so it violates the requirement that the baseline be **action-independent**. The zero-bias proof (Section 2.6) only works when $b$ can be pulled out of the expectation over actions, which requires $b$ not to depend on $a$. A legal baseline may depend on the state $s$ (that is $V(s)$), never on the action.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> The estimator R(a) · ∇ log π(a) is unbiased. "Unbiased" means "correct on average." Why is that a weaker promise than "useful on any single sample"?</summary>
 
-**Answer.** "Unbiased" means $\mathbb{E}[\hat{g}] = \nabla J$: if you averaged infinitely many one-sample estimates, you would get the true gradient. But on any *single* episode the estimate $\hat{g} = R(a) \cdot \nabla \log \pi(a)$ can point almost anywhere, because the variance is huge (one lucky or unlucky reward swings the whole vector). So "correct on average" is a much weaker guarantee than "close to the truth on every draw." That gap is precisely why REINFORCE is so slow and why we need variance-reduction tricks (baselines, critics) to make each individual sample more informative.
+**Answer.** "Unbiased" means $\mathbb{E}[\hat{g}] = \nabla J$: if you averaged infinitely many one-sample estimates, you would get the true gradient. But on any _single_ episode the estimate $\hat{g} = R(a) \cdot \nabla \log \pi(a)$ can point almost anywhere, because the variance is huge (one lucky or unlucky reward swings the whole vector). So "correct on average" is a much weaker guarantee than "close to the truth on every draw." That gap is precisely why REINFORCE is so slow and why we need variance-reduction tricks (baselines, critics) to make each individual sample more informative.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> grad log pi is called the "score function." For a softmax policy, show that the score for the chosen action is (1 - pi(a)) along its logit. Why does an already-confident action barely move?</summary>
 
 **Answer.** For a softmax, $\log \pi(a) = z_a - \log \sum_k e^{z_k}$, so $\partial(\log \pi(a))/\partial z_a = 1 - \pi(a)$. If the action is already confident ($\pi(a)$ near 1), then $1 - \pi(a) \approx 0$ and the gradient barely moves it. You do not waste updates re-confirming what the policy already does.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> The trick needs pi(a) > 0 for every action we might sample (we divide by it). What does that say about why a policy should never assign exactly zero probability during training?</summary>
 
 **Answer.** Because the score function divides by $\pi(a)$: an action with $\pi(a) = 0$ makes $\nabla \log \pi$ blow up and can never be sampled or learned about. Policies should keep every probability strictly positive during training (e.g. via entropy regularization, or a softmax that never fully saturates) so every action stays explorable and the gradient stays well-defined.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> An LLM's final layer is a softmax over 50,000 token logits, exactly like our Archer's 9-angle softmax. If a generated answer earns a positive reward, what does REINFORCE do to the token probabilities, and how is it the same push/pull we just derived?</summary>
 
 **Answer.** Exactly the same mechanics: for each token the model produced, a positive advantage pushes that token's logit up ($\partial \log\pi / \partial z_a = 1 - \pi(a) > 0$) and pushes every other token's logit down ($-\pi(a_k)$). The only differences are scale (50K actions instead of 9) and the fact that the reward arrives at the end of a whole sequence, not one shot. This is the core of RLHF and PPO for LLMs, which the [TRPO & PPO](../06-trpo-ppo/README.md) post covers in full.
+
 </details>
 
 ### 2.7 Adding states: from bandit to MDP
@@ -524,17 +557,19 @@ for s, Gt in zip(states, returns):
 <summary><strong>Check:</strong> REINFORCE waits for a full episode before updating (it needs G_t). Which earlier method does that remind you of, and what is the cost of waiting?</summary>
 
 **Answer.** It is like Monte Carlo prediction from the [DP, MC & TD](../03-dp-mc-td/README.md) post: both wait for the full episode return before updating. The cost of waiting is high variance (the whole-episode return is noisy) and no online learning: you cannot update mid-episode.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> An action at time t is weighted by G_t, the return that came after it. Why do we use the reward-to-go G_t rather than the whole-episode return for every step?</summary>
 
 **Answer.** An action at time t cannot affect rewards earned before t, so including those earlier rewards only adds zero-mean noise. Reward-to-go drops them: same expectation (still unbiased), smaller variance.
+
 </details>
 
-### 2.8 The advantage: "better than typical *here*"
+### 2.8 The advantage: "better than typical _here_"
 
-REINFORCE with states is painfully noisy because the return $G_t$ is a big, lurching number. The fix from Section 2.6 generalizes: subtract a *per-state* baseline $V(s)$.
+REINFORCE with states is painfully noisy because the return $G_t$ is a big, lurching number. The fix from Section 2.6 generalizes: subtract a _per-state_ baseline $V(s)$.
 
 $$A_t = G_t - V(s_t)$$
 
@@ -557,12 +592,14 @@ This is the form that every method in the rest of reinforcement learning shares.
 <summary><strong>Check:</strong> A constant baseline subtracts the same number everywhere. Why is a state-dependent baseline V(s) strictly better?</summary>
 
 **Answer.** Different states have very different typical returns. A constant can only be right "on average"; $V(s)$ subtracts the right amount per state, so $A = G - V(s)$ measures "better than expected in THIS state," removing more variance than any single constant could. That is the Actor-Critic idea.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> At a state the critic predicts V(s) = 5. Two episodes pass through s: one returns G = 8, the other G = 3. Compute each advantage and say what happens to the probability of the action taken in each.</summary>
 
 **Answer.** A = 8 - 5 = +3 (well above expectation, push that action's probability up, hard) and A = 3 - 5 = -2 (below expectation, push that action's probability down). Same state, same baseline: the advantage's sign and size do all the work.
+
 </details>
 
 ### 2.9 Actor-Critic: two heads, one loop
@@ -578,6 +615,7 @@ $$A = r + \gamma V_w(s') - V_w(s)$$
 Read it as: "the reward I just got ($r$), plus what the critic thinks the next state is worth ($\gamma V_w(s')$), minus what the critic thought this state was worth ($V_w(s)$)." If $A > 0$, reality beat the critic's expectation, so push the action up; if $A < 0$, reality was worse, so push it down.
 
 Two losses, one pass:
+
 - **Critic:** regress $V(s)$ toward the TD target $r + \gamma V(s')$: minimize $(r + \gamma V(s') - V(s))^2$.
 - **Actor:** push each action by its advantage: minimize $-(A \cdot \log \pi(a \mid s))$.
 
@@ -746,42 +784,49 @@ The Actor-Critic reaches a greedy return near the maximum possible score. The cr
 <summary><strong>Check:</strong> The critic's job is to predict V(s). But the policy keeps changing, so the "correct" V(s) keeps moving. How can the critic ever learn a moving target, and why doesn't this stall the actor?</summary>
 
 **Answer.** They co-adapt: the critic regresses toward the returns the current policy actually earns, so it tracks that policy's value as the policy drifts slowly (small learning rate). The actor does not need an absolute value, only the sign and rough size of the advantage (better or worse than this state's baseline). Even an imperfect critic gives a useful advantage, so both improve together. This co-adaptation is why a slow, stable step size matters, and why TRPO/PPO (next) are about controlling how far the actor moves per update.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why is the policy called the "actor" and the value the "critic"? In the archer-and-coach picture, what does each do, and why is "judge but never act" actually useful rather than redundant?</summary>
 
 **Answer.** The actor (policy pi) is the only part that acts: it takes the moves and shots. The critic (value V) never acts; it only judges how good a state is. The split is useful because the critic turns a noisy raw score into "better/worse than expected at THIS state" (a learned, per-state baseline), and because the two can specialize and improve together: the actor exploits the critic's sign, the critic sharpens its estimate.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> "Step closer at 40 m" scored about 0 by itself, yet its probability goes up. Trace how a reward that only appears at the final shot reaches that early move.</summary>
 
 **Answer.** Through the return $G_t$. The step's discounted future includes the +10 shot it set up, so its return is high, well above the critic's $V(40)$. The positive advantage $A = G_t - V(40)$ credits the quiet step for leading somewhere better, even though its own reward was just $-0.2$.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> REINFORCE-with-a-baseline already subtracts a value to get A = G_t - V(s). What does calling that value a "critic" and giving it its own network actually add?</summary>
 
 **Answer.** A learned, per-state network generalizes: it predicts the typical return for any state, including ones rarely visited, instead of a single global average. That sharper, state-specific baseline makes the advantage cleaner, and naming the two pieces "actor" and "critic" recognizes that the policy and its value can be separate networks that improve together.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why do we detach the advantage when computing the actor's loss? What would break if the actor's gradient flowed into V?</summary>
 
 **Answer.** The advantage is meant to be a fixed weight telling the actor how much to push. If the actor's gradient flowed into $V$, the actor could "cheat" by changing the critic to make its chosen actions look good (lowering $V(s)$) instead of improving the policy, corrupting both the baseline and the learning signal. `detach` keeps the two objectives clean.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Actor-Critic can update every step, but REINFORCE must wait for the episode to end. Which property of the advantage makes online updates possible?</summary>
 
 **Answer.** Bootstrapping: the advantage uses $V(s')$, a one-step estimate of the future, instead of the full return $G_t$. You do not need the rest of the episode, just the next state's value, so you can update immediately after each transition.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Actor-Critic adds a critic network and reduces variance. Yet plain REINFORCE (no critic) is used in production for tasks like text-to-SQL. Why would the simpler algorithm ever be preferred?</summary>
 
 **Answer.** When episodes are short, reward is sparse but clear (the SQL query either runs correctly or not), and the action space is small enough that variance is manageable, the extra complexity of training a critic is not worth the engineering cost. REINFORCE is dead simple to implement, and for tasks with a strong binary signal at episode end, its high variance is tolerable because the reward already tells you whether the output was right or wrong.
+
 </details>
 
 ### 2.10 A note on continuous actions
@@ -820,24 +865,28 @@ The mean and standard deviation define a Gaussian; we sample the action from it.
 <summary><strong>Check:</strong> For continuous actions we output a Gaussian's mean and standard deviation. Why is the standard deviation itself a learned parameter, and what would go wrong if we fixed it to a constant?</summary>
 
 **Answer.** The right amount of exploration varies by state and over training, so a learned standard deviation lets the policy be uncertain where it should be and confident where it should not. Fix it too large and the policy never commits (it cannot exploit); too small and it stops exploring and gets stuck. A constant cannot adapt as learning progresses.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> For each task, say whether you would reach for a value method or a policy method, and why: (a) a board game with 20 legal moves per turn; (b) steering angle and throttle for a self-driving car; (c) rock-paper-scissors against an adaptive opponent.</summary>
 
 **Answer.** (a) Either works: discrete, modest action set, so a value argmax is cheap. (b) Policy: continuous controls; an argmax over a 2-D continuum every step is painful, a Gaussian policy is natural. (c) Policy: the optimal play is the stochastic uniform mix, which a deterministic argmax can never represent.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> "Policy gradients optimize expected return directly; value methods optimize a Bellman error and hope." Name one situation where the value-method's indirection is actually an advantage.</summary>
 
 **Answer.** When the policy is hard to represent but the value is not, e.g. large discrete action sets where the argmax over Q is cheap, or when off-policy data reuse matters: value methods can learn from a replay buffer and are far more sample-efficient, which an on-policy policy gradient cannot match.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> A baseline reduces variance with zero added bias. Bootstrapping (using V(s') instead of the full return) reduces variance but ADDS bias. Why is one a free lunch and the other a trade?</summary>
 
 **Answer.** A baseline sits inside a term that provably integrates to zero ($\mathbb{E}[b \cdot \nabla \log \pi] = 0$), so it cannot shift the mean: free variance reduction. Bootstrapping replaces the true return with an estimate $V(s')$ that is itself wrong, so it changes the target's mean: you trade some bias for the variance cut.
+
 </details>
 
 ---
@@ -865,7 +914,7 @@ Sum of all nine: $0.000$ exactly.
 
 ![Policy fan before and after one REINFORCE update, showing the shift toward the taken action](./images/fig-policy-fan.svg)
 
-**The key insight:** a single sample moves *all nine* logits, not just the one you tried. Probability is redistributed, never created.
+**The key insight:** a single sample moves _all nine_ logits, not just the one you tried. Probability is redistributed, never created.
 
 ### 3.2 Hand-worked: computing the variance ladder
 
@@ -873,11 +922,11 @@ We run 1500 episodes of the Archer MDP with three methods and compute the varian
 
 Results (5-seed average):
 
-| Method | Gradient variance | Greedy return |
-|--------|:-----------------:|:-------------:|
-| REINFORCE | 0.0437 | 4.66 |
-| + baseline | 0.0006 | 9.60 |
-| Actor-Critic | 0.0004 | 9.62 |
+| Method       | Gradient variance | Greedy return |
+| ------------ | :---------------: | :-----------: |
+| REINFORCE    |      0.0437       |     4.66      |
+| + baseline   |      0.0006       |     9.60      |
+| Actor-Critic |      0.0004       |     9.62      |
 
 ![Gradient variance on a log scale for the three methods, dropping by orders of magnitude with variance reduction](./images/fig-variance-ladder.svg)
 
@@ -891,18 +940,21 @@ Why does the baseline help so much? In the Archer MDP, rewards are mostly positi
 <summary><strong>Check:</strong> Actor-Critic uses a one-step TD error instead of the full return. That one-step estimate is biased (it uses an imperfect V(s')). How can a biased estimator produce better results than the unbiased REINFORCE?</summary>
 
 **Answer.** Because bias is not the whole story: total error = bias^2 + variance. The one-step TD error has tiny bias (it is one sample of a recursion that converges) but massively lower variance than the full return. The net effect is a much better signal-to-noise ratio, so learning is faster and more stable despite the small bias.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> In the Archer MDP there is always a walking cost of -0.2 per step. Without a baseline, the gradient estimator can never push an action DOWN (returns are positive). Why is that wasteful?</summary>
 
 **Answer.** Because every action, good or bad, gets pushed UP by the positive return. The only difference is how much, and that difference is small compared to the offset. The policy drifts aimlessly uphill instead of quickly separating good from bad. With a baseline, worse-than-average actions get a negative advantage and are pushed down, giving a two-sided signal.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> A student removes entropy regularization (ent_coef = 0) from Actor-Critic. What happens and why?</summary>
 
 **Answer.** Without entropy regularization, the policy collapses early: one action dominates, exploration dies, and the agent gets stuck in a local optimum. The entropy bonus gives a "tax" on certainty, keeping probabilities spread so the agent tries all actions long enough to learn which is best before committing.
+
 </details>
 
 ### 3.3 The entropy bonus and ablation insights
@@ -921,6 +973,7 @@ Our ablation experiments:
 <summary><strong>Check:</strong> Ablation B found that removing the critic warmup hurts performance. Why specifically does a "cold" critic hurt the ACTOR, not just the critic?</summary>
 
 **Answer.** Because the actor's gradient uses the critic's advantage signal. A cold critic outputs near-random values, so the advantage $A = r + \gamma V(s') - V(s)$ is garbage: its sign and magnitude are noise. The actor follows this random signal and drifts aimlessly, potentially into a policy from which recovery is hard. The warmup gives the critic time to produce meaningful advantages before the actor starts trusting them.
+
 </details>
 
 ---
@@ -929,15 +982,15 @@ Our ablation experiments:
 
 Before the capstone, a quick recap of every concept and how it maps to code:
 
-| Concept | Math | In code |
-|---|---|---|
-| Objective | $J(\theta) = \mathbb{E}[R]$ | `loss = -(adv * logp).mean()` (negate for descent) |
-| Score-function trick | $\nabla J = \mathbb{E}[R \nabla\log\pi]$ | `logp = dist.log_prob(action)` |
-| REINFORCE weight | $G_t$ (return) | `G = r + gamma * G` (backward loop) |
-| Baseline / advantage | $A_t = G_t - V(s_t)$ | `adv = (target - v).detach()` |
-| TD advantage (Actor-Critic) | $A = r + \gamma V(s') - V(s)$ | `target = rew + GAMMA * val(snext) * (1 - dn)` |
-| Entropy bonus | $H(\pi) = -\sum \pi\log\pi$ | `- ent_coef * ent.mean()` |
-| Critic loss | $(r + \gamma V(s') - V(s))^2$ | `(target - v).pow(2).mean()` |
+| Concept                     | Math                                     | In code                                            |
+| --------------------------- | ---------------------------------------- | -------------------------------------------------- |
+| Objective                   | $J(\theta) = \mathbb{E}[R]$              | `loss = -(adv * logp).mean()` (negate for descent) |
+| Score-function trick        | $\nabla J = \mathbb{E}[R \nabla\log\pi]$ | `logp = dist.log_prob(action)`                     |
+| REINFORCE weight            | $G_t$ (return)                           | `G = r + gamma * G` (backward loop)                |
+| Baseline / advantage        | $A_t = G_t - V(s_t)$                     | `adv = (target - v).detach()`                      |
+| TD advantage (Actor-Critic) | $A = r + \gamma V(s') - V(s)$            | `target = rew + GAMMA * val(snext) * (1 - dn)`     |
+| Entropy bonus               | $H(\pi) = -\sum \pi\log\pi$              | `- ent_coef * ent.mean()`                          |
+| Critic loss                 | $(r + \gamma V(s') - V(s))^2$            | `(target - v).pow(2).mean()`                       |
 
 The capstone below combines all the pieces into a single runnable program: the Archer MDP environment, the actor (policy) and critic (value) networks, the act function, the actor-critic training loop with TD advantage and critic warmup, and greedy evaluation.
 
@@ -1128,13 +1181,15 @@ The Actor-Critic solves the Archer MDP, reliably reaching a greedy return of ~9.
 <details>
 <summary><strong>Check:</strong> In the capstone, why do we use `(1 - dn)` in the TD target? What would go wrong without it?</summary>
 
-**Answer.** The `dn` flag is 1 at terminal states. Without `(1 - dn)`, we would bootstrap through the terminal state, adding gamma * V(s') after the episode is over. That injects a phantom future reward into the target, corrupting the critic's estimate. Setting the bootstrap to zero at terminal states keeps the value grounded in the actual final reward.
+**Answer.** The `dn` flag is 1 at terminal states. Without `(1 - dn)`, we would bootstrap through the terminal state, adding gamma \* V(s') after the episode is over. That injects a phantom future reward into the target, corrupting the critic's estimate. Setting the bootstrap to zero at terminal states keeps the value grounded in the actual final reward.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why do we warm up the critic for 150 episodes before enabling the actor's updates?</summary>
 
 **Answer.** A randomly initialized critic outputs random values, so the advantage is just noise. If the actor updates on that noise, it drifts into a bad policy that is hard to recover from. The warmup lets the critic settle into roughly correct $V(s)$ estimates first, so the advantage the actor sees is meaningful from the start.
+
 </details>
 
 ---

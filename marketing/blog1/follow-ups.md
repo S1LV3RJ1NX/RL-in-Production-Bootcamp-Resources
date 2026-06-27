@@ -10,12 +10,12 @@ Copy-paste posts to keep one blog alive for a few days, one angle per day, on bo
 - The closing question doubles as your first self-reply to kick off engagement. Reply to every comment in the first hour. That hour matters more than the post itself.
 - **This run is 3 days only** (blog 1 is already live): Follow-up 1 = Sat Jun 27, Follow-up 2 = Sun Jun 28, Follow-up 3 = Mon Jun 29. On Tuesday the series moves to blog 2.
 
-Blog link: https://prathameshsaraf.com/blogs/01-rl-intro-and-prerequisites/
+Blog link: [https://prathameshsaraf.com/blogs/01-rl-intro-and-prerequisites/](https://prathameshsaraf.com/blogs/01-rl-intro-and-prerequisites/)
 Hashtags (LinkedIn): #ReinforcementLearning #MachineLearning #LLMs #LearningInPublic
 
 ---
 
-## Follow-up 1 (Sat Jun 27) — the one sentence
+## Follow-up 1 (Sat Jun 27) — the one sentence - DONE
 
 Every RL algorithm you have heard of, PPO, DQN, RLHF, GRPO, is a variation on one sentence:
 
@@ -75,3 +75,4 @@ Link in comments.
 
 - Vary the opening line if you reuse an angle; identical reposts on the same platform get penalized.
 - If a paper or model drops, quote-post it with "here is the foundation behind this" and your blog link. A timely reply outperforms a scheduled post.
+
