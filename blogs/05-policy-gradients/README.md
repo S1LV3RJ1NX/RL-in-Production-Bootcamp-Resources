@@ -193,46 +193,48 @@ import numpy as np, torch, torch.nn as nn
 
 class ArcherBandit(gym.Env):
     """One-state bandit: 9 angles, reward = Gaussian centered on bullseye."""
-    N_ANGLES, TARGET, SIGMA = 9, 4, 1.5  # 9 discrete angles (0-8), bullseye at 4, spread 1.5
+    # 9 discrete angles (0-8), bullseye at index 4, spread 1.5
+    N_ANGLES, TARGET, SIGMA = 9, 4, 1.5
 
     def __init__(self):
         super().__init__()
-        # Bandit has no meaningful state: observation is always [0.]
+        # bandit has no meaningful state: the observation is always [0.]
         self.observation_space = spaces.Box(0., 1., (1,), np.float32)
         self.action_space = spaces.Discrete(self.N_ANGLES)
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
-        return np.array([0.], np.float32), {}  # constant dummy state
+        # constant dummy state
+        return np.array([0.], np.float32), {}
 
     def step(self, a):
-        # Reward = Gaussian bell curve: exp(-(a - target)^2 / (2σ^2))
-        # Peaks at 1.0 when a == TARGET (dead center), drops smoothly
-        # toward 0 the further a is from the bullseye.
-        # This gives a smooth, deterministic reward landscape that
-        # the policy must discover by trial and error.
+        # reward = Gaussian bell curve exp(-(a - target)^2 / (2σ^2))
+        # it peaks at 1.0 when a == TARGET (dead center) and falls
+        # smoothly toward 0 as a moves away from the bullseye
         r = float(np.exp(-((a - self.TARGET)**2) / (2*self.SIGMA**2)))
-        return np.array([0.], np.float32), r, True, False, {}
         # terminated=True: bandit episodes are always one step
+        return np.array([0.], np.float32), r, True, False, {}
 
 # ── Policy network ──────────────────────────────────────────────
 class Policy(nn.Module):
     def __init__(self, obs_dim, n_act, h=64):
         super().__init__()
-        # Two-layer MLP: obs → hidden (tanh) → one logit per action
+        # two-layer MLP: obs -> hidden (tanh) -> one logit per action
         self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, n_act))
 
     def forward(self, x):
-        return self.net(x)  # raw logits; softmax applied by Categorical
+        # raw logits; softmax is applied by Categorical
+        return self.net(x)
 
 # ── Action sampling ─────────────────────────────────────────────
 def act(policy, state_np):
     st = torch.tensor(state_np, dtype=torch.float32)
-    # Categorical takes raw logits, applies softmax internally
+    # Categorical takes raw logits and applies softmax internally
     dist = torch.distributions.Categorical(logits=policy(st))
-    action = dist.sample()  # stochastic: exploration is built in
-    # log_prob(a) = log π(a) — needed for the REINFORCE gradient
-    # entropy H(π) — measures how spread out the policy is
+    # stochastic draw: exploration is built into the policy
+    action = dist.sample()
+    # log_prob(a) = log π(a) feeds the REINFORCE gradient;
+    # entropy H(π) measures how spread out the policy is
     return action, dist.log_prob(action), dist.entropy()
 
 # ── Training loop ───────────────────────────────────────────────
@@ -245,15 +247,16 @@ def train_bandit(episodes=1500, lr=0.01, ent_coef=0.1):
         s, _ = env.reset()
         a, logp, ent = act(pol, s)
         _, r, *_ = env.step(int(a))
-        # REINFORCE loss: -r · log π(a).  Negative because optimizers
-        # minimize, but we want to *maximize* expected reward.
-        # Entropy bonus (+ent_coef·H) discourages premature collapse
-        # to a single action before the reward landscape is explored.
+        # REINFORCE loss -r·log π(a), negated because optimizers minimize
+        # but we want to maximize expected reward; the entropy bonus
+        # (+ent_coef·H) delays collapse to one angle before we explore
         loss = -(r * logp) - ent_coef * ent
         opt.zero_grad(); loss.backward(); opt.step()
         hist.append(r)
     return pol, hist
 
+# seed everything so the run below is reproducible
+torch.manual_seed(2)
 pol, hist = train_bandit()
 probs = torch.softmax(pol(torch.zeros(1)), -1).detach().numpy()
 print(f"mean reward (last 200): {np.mean(hist[-200:]):.3f}  (uniform ≈ 0.42)")
@@ -319,35 +322,39 @@ All nine pushes **sum to zero**: probability is conserved, only redistributed.
 
 ![The nine per-logit gradient pushes from one REINFORCE update, showing one positive bar for the taken action and eight negative bars that sum to zero](./images/fig-logit-gradients.svg)
 
+The figure makes the formula concrete: one tall bar for the taken angle $a_6$ pushing it up, and eight short bars for the others pushing them down. The ups and downs are sized so they cancel exactly, which is the "sum to zero" we just derived. One sample, nine moves.
+
 Here is a tiny snippet that reproduces the nine logit gradients with real numbers:
 
 ```python
 import numpy as np
 
-# Hypothetical logits (raw scores) the policy network outputs for 9 angles.
-# These are NOT probabilities yet — softmax converts them next.
+# hypothetical logits (raw scores) the policy network outputs for 9 angles;
+# these are NOT probabilities yet, softmax converts them next
 logits = np.array([0.2, 0.6, 1.0, 1.6, 2.0, 1.6, 1.0, 0.6, 0.2])
 
-# Softmax: π(aₖ) = exp(zₖ) / Σ exp(zⱼ)  — turns logits into a valid
-# probability distribution that sums to 1.
+# softmax π(aₖ) = exp(zₖ) / Σ exp(zⱼ) turns logits into a valid
+# probability distribution that sums to 1
 probs = np.exp(logits) / np.exp(logits).sum()
 
-taken = 5  # a6 (0-indexed): the action we actually sampled
-r = 0.9    # reward received for that shot
+# a6 (0-indexed): the action we actually sampled
+taken = 5
+# reward received for that shot
+r = 0.9
 
-# Per-logit gradient of the REINFORCE loss L = -r · log π(a_taken).
-# Formula: ∂L/∂zₖ = -r · (𝟙[k = taken] - π(aₖ))
-#   • For the taken action: gradient = -r·(1 - π(a₆)), negative → logit rises
-#   • For every other action: gradient = -r·(0 - π(aₖ)) = +r·π(aₖ), positive → logit falls
-# np.eye(9)[taken] is a one-hot vector: 1 at position 'taken', 0 elsewhere.
+# per-logit gradient of the REINFORCE loss L = -r · log π(a_taken):
+#   ∂L/∂zₖ = -r · (𝟙[k = taken] - π(aₖ))
+#   for the taken action: gradient = -r·(1 - π(a₆)), negative so the logit rises
+#   for every other action: gradient = +r·π(aₖ), positive so the logit falls
+# np.eye(9)[taken] is a one-hot vector: 1 at position 'taken', 0 elsewhere
 grads = -r * (np.eye(9)[taken] - probs)
 
 print("Per-logit gradients (r=0.9, taken=a6):")
 for i, g in enumerate(grads):
     tag = " ← taken" if i == taken else ""
     print(f"  a{i+1}: {g:+.3f}{tag}")
-# All nine gradients sum to exactly zero: probability is conserved,
-# only redistributed among angles, never created or destroyed.
+# all nine gradients sum to exactly zero: probability is conserved,
+# only redistributed among angles, never created or destroyed
 print(f"  sum: {grads.sum():.6f}")
 ```
 
@@ -373,6 +380,12 @@ $$\frac{\partial L}{\partial \theta_j} = \sum_{k=1}^{9} \frac{\partial L}{\parti
 
 Every logit $z_k$ is built from the same shared weights $\theta$, so the chain rule adds up all nine influences. The result is one gradient per weight and one Adam step, not nine.
 
+**One update, by hand.** Take the same fan the snippet used, $\pi = [0.042, 0.063, 0.094, 0.172, 0.256, 0.172, 0.094, 0.063, 0.042]$ (peaked at $a_5$), and suppose we sample $a_6$ and score $r = 0.9$. The per-logit gradients are exactly the ones printed above: $-0.745$ on the taken angle $a_6$, small positives on the other eight, summing to zero. Now take one optimizer step at learning rate $\alpha = 0.1$. Each logit moves by $-\alpha \cdot \partial L / \partial z_k$, so $a_6$ rises and every other angle drops a little. The fan tilts toward the shot that scored well.
+
+![Policy fan before and after one REINFORCE update, showing the shift toward the taken action](./images/fig-policy-fan.svg)
+
+The figure shows the nine-angle fan before and after that single step: the bar on $a_6$ grows while the other eight shrink, and the total stays at 1. **A single sample moves all nine logits, not just the one you tried. Probability is redistributed, never created.**
+
 <details>
 <summary><strong>Check:</strong> The policy gave nine probabilities but we sampled only a6. Why does the update change all nine angles, not just a6?</summary>
 
@@ -390,7 +403,7 @@ Every logit $z_k$ is built from the same shared weights $\theta$, so the chain r
 <details>
 <summary><strong>Check:</strong> In the example the reward was 0.9 (a big push on a6). Redo it for a near-miss that scored only 0.1: which way does a6 move, and by how much?</summary>
 
-**Answer.** The weight is just the reward, 0.1 > 0, so a6 still moves UP, only about a ninth as far ((1-.172)*0.1 ≈ +0.083 on its logit, versus +0.745 before), with the other eight nudged down proportionally. The catch: with the reward alone, *every\* shot pushes the taken angle up. Only the size changes. That one-sidedness is wasteful, and it is exactly what the baseline in Section 2.6 fixes.
+**Answer.** The weight is just the reward, 0.1 > 0, so a6 still moves UP, only about a ninth as far ((1-.172)*0.1 ≈ +0.083 on its logit, versus +0.745 before), with the other eight nudged down proportionally. The catch: with the reward alone, _every_ shot pushes the taken angle up. Only the size changes. That one-sidedness is wasteful, and it is exactly what the baseline in Section 2.6 fixes.
 
 </details>
 
@@ -439,7 +452,9 @@ The policy automatically spends its learning budget where it matters most: on ac
 
 ![The push magnitude 1 minus pi(a) plotted against current probability, showing that surprising actions get bigger updates](./images/fig-score-push.svg)
 
-The near-optimal constant baseline is approximately the average return, $b^* \approx \mathbb{E}[G_t]$. An even better baseline is a _learned, per-state_ value $V(s)$, which we will see in Section 2.8.
+The curve is just $1 - \pi(a)$. On the left, an action the policy thought unlikely (small $\pi$) gets a near-1 push when it pays off. On the right, an action the policy was already sure of (large $\pi$) barely moves. The downward slope is the policy spending its learning budget on surprises, exactly the two cases above.
+
+Back to the baseline itself: the near-optimal constant baseline is approximately the average return, $b^* \approx \mathbb{E}[G_t]$. An even better baseline is a _learned, per-state_ value $V(s)$, which we will see in Section 2.8.
 
 <details>
 <summary><strong>Check:</strong> We subtract a baseline b to cut variance. A skeptic worries: "you changed the gradient, now you're optimizing the wrong thing." Why is the skeptic wrong?</summary>
@@ -517,28 +532,33 @@ Read it against the bandit: the bandit was the one-step case, a single term with
 
 ![Credit assignment across the Archer MDP trajectory, showing the return at each distance building up from the final reward](./images/fig-credit-assignment.svg)
 
+The figure traces one trajectory from far (40 m) to the final shot. Each bar is that step's return $G_t$, and you can see the big +10 at the shot flowing backwards: the discount shrinks it a little at every earlier step, but even the first quiet move inherits most of it. That backward flow is credit assignment, and the snippet below computes those exact bars.
+
 ```python
 import numpy as np
 
-# A 5-step Archer MDP trajectory: 4 "step closer" moves (cost -0.2 each)
-# followed by a final shot that earns +10.
+# a 5-step Archer MDP trajectory: 4 "step closer" moves (cost -0.2 each)
+# followed by a final shot that earns +10
 rewards = [-0.2, -0.2, -0.2, -0.2, 10.0]
 states  = ["40m", "30m", "20m", "10m", "shoot"]
-gamma   = 0.9  # discount factor: future rewards are worth 90% per step
+# discount factor: future rewards are worth 90% per step
+gamma   = 0.9
 
-# Compute the discounted return G_t at every timestep, working BACKWARDS.
-# G_t = r_t + γ·G_{t+1}  (recursive definition of the return)
-# We iterate in reverse so each step can reuse the already-computed future.
+# compute the discounted return G_t at every step, working BACKWARDS;
+# G_t = r_t + γ·G_{t+1} is the recursive definition of the return, so
+# iterating in reverse lets each step reuse the already-computed future
 G, returns = 0.0, []
 for r in reversed(rewards):
-    G = r + gamma * G   # accumulate: this reward + discounted future
+    # accumulate: this reward + discounted future
+    G = r + gamma * G
     returns.append(G)
-returns.reverse()  # flip back to chronological order
+# flip back to chronological order
+returns.reverse()
 
-# Display: even the earliest "step closer" at 40 m gets a large positive
-# return (~5.87) because the discounted +10 final shot propagates back.
-# This is CREDIT ASSIGNMENT: quiet moves are credited for the future
-# they set up, not just their own immediate -0.2.
+# even the earliest "step closer" at 40 m gets a large positive return
+# because the discounted +10 final shot propagates back to it: this is
+# CREDIT ASSIGNMENT, quiet moves credited for the future they set up,
+# not just their own immediate -0.2
 for s, Gt in zip(states, returns):
     print(f"  {s:>5s}: G = {Gt:+.3f}")
 ```
@@ -621,25 +641,28 @@ Two losses, one pass:
 
 **Why `detach`?** The advantage is meant to be a fixed weight telling the actor how much to push. If the actor's gradient flowed into $V$, the actor could "cheat" by changing the critic to make its chosen actions look good (lowering $V(s)$) instead of improving the policy. `detach` keeps the two objectives clean.
 
-Here is the Actor-Critic training loop we build in this blog (trimmed for clarity):
+Here is the complete, runnable Actor-Critic for the Archer MDP: the environment, both networks, the act helper, the training loop, and a greedy evaluation. It is the algorithm in full, so the rest of the post just analyzes what it does.
 
 ```python
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np, torch, torch.nn as nn
 
-GAMMA = 0.99  # discount factor: how much we value future rewards vs. immediate
+# discount factor: how much we value future rewards vs. immediate
+GAMMA = 0.99
 
 # ── Environment: Archer MDP ─────────────────────────────────────
-# Unlike the bandit (one state, one shot), the MDP has a DISTANCE state.
-# The archer can walk closer, step back, or shoot from the current distance.
+# unlike the bandit (one state, one shot), the MDP has a DISTANCE state;
+# the archer can walk closer, step back, or shoot from the current distance
 class ArcherMDP(gym.Env):
     """MDP: distance-to-target as state, 3 actions (closer/back/shoot)."""
-    CLOSER, BACK, SHOOT = 0, 1, 2   # three discrete actions
-    MIN_D, MAX_D = 10., 50.          # distance range in meters
+    # three discrete actions
+    CLOSER, BACK, SHOOT = 0, 1, 2
+    # distance range in meters
+    MIN_D, MAX_D = 10., 50.
     def __init__(self, max_steps=25):
         super().__init__()
-        # Observation = normalized distance d/50, so it lies in [0, 1]
+        # observation = normalized distance d/50, so it lies in [0, 1]
         self.observation_space = spaces.Box(0., 1., (1,), np.float32)
         self.action_space = spaces.Discrete(3)
         self.max_steps = max_steps
@@ -647,27 +670,27 @@ class ArcherMDP(gym.Env):
         return np.array([self.d / self.MAX_D], np.float32)
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
-        # Start at a random distance from {10, 20, 30, 40, 50}
+        # start at a random distance from {10, 20, 30, 40, 50}
         self.d = float(self.np_random.choice([10.,20.,30.,40.,50.]))
         self.t = 0
         return self._obs(), {}
     def shoot_reward(self, d):
-        # Reward for shooting: 10 at 10 m (closest), drops linearly with distance.
-        # Optimal strategy: walk to 10 m, then shoot for max reward.
+        # reward for shooting: 10 at 10 m (closest), drops linearly with distance;
+        # optimal strategy is to walk to 10 m, then shoot for max reward
         return 10. - 0.28*(d - self.MIN_D)
     def step(self, a):
         self.t += 1
         if a == self.SHOOT:
-            # Shooting ends the episode (terminated=True) with distance-based reward
+            # shooting ends the episode (terminated=True) with a distance-based reward
             return self._obs(), float(self.shoot_reward(self.d)), True, False, {}
-        # Walking costs -0.2 per step (small penalty to encourage efficiency)
+        # walking costs -0.2 per step (a small penalty to encourage efficiency)
         self.d = float(np.clip(
             self.d + (-10. if a == self.CLOSER else 10.), self.MIN_D, self.MAX_D))
         return self._obs(), -0.2, False, self.t >= self.max_steps, {}
 
 # ── Actor (Policy network) ──────────────────────────────────────
-# Maps state → one logit per action. Softmax (inside Categorical) converts
-# logits to π(a|s). This IS the policy we are optimizing.
+# maps state -> one logit per action; softmax (inside Categorical) converts
+# logits to π(a|s). This IS the policy we are optimizing
 class Policy(nn.Module):
     def __init__(self, obs_dim, n_act, h=64):
         super().__init__()
@@ -675,8 +698,8 @@ class Policy(nn.Module):
     def forward(self, x): return self.net(x)
 
 # ── Critic (Value network) ──────────────────────────────────────
-# Maps state → single scalar V(s), the expected return from state s
-# under the current policy. Used as a baseline to compute advantage.
+# maps state -> single scalar V(s), the expected return from state s
+# under the current policy; used as a baseline to compute the advantage
 class Value(nn.Module):
     def __init__(self, obs_dim, h=64):
         super().__init__()
@@ -686,23 +709,28 @@ class Value(nn.Module):
 # ── Action sampling ─────────────────────────────────────────────
 def act(policy, s):
     st = torch.tensor(s, dtype=torch.float32)
-    # Categorical applies softmax to logits → π(a|s), then we sample
+    # Categorical applies softmax to logits -> π(a|s), then we sample
     dist = torch.distributions.Categorical(logits=policy(st))
-    a = dist.sample()  # stochastic action: exploration is built into the policy
-    # log_prob = log π(a|s) — the "score" in the REINFORCE gradient
-    # entropy = H(π) — measures exploration breadth
+    # stochastic action: exploration is built into the policy
+    a = dist.sample()
+    # log_prob = log π(a|s) is the "score" in the REINFORCE gradient;
+    # entropy = H(π) measures exploration breadth
     return a, dist.log_prob(a), dist.entropy()
 
 # ── Actor-Critic training loop ──────────────────────────────────
 def actor_critic(env, episodes=2000, lr_a=0.004, lr_c=0.03, ent_coef=0.01, warmup=150):
-    pol = Policy(1, env.action_space.n)       # actor: learns WHAT to do
-    val = Value(1)                             # critic: learns HOW GOOD each state is
-    popt = torch.optim.Adam(pol.parameters(), lr_a)  # actor optimizer (slower lr)
-    vopt = torch.optim.Adam(val.parameters(), lr_c)  # critic optimizer (faster lr)
+    # actor: learns WHAT to do
+    pol = Policy(1, env.action_space.n)
+    # critic: learns HOW GOOD each state is
+    val = Value(1)
+    # actor optimizer (slower lr)
+    popt = torch.optim.Adam(pol.parameters(), lr_a)
+    # critic optimizer (faster lr)
+    vopt = torch.optim.Adam(val.parameters(), lr_c)
     curve = []
     for ep in range(episodes):
         s, _ = env.reset()
-        # Collect one full episode: states, log-probs, entropies, rewards,
+        # collect one full episode: states, log-probs, entropies, rewards,
         # next-states, and done flags for every transition
         S, logps, ents, R, S2, Dn = [], [], [], [], [], []
         done = False
@@ -714,68 +742,74 @@ def actor_critic(env, episodes=2000, lr_a=0.004, lr_c=0.03, ent_coef=0.01, warmu
             R.append(r); S2.append(s2); Dn.append(float(term))
             s = s2
 
-        # Convert episode data to tensors for batch computation
+        # convert episode data to tensors for batch computation
         states = torch.tensor(np.array(S), dtype=torch.float32)
         snext  = torch.tensor(np.array(S2), dtype=torch.float32)
         rew    = torch.tensor(R, dtype=torch.float32)
-        dn     = torch.tensor(Dn)  # 1.0 at terminal step, 0.0 otherwise
+        # 1.0 at the terminal step, 0.0 otherwise
+        dn     = torch.tensor(Dn)
 
-        # TD target: r + γ·V(s')·(1 - done)
-        # (1-dn) zeroes out the bootstrap at terminal states — there is no
-        # future after the episode ends, so V(s') should not contribute.
+        # TD target r + γ·V(s')·(1 - done); the (1-dn) factor zeroes out the
+        # bootstrap at terminal states, since there is no future after the
+        # episode ends, so V(s') should not contribute there
         with torch.no_grad():
             target = rew + GAMMA * val(snext) * (1 - dn)
 
         v   = val(states)
-        # Advantage A = TD_target - V(s) = r + γV(s') - V(s)
-        # Positive → action was better than expected, push probability UP
-        # Negative → action was worse than expected, push probability DOWN
-        # .detach() prevents actor gradients from flowing into the critic
+        # advantage A = TD_target - V(s) = r + γV(s') - V(s):
+        # positive means the action beat expectation, push probability UP;
+        # negative means it was worse, push probability DOWN;
+        # .detach() stops actor gradients from flowing into the critic
         adv = (target - v).detach()
 
         # ── Critic update: minimize (TD_target - V(s))² ────────────
-        # Trains V(s) to predict the discounted return from each state
+        # trains V(s) to predict the discounted return from each state
         vopt.zero_grad()
         (target - v).pow(2).mean().backward()
         vopt.step()
 
         # ── Actor update (only after warmup) ────────────────────────
-        # Warmup: let the critic learn reasonable V(s) before the actor
-        # starts using the advantage. Early random advantages = noise.
+        # warmup lets the critic learn a reasonable V(s) before the actor
+        # uses the advantage; early random advantages would just be noise
         if ep >= warmup:
             logp = torch.stack(logps)
             ent  = torch.stack(ents)
             popt.zero_grad()
-            # Actor loss = -𝔼[A · log π(a|s)] - ent_coef · H(π)
-            # First term: REINFORCE weighted by advantage (negated for descent)
-            # Second term: entropy bonus keeps the policy exploring
+            # actor loss = -𝔼[A · log π(a|s)] - ent_coef · H(π):
+            # first term is REINFORCE weighted by advantage (negated for descent),
+            # second term is the entropy bonus that keeps the policy exploring
             (-(adv * logp).mean() - ent_coef * ent.mean()).backward()
             popt.step()
         curve.append(sum(R))
     return pol, val, curve
 
 # ── Greedy evaluation ───────────────────────────────────────────
-# After training, test the policy deterministically (argmax, no sampling)
-# to measure what it has actually learned, free from exploration noise.
+# after training, test the policy deterministically (argmax, no sampling)
+# to measure what it has actually learned, free from exploration noise
 def greedy_eval(env, pol, n=20):
     total = 0.
     for _ in range(n):
         s, _ = env.reset(); done = False; ep_r = 0.
         while not done:
             with torch.no_grad():
-                # Greedy: pick the action with the highest logit (most confident)
+                # greedy: pick the action with the highest logit (most confident)
                 a = pol(torch.tensor(s, dtype=torch.float32)).argmax()
             s, r, term, trunc, _ = env.step(int(a))
             ep_r += r; done = term or trunc
         total += ep_r
     return total / n
 
-pol, val, curve = actor_critic(ArcherMDP())
-print(f"Actor-Critic greedy return: {greedy_eval(ArcherMDP(), pol):.2f}")
+# seed everything (torch init + sampling, and each env's RNG) so the
+# greedy return below reproduces on a re-run
+torch.manual_seed(0)
+train_env = ArcherMDP(); train_env.reset(seed=0)
+pol, val, curve = actor_critic(train_env)
+eval_env = ArcherMDP(); eval_env.reset(seed=1)
+print(f"Actor-Critic greedy return: {greedy_eval(eval_env, pol):.2f}")
 ```
 
 ```text title="Output"
-Actor-Critic greedy return: 9.51
+Actor-Critic greedy return: 9.58
 ```
 
 The Actor-Critic reaches a greedy return near the maximum possible score. The critic's warmup period lets $V$ settle before the actor starts moving; the detached advantage ensures the two heads stay clean.
@@ -834,28 +868,30 @@ The Actor-Critic reaches a greedy return near the maximum possible score. The cr
 Everything above used discrete actions (softmax over 9 angles). For continuous actions (robot torques, steering angles), the policy head outputs the parameters of a distribution:
 
 ```python
-# For continuous actions (e.g. torque, steering angle), the policy outputs
-# the PARAMETERS of a Gaussian distribution, not discrete logits.
-# We sample the action from a ~ N(μ(s), σ(s)), and log π(a|s) is the
-# Gaussian log-density — the same REINFORCE / Actor-Critic math applies.
+# for continuous actions (e.g. torque, steering angle), the policy outputs
+# the PARAMETERS of a Gaussian distribution, not discrete logits;
+# we sample a ~ N(μ(s), σ(s)) and log π(a|s) is the Gaussian log-density,
+# so the same REINFORCE / Actor-Critic math still applies
 class GaussianPolicy(nn.Module):
     def __init__(self, obs_dim, act_dim, h=64):
         super().__init__()
-        # Shared trunk: maps observation → hidden features
+        # shared trunk: maps observation to hidden features
         self.trunk = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh())
-        # Mean head: one output per action dimension (state-dependent)
+        # mean head: one output per action dimension (state-dependent)
         self.mu_head  = nn.Linear(h, act_dim)
-        # Log standard deviation: a LEARNABLE parameter (not state-dependent).
-        # Stored as log(σ) so exp() guarantees σ > 0.
-        # Starts at zeros → σ = 1.0 (moderate initial exploration).
+        # log standard deviation: a LEARNABLE parameter (not state-dependent),
+        # stored as log(σ) so exp() guarantees σ > 0; starts at zeros, so
+        # σ = 1.0 gives moderate initial exploration
         self.log_std  = nn.Parameter(torch.zeros(act_dim))
 
     def forward(self, x):
         h = self.trunk(x)
-        mu = self.mu_head(h)            # μ(s): center of the Gaussian
-        std = self.log_std.exp()         # σ: spread (exploration width)
-        # Returns a Normal distribution; call .sample() to get an action,
-        # .log_prob(a) for the score ∇log π needed by REINFORCE.
+        # μ(s): center of the Gaussian
+        mu = self.mu_head(h)
+        # σ: spread (exploration width)
+        std = self.log_std.exp()
+        # returns a Normal distribution; call .sample() to get an action and
+        # .log_prob(a) for the score ∇log π needed by REINFORCE
         return torch.distributions.Normal(mu, std)
 ```
 
@@ -889,36 +925,9 @@ The mean and standard deviation define a Gaussian; we sample the action from it.
 
 </details>
 
----
+### 2.11 The variance ladder: REINFORCE vs baseline vs Actor-Critic
 
-## 3. Worked examples by hand
-
-### 3.1 Hand-worked: one REINFORCE update on the bandit
-
-Suppose the policy's current probabilities over 9 angles are:
-$\pi = [0.042, 0.063, 0.094, 0.172, 0.256, 0.172, 0.094, 0.063, 0.042]$
-
-(roughly Gaussian, peaked at $a_5$). We sample $a_6$ and get $r = 0.9$.
-
-**Step 1.** Compute the per-logit gradient (Section 2.5):
-
-$$\frac{\partial L}{\partial z_k} = -r \cdot \big(\mathbb{1}[k = 6] - \pi(a_k)\big)$$
-
-For the taken action $a_6$: $-0.9 \times (1 - 0.172) = -0.745$ (loss gradient; optimizer subtracts, so the logit rises).
-For $a_5$: $-0.9 \times (0 - 0.256) = +0.230$ (loss gradient is positive; optimizer subtracts, so the logit falls).
-For $a_1$: $-0.9 \times (0 - 0.042) = +0.038$.
-
-Sum of all nine: $0.000$ exactly.
-
-**Step 2.** After one optimizer step with learning rate $\alpha = 0.1$, each logit shifts by $-\alpha \cdot \partial L / \partial z_k$. The new probabilities shift: $a_6$ goes up, all others go down. The fan has tilted toward the shot that scored well.
-
-![Policy fan before and after one REINFORCE update, showing the shift toward the taken action](./images/fig-policy-fan.svg)
-
-**The key insight:** a single sample moves _all nine_ logits, not just the one you tried. Probability is redistributed, never created.
-
-### 3.2 Hand-worked: computing the variance ladder
-
-We run 1500 episodes of the Archer MDP with three methods and compute the variance of the gradient estimator. (We use an `estimator_variance` helper, which records the per-episode gradient-estimator and returns `Var(estimator)`.)
+Every trick in this post was aimed at one enemy: the variance of the gradient estimate. It is worth seeing the payoff in numbers. We run 1500 episodes of the Archer MDP with three methods and measure the variance of the gradient estimator. (We use an `estimator_variance` helper, which records the per-episode gradient-estimator and returns `Var(estimator)`.)
 
 Results (5-seed average):
 
@@ -930,7 +939,11 @@ Results (5-seed average):
 
 ![Gradient variance on a log scale for the three methods, dropping by orders of magnitude with variance reduction](./images/fig-variance-ladder.svg)
 
+The first figure plots the gradient variance on a log scale, so each step down the ladder is a full order of magnitude. Plain REINFORCE sits at the top; adding the baseline drops it sharply, and the Actor-Critic edges a little lower still. The bars are the table above, drawn to scale.
+
 ![Greedy returns for the three methods, showing only variance-reduced methods solve the task](./images/fig-greedy-returns.svg)
+
+The second figure shows what that variance buys: the greedy return each method actually achieves. The two low-variance methods reach the near-optimal score while plain REINFORCE stalls well short. Lower variance is not a cosmetic win, it is the difference between learning the task and not.
 
 **The baseline slashes variance by about 73x** (0.0437 / 0.0006). The Actor-Critic cuts it by another ~1.5x (0.0006 / 0.0004). But the performance gap is stark: plain REINFORCE barely learns, while both variance-reduced methods reach the near-optimal return of ~9.6.
 
@@ -957,7 +970,7 @@ Why does the baseline help so much? In the Archer MDP, rewards are mostly positi
 
 </details>
 
-### 3.3 The entropy bonus and ablation insights
+### 2.12 Entropy and the ablations
 
 The entropy $H(\pi) = -\sum_a \pi(a) \log \pi(a)$ measures how spread out the policy is. Adding $+\texttt{ent\_coef} \cdot H$ to the objective discourages premature collapse: the policy pays a "tax" for becoming too certain too early.
 
@@ -978,9 +991,9 @@ Our ablation experiments:
 
 ---
 
-## 4. Putting it all together: Actor-Critic on the Archer MDP
+## 3. Putting it all together
 
-Before the capstone, a quick recap of every concept and how it maps to code:
+A quick recap of every concept in this post and how it maps to code:
 
 | Concept                     | Math                                     | In code                                            |
 | --------------------------- | ---------------------------------------- | -------------------------------------------------- |
@@ -992,194 +1005,12 @@ Before the capstone, a quick recap of every concept and how it maps to code:
 | Entropy bonus               | $H(\pi) = -\sum \pi\log\pi$              | `- ent_coef * ent.mean()`                          |
 | Critic loss                 | $(r + \gamma V(s') - V(s))^2$            | `(target - v).pow(2).mean()`                       |
 
-The capstone below combines all the pieces into a single runnable program: the Archer MDP environment, the actor (policy) and critic (value) networks, the act function, the actor-critic training loop with TD advantage and critic warmup, and greedy evaluation.
+Every concept above already appeared as a small snippet right next to its explanation, and §2.9 has the complete Actor-Critic loop that produced the 9.58 result. There is no separate capstone to paste here. The full end-to-end runnable program (the Archer bandit, the Archer MDP, and the whole climb from REINFORCE to Actor-Critic) lives in the assignment notebook:
 
-```python
-import gymnasium as gym
-from gymnasium import spaces
-import numpy as np, torch, torch.nn as nn
-
-GAMMA = 0.99  # discount factor: future rewards are worth 99% per step
-
-# ═══════════════════════════════════════════════════════════════════
-# ENVIRONMENT — Archer MDP
-# The archer starts at a random distance (10–50 m) and must decide:
-#   • walk closer (-10 m, costs -0.2 per step)
-#   • step back  (+10 m, costs -0.2 per step)
-#   • shoot      (ends episode, reward depends on current distance)
-# Optimal strategy: walk to 10 m then shoot for maximum +10 reward.
-# ═══════════════════════════════════════════════════════════════════
-class ArcherMDP(gym.Env):
-    CLOSER, BACK, SHOOT = 0, 1, 2   # the three discrete actions
-    MIN_D, MAX_D = 10., 50.          # distance bounds (meters)
-    def __init__(self, max_steps=25):
-        super().__init__()
-        # State = normalized distance d/50 ∈ [0, 1], a 1-D observation
-        self.observation_space = spaces.Box(0., 1., (1,), np.float32)
-        self.action_space = spaces.Discrete(3)
-        self.max_steps = max_steps
-    def _obs(self):
-        return np.array([self.d / self.MAX_D], np.float32)
-    def reset(self, *, seed=None, options=None):
-        super().reset(seed=seed)
-        self.d = float(self.np_random.choice([10.,20.,30.,40.,50.]))
-        self.t = 0
-        return self._obs(), {}
-    def shoot_reward(self, d):
-        # Linear reward: 10 at closest (10 m), drops by 0.28 per extra meter
-        return 10. - 0.28*(d - self.MIN_D)
-    def step(self, a):
-        self.t += 1
-        if a == self.SHOOT:
-            return self._obs(), float(self.shoot_reward(self.d)), True, False, {}
-        # Walking incurs a small step cost of -0.2 to encourage efficiency
-        self.d = float(np.clip(
-            self.d + (-10. if a == self.CLOSER else 10.), self.MIN_D, self.MAX_D))
-        return self._obs(), -0.2, False, self.t >= self.max_steps, {}
-
-# ═══════════════════════════════════════════════════════════════════
-# ACTOR (Policy) — maps state → action logits → π(a|s)
-# Two-layer MLP with tanh activation. Categorical distribution
-# converts logits to probabilities via softmax internally.
-# ═══════════════════════════════════════════════════════════════════
-class Policy(nn.Module):
-    def __init__(self, obs_dim, n_act, h=64):
-        super().__init__()
-        self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, n_act))
-    def forward(self, x): return self.net(x)
-
-# ═══════════════════════════════════════════════════════════════════
-# CRITIC (Value) — maps state → scalar V(s)
-# Predicts the expected discounted return from a given state under
-# the current policy. Used as a per-state baseline for the advantage.
-# ═══════════════════════════════════════════════════════════════════
-class Value(nn.Module):
-    def __init__(self, obs_dim, h=64):
-        super().__init__()
-        self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, 1))
-    def forward(self, x): return self.net(x).squeeze(-1)
-
-# ═══════════════════════════════════════════════════════════════════
-# ACTION SAMPLING — the score-function machinery at work
-# Converts policy logits into a Categorical distribution, samples an
-# action, and returns log π(a|s) and entropy H(π) for the gradient.
-# ═══════════════════════════════════════════════════════════════════
-def act(policy, s):
-    st = torch.tensor(s, dtype=torch.float32)
-    dist = torch.distributions.Categorical(logits=policy(st))
-    a = dist.sample()                              # stochastic: built-in exploration
-    return a, dist.log_prob(a), dist.entropy()      # log π(a|s), H(π)
-
-# ═══════════════════════════════════════════════════════════════════
-# ACTOR-CRITIC TRAINING LOOP
-# Each episode: roll out a full trajectory, compute TD advantage,
-# update the critic (value regression) then the actor (REINFORCE
-# weighted by advantage + entropy bonus).
-# ═══════════════════════════════════════════════════════════════════
-def actor_critic(env, episodes=2000, lr_a=0.004, lr_c=0.03,
-                 ent_coef=0.01, warmup=150):
-    pol = Policy(1, env.action_space.n)       # actor network
-    val = Value(1)                             # critic network
-    popt = torch.optim.Adam(pol.parameters(), lr_a)  # actor optimizer (lower lr)
-    vopt = torch.optim.Adam(val.parameters(), lr_c)  # critic optimizer (higher lr)
-    curve = []  # per-episode total reward for plotting
-    for ep in range(episodes):
-        s, _ = env.reset()
-        # S=states, logps=log π(a|s), ents=H, R=rewards, S2=next states,
-        # Dn=terminal flags. One entry per step in the episode.
-        S, logps, ents, R, S2, Dn = [], [], [], [], [], []
-        done = False
-        while not done:                             # ── rollout ──
-            a, logp, ent = act(pol, s)
-            s2, r, term, trunc, _ = env.step(int(a))
-            done = term or trunc
-            S.append(s); logps.append(logp); ents.append(ent)
-            R.append(r); S2.append(s2); Dn.append(float(term))
-            s = s2
-
-        # Convert lists → tensors for vectorized computation
-        states = torch.tensor(np.array(S), dtype=torch.float32)
-        snext  = torch.tensor(np.array(S2), dtype=torch.float32)
-        rew    = torch.tensor(R, dtype=torch.float32)
-        dn     = torch.tensor(Dn)  # 1.0 at terminal, 0.0 otherwise
-
-        # TD target = r + γ·V(s')·(1 - done)
-        # (1-dn) zeroes out the bootstrap at terminal states — no future
-        # exists after the episode ends, so V(s') must not contribute.
-        with torch.no_grad():
-            target = rew + GAMMA * val(snext) * (1 - dn)
-
-        v   = val(states)
-        # Advantage A = TD_target - V(s) = r + γV(s') - V(s)
-        # A > 0 → action was BETTER than expected → push π(a|s) UP
-        # A < 0 → action was WORSE  than expected → push π(a|s) DOWN
-        # .detach() blocks actor gradients from leaking into the critic
-        adv = (target - v).detach()
-
-        # ── Critic update: minimize MSE (TD_target - V(s))² ──────
-        # Teaches V(s) to predict the discounted return from each state
-        vopt.zero_grad()
-        (target - v).pow(2).mean().backward()
-        vopt.step()
-
-        # ── Actor update (only after warmup episodes) ────────────
-        # During warmup, the critic's V(s) is near-random so the advantage
-        # is noise. We wait until V(s) is reasonable before training π.
-        if ep >= warmup:
-            logp = torch.stack(logps)
-            ent  = torch.stack(ents)
-            popt.zero_grad()
-            # Actor loss = -𝔼[A · log π(a|s)]  - ent_coef · 𝔼[H(π)]
-            #   First term : REINFORCE gradient weighted by advantage
-            #                (negated because optimizer minimizes)
-            #   Second term: entropy bonus encourages continued exploration
-            (-(adv * logp).mean() - ent_coef * ent.mean()).backward()
-            popt.step()
-
-        curve.append(sum(R))  # track raw episode return
-    return pol, val, curve
-
-# ═══════════════════════════════════════════════════════════════════
-# GREEDY EVALUATION — test what the policy actually learned
-# Uses argmax (deterministic) instead of sampling, so evaluation is
-# free of exploration noise and reflects the policy's best behavior.
-# ═══════════════════════════════════════════════════════════════════
-def greedy_eval(env, pol, n=50):
-    total = 0.
-    for _ in range(n):
-        s, _ = env.reset(); done = False; ep_r = 0.
-        while not done:
-            with torch.no_grad():
-                # Pick the highest-logit action (greedy, no sampling)
-                a = pol(torch.tensor(s, dtype=torch.float32)).argmax()
-            s, r, term, trunc, _ = env.step(int(a))
-            ep_r += r; done = term or trunc
-        total += ep_r
-    return total / n  # average return across n evaluation episodes
-
-# ═══════════════════════════════════════════════════════════════════
-# RUN — train and report results
-# ═══════════════════════════════════════════════════════════════════
-env = ArcherMDP()
-pol, val, curve = actor_critic(env)
-ret = greedy_eval(env, pol)
-print(f"Actor-Critic on ArcherMDP")
-print(f"  training episodes: 2000")
-print(f"  greedy return (50 eval episodes): {ret:.2f}")
-print(f"  mean training return (last 200): {np.mean(curve[-200:]):.2f}")
-```
-
-```text title="Output"
-Actor-Critic on ArcherMDP
-  training episodes: 2000
-  greedy return (50 eval episodes): 9.58
-  mean training return (last 200): 9.58
-```
-
-The Actor-Critic solves the Archer MDP, reliably reaching a greedy return of ~9.6 (close to the theoretical optimum of 10, achievable only by starting at 10 m). The critic warmup keeps early noise from corrupting the actor, and entropy regularization prevents premature collapse to a suboptimal action.
+> **[Assignment — Policy Gradients from Scratch (The Archer)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture3.ipynb)**
 
 <details>
-<summary><strong>Check:</strong> In the capstone, why do we use `(1 - dn)` in the TD target? What would go wrong without it?</summary>
+<summary><strong>Check:</strong> In the Actor-Critic loop, why do we use `(1 - dn)` in the TD target? What would go wrong without it?</summary>
 
 **Answer.** The `dn` flag is 1 at terminal states. Without `(1 - dn)`, we would bootstrap through the terminal state, adding gamma \* V(s') after the episode is over. That injects a phantom future reward into the target, corrupting the critic's estimate. Setting the bootstrap to zero at terminal states keeps the value grounded in the actual final reward.
 
@@ -1196,7 +1027,7 @@ The Actor-Critic solves the Archer MDP, reliably reaching a greedy return of ~9.
 
 ## Practice: assignment
 
-Build the Archer from scratch — a bandit, then an MDP agent, climbing the variance ladder from REINFORCE all the way to Actor-Critic:
+Build the Archer from scratch: a bandit, then an MDP agent, climbing the variance ladder from REINFORCE all the way to Actor-Critic.
 
 > **[Assignment — Policy Gradients from Scratch (The Archer)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture3.ipynb)**
 
@@ -1204,8 +1035,8 @@ Build the Archer from scratch — a bandit, then an MDP agent, climbing the vari
 
 ## Where this goes next
 
-The Actor-Critic gives us a clean way to climb expected return, but each policy update can take a step of any size. If the step is too large, the policy overshoots and collapses; if too small, learning crawls. The next lecture adds **trust regions**: a hard constraint (TRPO) or a clipped surrogate (PPO) that keeps each update in a safe neighborhood of the old policy. The central equation becomes:
+The Actor-Critic gives us a clean way to climb expected return, but each policy update can take a step of any size. If the step is too large, the policy overshoots and collapses. If it is too small, learning crawls. The next lecture adds **trust regions**: a hard constraint (TRPO) or a clipped surrogate (PPO) that keeps each update in a safe neighborhood of the old policy. The central equation becomes:
 
 $$\max_\theta \; \mathbb{E}\left[\min\left(\frac{\pi_\theta(a \mid s)}{\pi_{\theta_\text{old}}(a \mid s)} A, \; \text{clip}\left(\frac{\pi_\theta}{\pi_{\theta_\text{old}}}, 1-\epsilon, 1+\epsilon\right) A\right)\right]$$
 
-That probability ratio $\pi_\theta / \pi_{\theta_\text{old}}$ is the thread: it measures how far the new policy has drifted, and clipping it is the mechanism that makes large-scale policy optimization stable.
+Read it as: maximize the advantage-weighted probability ratio $\pi_\theta / \pi_{\theta_\text{old}}$ (how much more likely the new policy makes the action than the old one), but take the smaller of the raw ratio and a clipped version pinned to the band $[1-\epsilon, 1+\epsilon]$. In plain English, you still push good actions up and bad ones down, but you refuse to move the policy more than a fixed fraction per update. That probability ratio is the thread: it measures how far the new policy has drifted, and clipping it is the mechanism that makes large-scale policy optimization stable. We unpack all of it in the [TRPO & PPO](../06-trpo-ppo/README.md) post.
