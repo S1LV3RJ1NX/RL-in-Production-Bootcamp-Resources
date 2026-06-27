@@ -101,7 +101,9 @@ The goal is a single number: the expected reward under the current policy.
 
 $$J(\theta) = \mathbb{E}_{a \sim \pi_\theta}[R(a)] = \sum_a \pi_\theta(a) \cdot R(a)$$
 
-Read it as: "for every action the agent could take, multiply the chance of taking it ($\pi_\theta(a)$) by the reward it would earn ($R(a)$), and add them all up." The result is the average reward you would see if you kept sampling from the current policy. $J$ is a function of the policy parameters $\theta$: change $\theta$, the probabilities shift, the weighted sum changes, and $J$ goes up or down. It goes up when we put more probability on higher-reward actions. **The whole goal: gradient ascent on $J$.**
+Read it aloud, symbol by symbol: "$J$ of $\theta$ equals the expected value ($\mathbb{E}$) of the reward $R(a)$, when the action $a$ is drawn from the policy $\pi_\theta$ (that is what $a \sim \pi_\theta$ means); and that expected value is the same thing as the sum, over every action $a$, of $\pi_\theta(a)$ times $R(a)$." The two halves are equal because an expectation _is_ a probability-weighted average: you weight each action's reward by how often the policy plays it.
+
+In plain English: for every action the agent could take, multiply the chance of taking it ($\pi_\theta(a)$) by the reward it would earn ($R(a)$), and add them all up. The result is the average reward you would see if you kept sampling from the current policy. $J$ is a function of the policy parameters $\theta$: change $\theta$, the probabilities shift, the weighted sum changes, and $J$ goes up or down. It goes up when we put more probability on higher-reward actions. **The whole goal: gradient ascent on $J$.**
 
 $$\theta \leftarrow \theta + \alpha \cdot \nabla_\theta J(\theta)$$
 
@@ -109,11 +111,20 @@ We _maximize_ reward, so we move _along_ the gradient (ascent, the **+** sign), 
 
 ### 2.2 The obstacle: you cannot just differentiate the sum
 
-The naive gradient is:
+We want $\nabla_\theta J$, the gradient of $J$ with respect to the parameters $\theta$. A "gradient" is just the collection of derivatives, one per parameter. It points in the direction that makes $J$ bigger, which is exactly the direction the update rule above wants to step. So we need to differentiate $J(\theta) = \sum_a \pi_\theta(a) \cdot R(a)$ with respect to $\theta$.
 
-$$\nabla_\theta J = \sum_a R(a) \cdot \nabla_\theta \pi_\theta(a)$$
+Two basic rules of derivatives are all we need:
 
-This needs $R(a)$ for _every_ action, including the ones we never tried, and the sum is huge or infinite for large or continuous action sets. **We cannot evaluate it. We need to turn it into something we can sample.**
+1. **The derivative of a sum is the sum of the derivatives.** We are allowed to reach inside the $\sum_a$ and differentiate one term at a time, then add the results back up.
+2. **A constant multiplier stays put.** Inside each term, $R(a)$ does not depend on $\theta$: the reward an action pays is fixed by the environment, while $\theta$ only changes how _likely_ we are to pick that action. So $R(a)$ is just a constant here, and a constant in front of a derivative comes along unchanged (the same way $\frac{d}{dx}(5x) = 5$). We differentiate only the $\theta$-dependent piece, $\pi_\theta(a)$.
+
+Applying both, term by term:
+
+$$\nabla_\theta J = \nabla_\theta \sum_a \pi_\theta(a) R(a) = \sum_a \nabla_\theta \big[\pi_\theta(a) R(a)\big] = \sum_a R(a) \cdot \nabla_\theta \pi_\theta(a)$$
+
+Read the final result aloud, symbol by symbol: "the gradient with respect to $\theta$ of $J$ ($\nabla_\theta J$) equals the sum, over every action $a$, of $R(a)$ times the gradient with respect to $\theta$ of $\pi_\theta(a)$ ($\nabla_\theta \pi_\theta(a)$)." In plain English: to raise $J$, push on each action's probability in proportion to the reward that action earns, big rewards get a big push, small rewards a small one.
+
+This is the naive gradient, and it has a fatal flaw. It needs $R(a)$ for _every_ action, including the ones we never tried, and the sum is huge or infinite for large or continuous action sets. **We cannot evaluate it. We need to turn it into something we can sample.**
 
 ### 2.3 The score-function trick (the one clean derivation)
 
