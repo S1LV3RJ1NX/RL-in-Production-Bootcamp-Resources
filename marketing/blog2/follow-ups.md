@@ -5,9 +5,9 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 ## How to use
 
 - Post one item per day, around 10:30 AM IST. Both platforms can run the same angle.
-- **LinkedIn:** paste the text, put the blog link in the first comment, add the hashtags at the bottom.
-- **X:** paste the text, drop the blog link in a self-reply. No hashtags.
-- Reply to your own post with the closing question, and reply to every comment in the first hour.
+- **LinkedIn:** paste the text (it ends with "Link in comments."), then put the blog link in the first comment, and add the hashtags at the bottom.
+- **X:** delete the "Link in comments." line, paste the text, and drop the blog link in a self-reply. No hashtags.
+- The closing question doubles as your first self-reply. Reply to every comment in the first hour.
 
 Blog link: https://prathameshsaraf.com/blogs/02-mdps-and-bellman/
 Hashtags (LinkedIn): #ReinforcementLearning #BellmanEquation #MachineLearning #RLHF #LearningInPublic
@@ -24,6 +24,8 @@ Value iteration, policy gradients, PPO, RLHF: each is a different way of solving
 
 What is the one equation you wish someone had just read out loud to you?
 
+Link in comments.
+
 ---
 
 ## Follow-up 2 — what an MDP actually is
@@ -37,6 +39,10 @@ An MDP sounds intimidating and is really just four things:
 
 That is the entire game board RL plays on. Once you can read a dynamics table line by line, the rest of RL stops being mysterious.
 
+What term in RL still sounds scarier than it actually is?
+
+Link in comments.
+
 ---
 
 ## Follow-up 3 — V versus Q
@@ -47,6 +53,10 @@ There are two ways to measure "how good," and mixing them up causes half of all 
 - Q(s, a) scores an action in a state: how good is it to do this, here?
 
 V is the value of the room. Q is the value of each door out of it. Most algorithms quietly switch from V to Q the moment they need to actually choose a move.
+
+Did V vs Q confuse you at first too?
+
+Link in comments.
 
 ---
 
@@ -60,6 +70,8 @@ Stare at it once and the Bellman equation reads itself.
 
 (Attach: fig-backup-diagram.svg, exported to PNG for X)
 
+Link in comments.
+
 ---
 
 ## Follow-up 5 — expectation versus optimality
@@ -69,7 +81,9 @@ The Bellman equation comes in two flavors, and the difference is a single operat
 - Expectation: average over the actions your policy takes. This scores a given policy.
 - Optimality: take the max over actions instead of the average. This finds the best policy.
 
-Swap "average" for "max" and evaluation becomes control. That one swap is the seed of Q-learning, three posts later.
+Swap "average" for "max" and evaluation becomes control. That one swap is the seed of Q-learning, two posts later.
+
+Link in comments.
 
 ---
 
@@ -80,6 +94,8 @@ The thing that finally made Bellman click for me was seeing every symbol become 
 The sum over actions is a loop. The transition probability is a weight. The reward plus discounted next value is the body. No magic, just the equation typed out.
 
 If you learn better with the math and the Python side by side, this post was written for you.
+
+Link in comments.
 
 ---
 
@@ -94,6 +110,8 @@ Blog 2 in five lines:
 - Swap average for max and you get Bellman optimality.
 
 Next up is blog 3: three different ways to actually solve this equation (DP, Monte Carlo, and TD) and proof they all land on the same answer. Which flavor of Bellman trips you up more, expectation or optimality?
+
+Link in comments.
 
 ---
 

@@ -5,9 +5,9 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 ## How to use
 
 - Post one item per day, around 10:30 AM IST. Both platforms can run the same angle.
-- **LinkedIn:** paste the text, put the blog link in the first comment, add the hashtags at the bottom.
-- **X:** paste the text, drop the blog link in a self-reply. No hashtags.
-- Reply to your own post with the closing question, and reply to every comment in the first hour.
+- **LinkedIn:** paste the text (it ends with "Link in comments."), then put the blog link in the first comment, and add the hashtags at the bottom.
+- **X:** delete the "Link in comments." line, paste the text, and drop the blog link in a self-reply. No hashtags.
+- The closing question doubles as your first self-reply. Reply to every comment in the first hour.
 
 Blog link: https://prathameshsaraf.com/blogs/04-sarsa-qlearning-dqn/
 Hashtags (LinkedIn): #ReinforcementLearning #MachineLearning #DeepLearning #LLMs #LearningInPublic
@@ -22,6 +22,8 @@ The jump between them is one symbol. Take last week's TD update, apply it to act
 
 Control is prediction plus a max. What concept finally made RL "click" for you?
 
+Link in comments.
+
 ---
 
 ## Follow-up 2 — max versus argmax
@@ -33,6 +35,8 @@ Two words that quietly run all of value-based RL, and they are easy to mix up.
 
 Same row of numbers, two different questions. The max scores the state, the argmax picks the action. No model needed for either.
 
+Link in comments.
+
 ---
 
 ## Follow-up 3 — one symbol separates SARSA and Q-learning
@@ -43,6 +47,8 @@ SARSA and Q-learning differ by a single symbol in their target.
 - SARSA bootstraps off the action it actually took. It is honest about its own exploration.
 
 That one symbol is the entire difference between off-policy and on-policy learning.
+
+Link in comments.
 
 ---
 
@@ -56,6 +62,8 @@ Both are right. Q-learning takes the brave cliff-edge route assuming perfect pla
 
 (Attach: fig-sarsa-vs-q-curves.png)
 
+Link in comments.
+
 ---
 
 ## Follow-up 5 — from a table to a network
@@ -65,6 +73,8 @@ CliffWalking has 48 states, so the values fit in a table. Pong has more pixel sc
 The fix changes only the container, not the rule. Replace the lookup table with a neural network that takes a state and emits one value per action. A table memorizes; a network generalizes to states it has never seen.
 
 Same update, bigger container. That is DQN.
+
+Link in comments.
 
 ---
 
@@ -76,6 +86,8 @@ Naive deep Q-learning diverges. DQN adds two fixes, each aimed at one failure.
 - Target network: build the label with a frozen copy of the weights, so the agent stops chasing a target that moves every step.
 
 Neither changes the objective. They just let gradient descent cope. That is the jump to the network that learned 49 Atari games.
+
+Link in comments.
 
 ---
 
@@ -90,6 +102,8 @@ Blog 4 in five lines:
 - Swap the table for a network and the same loop plays Pong from pixels.
 
 Next up is blog 5: policy gradients, where we skip values and optimize the policy directly, the branch that leads to PPO and RLHF. Have you hit the cliff paradox in your own training runs?
+
+Link in comments.
 
 ---
 
