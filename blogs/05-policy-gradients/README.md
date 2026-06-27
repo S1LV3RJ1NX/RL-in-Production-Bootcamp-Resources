@@ -195,7 +195,7 @@ $$\hat{g} = R(a) \cdot \nabla_\theta \log \pi_\theta(a), \quad a \sim \pi_\theta
 
 Read it aloud, symbol by symbol: "the gradient estimate $\hat{g}$ equals the reward $R(a)$ times the gradient with respect to $\theta$ of $\log \pi_\theta(a)$, for an action $a$ sampled from the policy $\pi_\theta$ ($a \sim \pi_\theta$)."
 
-The scaling lives in that multiplication. $\nabla_\theta \log \pi_\theta(a)$ is a **vector**: the direction in parameter space that makes action $a$ more likely (the "nudge"). $R(a)$ is a single **number** sitting in front of it, so multiplying just stretches or shrinks that direction without rotating it. A big reward makes the nudge long (push hard toward $a$); a small reward makes it short; a negative reward flips the sign (push away from $a$). So in $\hat{g} = R(a) \cdot \nabla_\theta \log \pi_\theta(a)$, the "$\cdot$" _is_ the scaling and $R(a)$ is the scale factor. One sample gives one noisy estimate $\hat{g}$ of the true gradient.
+$\nabla_\theta \log \pi_\theta(a)$ is a **vector**: the direction in parameter space that makes action $a$ more likely (the "nudge"). $R(a)$ is a single **number** sitting in front of it, so multiplying just stretches or shrinks that direction without rotating it. A big reward makes the nudge long (push hard toward $a$); a small reward makes it short; a negative reward flips the sign (push away from $a$). So in $\hat{g} = R(a) \cdot \nabla_\theta \log \pi_\theta(a)$, the "$\cdot$" _is_ the scaling and $R(a)$ is the scale factor. One sample gives one noisy estimate $\hat{g}$ of the true gradient.
 
 In the bandit there is no future, so the weight on the chosen angle is simply its reward $r$. No returns, no credit assignment. One shot, one reward, one push.
 
@@ -213,8 +213,13 @@ class ArcherBandit(gym.Env):
 
     def __init__(self):
         super().__init__()
-        # bandit has no meaningful state: the observation is always [0.]
+        # observation_space declares what a state looks like. spaces.Box is the
+        # space for continuous values: Box(low, high, shape, dtype), so this is a
+        # length-1 float32 array bounded to [0, 1]. The bandit has no real state,
+        # so the observation is always the dummy [0.]
         self.observation_space = spaces.Box(0., 1., (1,), np.float32)
+        # spaces.Discrete(N) is the action space: one integer choice in 0..N-1
+        # (here the 9 release angles a1..a9)
         self.action_space = spaces.Discrete(self.N_ANGLES)
 
     def reset(self, *, seed=None, options=None):
