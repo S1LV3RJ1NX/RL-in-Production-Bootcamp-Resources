@@ -805,19 +805,19 @@ class ArcherMDP(gym.Env):
         self.observation_space = spaces.Box(0., 1., (1,), np.float32)
         self.action_space = spaces.Discrete(3)
         self.max_steps = max_steps
-    def _obs(self):
+    def _obs(self) -> np.ndarray:
         return np.array([self.d / self.MAX_D], np.float32)
-    def reset(self, *, seed=None, options=None):
+    def reset(self, *, seed=None, options=None) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         # start at a random distance from {10, 20, 30, 40, 50}
         self.d = float(self.np_random.choice([10.,20.,30.,40.,50.]))
         self.t = 0
         return self._obs(), {}
-    def shoot_reward(self, d):
+    def shoot_reward(self, d: float) -> float:
         # reward for shooting: 10 at 10 m (closest), drops linearly with distance;
         # optimal strategy is to walk to 10 m, then shoot for max reward
         return 10. - 0.28*(d - self.MIN_D)
-    def step(self, a):
+    def step(self, a: int) -> tuple[np.ndarray, float, bool, bool, dict]:
         self.t += 1
         if a == self.SHOOT:
             # shooting ends the episode (terminated=True) with a distance-based reward
@@ -838,7 +838,8 @@ class Policy(nn.Module):
     def __init__(self, obs_dim, n_act, h=64):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, n_act))
-    def forward(self, x): return self.net(x)
+    # x: (batch, obs_dim) -> logits (batch, n_act)
+    def forward(self, x: torch.Tensor) -> torch.Tensor: return self.net(x)
 
 # ── Critic (Value network) ──────────────────────────────────────
 # maps state -> single scalar V(s), the expected return from state s
@@ -847,14 +848,16 @@ class Value(nn.Module):
     def __init__(self, obs_dim, h=64):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, 1))
-    def forward(self, x): return self.net(x).squeeze(-1)
+    # net gives (batch, 1); squeeze(-1) drops the trailing dim -> (batch,)
+    # so V(s) lines up elementwise with the (batch,) rewards and advantages
+    def forward(self, x: torch.Tensor) -> torch.Tensor: return self.net(x).squeeze(-1)
 ```
 
 The `act` helper samples an action from the current policy and returns the three things the update needs: the action itself, its log-probability $\log \pi(a \mid s)$ (the "score" the gradient pushes on), and the entropy $H(\pi)$ (how spread out the policy is, used later for the exploration bonus).
 
 ```python
 # ── Action sampling ─────────────────────────────────────────────
-def act(policy, s):
+def act(policy: nn.Module, s: np.ndarray) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     st = torch.tensor(s, dtype=torch.float32)
     # Categorical applies softmax to logits -> π(a|s), then we sample
     dist = torch.distributions.Categorical(logits=policy(st))
@@ -869,7 +872,7 @@ Now the training loop, the heart of the algorithm. Each episode runs in five bea
 
 ```python
 # ── Actor-Critic training loop ──────────────────────────────────
-def actor_critic(env, episodes=2000, lr_a=0.004, lr_c=0.03, ent_coef=0.01, warmup=150):
+def actor_critic(env: gym.Env, episodes: int = 2000, lr_a: float = 0.004, lr_c: float = 0.03, ent_coef: float = 0.01, warmup: int = 150):
     # actor: learns WHAT to do
     pol = Policy(1, env.action_space.n)
     # critic: learns HOW GOOD each state is
@@ -947,7 +950,7 @@ The five beats inside the loop, one at a time:
 # ── Greedy evaluation ───────────────────────────────────────────
 # after training, test the policy deterministically (argmax, no sampling)
 # to measure what it has actually learned, free from exploration noise
-def greedy_eval(env, pol, n=20):
+def greedy_eval(env: gym.Env, pol: nn.Module, n: int = 20) -> float:
     total = 0.
     for _ in range(n):
         s, _ = env.reset(); done = False; ep_r = 0.
