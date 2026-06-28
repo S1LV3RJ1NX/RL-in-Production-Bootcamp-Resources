@@ -640,7 +640,27 @@ Two things change in the mechanics:
 
 The return $G_t = r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \dots$ was defined in the [MDPs & Bellman](../02-mdps-and-bellman/README.md) post. Discounting and returns were explored in the [DP, MC & TD](../03-dp-mc-td/README.md) post. REINFORCE waits for the full episode to compute $G_t$, exactly like Monte Carlo prediction from that same post.
 
-The complete REINFORCE gradient with states:
+**How we get there.** This is the same derivation as the bandit, with two extra facts that only show up once there are states. Four moves.
+
+First, write the objective over whole trajectories. A trajectory $\tau = (s_0, a_0, r_0, s_1, a_1, \dots)$ has return $R(\tau) = \sum_t \gamma^t r_t$, and we want $J(\theta) = \mathbb{E}_\tau[R(\tau)] = \sum_\tau P(\tau; \theta)\, R(\tau)$. The probability of a trajectory factorizes into the start state, our policy at each step, and the environment's transitions:
+
+$$P(\tau; \theta) = \rho(s_0) \prod_t \pi_\theta(a_t \mid s_t)\, P(s_{t+1} \mid s_t, a_t)$$
+
+We control only the $\pi_\theta$ factors; the start distribution $\rho(s_0)$ and the dynamics $P(s_{t+1} \mid s_t, a_t)$ belong to the environment and do not depend on $\theta$. Keep that in mind, it is the point of move 2.
+
+**Move 1: the log-derivative trick, again.** $R(\tau)$ does not depend on $\theta$ directly, so the gradient lands on $P(\tau; \theta)$, and the same trick from Section 2.3 ($\nabla P = P \nabla \log P$) turns it back into an expectation we can sample:
+
+$$\nabla_\theta J = \sum_\tau \nabla_\theta P(\tau; \theta)\, R(\tau) = \mathbb{E}_\tau\big[R(\tau)\, \nabla_\theta \log P(\tau; \theta)\big]$$
+
+**Move 2: the environment cancels.** Take the log of the trajectory probability (which turns the product into a sum) and differentiate. The start-state term and every transition term are constants in $\theta$, so their gradients are zero:
+
+$$\nabla_\theta \log P(\tau; \theta) = \underbrace{\nabla_\theta \log \rho(s_0)}_{=\,0} + \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t) + \underbrace{\sum_t \nabla_\theta \log P(s_{t+1} \mid s_t, a_t)}_{=\,0}$$
+
+Only the policy terms survive, $\nabla_\theta \log P(\tau; \theta) = \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)$. The unknown dynamics drop out entirely, and that one fact is **why REINFORCE is model-free**: you never need to know how the world transitions. Substituting back:
+
+$$\nabla_\theta J = \mathbb{E}_\tau\Big[\sum_t R(\tau)\, \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big]$$
+
+**Move 3: causality, the reward-to-go.** Each action $a_t$ is still weighted by the whole-episode return $R(\tau)$, but an action cannot affect rewards that happened before it. Those earlier rewards are uncorrelated with $\nabla_\theta \log \pi_\theta(a_t \mid s_t)$, so by the same zero-expectation argument as the baseline proof, dropping them leaves the mean unchanged and only trims variance. Keep just the return from $t$ onward, $G_t = \sum_{t' \ge t} \gamma^{t'-t} r_{t'}$, and you land on the complete REINFORCE gradient with states:
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_\tau \Big[\sum_t G_t \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big]$$
 
