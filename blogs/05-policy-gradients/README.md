@@ -654,25 +654,39 @@ $$P(\tau; \theta) = \rho(s_0) \prod_t \pi_\theta(a_t \mid s_t)\, P(s_{t+1} \mid 
 
 Symbol by symbol: $\rho(s_0)$ is the chance of the starting state; $\prod_t$ means "multiply over every timestep"; $\pi_\theta(a_t \mid s_t)$ is our policy's chance of the action it took (the only factor with $\theta$ in it, the only part we control); and $P(s_{t+1} \mid s_t, a_t)$ is the environment's chance of the next state, which we do not control and which carries no $\theta$. Remember that last point, it is the whole trick in Step 3.
 
-**Step 2: differentiate, and reuse the log trick.** We want $\nabla_\theta J$. Since $R(\tau)$ does not depend on $\theta$ directly, the gradient only hits $P(\tau; \theta)$:
+**Step 2: differentiate, and reuse the log trick.** We have $J(\theta) = \sum_\tau P(\tau; \theta)\, R(\tau)$ and we want $\nabla_\theta J$. Three small derivative rules get us there, one at a time.
 
-$$\nabla_\theta J = \sum_\tau \nabla_\theta P(\tau; \theta)\, R(\tau)$$
+_Rule 1, the sum rule._ The derivative of a sum is the sum of the derivatives, so we can push the gradient inside the sum and deal with one trajectory at a time:
 
-That is a gradient of a probability, which we cannot sample, the exact wall we hit in the bandit. Apply the same log-derivative trick from Section 2.3, $\nabla P = P \nabla \log P$, to turn it back into an expectation:
+$$\nabla_\theta J = \sum_\tau \nabla_\theta \big[P(\tau; \theta)\, R(\tau)\big]$$
 
-$$\nabla_\theta J = \sum_\tau P(\tau; \theta)\, \nabla_\theta \log P(\tau; \theta)\, R(\tau) = \mathbb{E}_\tau\big[R(\tau)\, \nabla_\theta \log P(\tau; \theta)\big]$$
+_Rule 2, the constant-multiplier rule._ Inside each term, $R(\tau)$ does not depend on $\theta$: the return of a _fixed_ trajectory is a fixed number, and $\theta$ only changes how _likely_ that trajectory is, not the reward it pays. A constant in front of a derivative comes along unchanged (the same way $\frac{d}{dx}(5x) = 5$), so $R(\tau)$ slides out and the gradient only has to act on $P(\tau; \theta)$:
 
-**Step 3: take the log, and watch the environment cancel.** The log of a product is a sum of logs, so $\log P(\tau; \theta)$ breaks into three pieces, and we differentiate each:
+$$\nabla_\theta J = \sum_\tau R(\tau)\, \nabla_\theta P(\tau; \theta)$$
+
+_Rule 3, the log-derivative trick._ We are now stuck on $\nabla_\theta P(\tau; \theta)$, the gradient of a probability, which is not an average over anything we can sample. This is the exact wall we hit in the bandit, and the same trick breaks it. For any positive function, the chain rule gives $\nabla_\theta \log P = \frac{\nabla_\theta P}{P}$; multiply both sides by $P$ and you get
+
+$$\nabla_\theta P(\tau; \theta) = P(\tau; \theta)\, \nabla_\theta \log P(\tau; \theta)$$
+
+Substitute that in. The $P(\tau; \theta)$ we just created sits back in front of $R(\tau)$, which turns the bare sum into a probability-weighted average, that is, an expectation we can estimate by rolling out episodes:
+
+$$\nabla_\theta J = \sum_\tau P(\tau; \theta)\, \big[R(\tau)\, \nabla_\theta \log P(\tau; \theta)\big] = \mathbb{E}_\tau\big[R(\tau)\, \nabla_\theta \log P(\tau; \theta)\big]$$
+
+**Step 3: take the log, and watch the environment cancel.** We still owe one piece: $\nabla_\theta \log P(\tau; \theta)$. Start from the trajectory probability in Step 1 and use one more rule, **the log of a product is the sum of the logs**, which turns that long product into a tidy sum:
+
+$$\log P(\tau; \theta) = \log \rho(s_0) + \sum_t \log \pi_\theta(a_t \mid s_t) + \sum_t \log P(s_{t+1} \mid s_t, a_t)$$
+
+Now differentiate term by term (sum rule once more). A term with no $\theta$ in it has derivative $0$, exactly like $\frac{d}{dx}(5) = 0$. The start-state term $\log \rho(s_0)$ and every transition term $\log P(s_{t+1} \mid s_t, a_t)$ are the environment's, with no $\theta$ anywhere in them, so they drop to zero:
 
 $$\nabla_\theta \log P(\tau; \theta) = \underbrace{\nabla_\theta \log \rho(s_0)}_{=\,0} + \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t) + \underbrace{\sum_t \nabla_\theta \log P(s_{t+1} \mid s_t, a_t)}_{=\,0}$$
 
-The start-state term and every transition term have no $\theta$ in them (they are the environment's, from Step 1), and the derivative of something with no $\theta$ is $0$. Only the policy terms survive:
+Only the policy terms survive:
 
 $$\nabla_\theta \log P(\tau; \theta) = \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)$$
 
-This is the payoff: the unknown environment dynamics vanish from the gradient. That single fact is **why REINFORCE is model-free**, you never need to know how the world transitions. Put it back into Step 2:
+This is the payoff: the unknown environment dynamics vanish from the gradient. That single fact is **why REINFORCE is model-free**, you never need to know how the world transitions. Put it back into the expectation from Step 2:
 
-$$\nabla_\theta J = \mathbb{E}_\tau\Big[\sum_t R(\tau)\, \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big]$$
+$$\nabla_\theta J = \mathbb{E}_\tau\Big[R(\tau) \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big] = \mathbb{E}_\tau\Big[\sum_t R(\tau)\, \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big]$$
 
 **Step 4: only count rewards an action could cause (reward-to-go).** Right now every action $a_t$ is weighted by the full-episode return $R(\tau)$, including rewards that arrived _before_ it. But an action cannot change the past. Those earlier rewards are uncorrelated with the push $\nabla_\theta \log \pi_\theta(a_t \mid s_t)$, so by the same zero-expectation argument as the baseline proof, dropping them does not change the average, it only trims variance. Keep just the return from step $t$ onward, the reward-to-go $G_t = \sum_{t' \ge t} \gamma^{t'-t} r_{t'}$, and you arrive at the complete REINFORCE gradient with states:
 
