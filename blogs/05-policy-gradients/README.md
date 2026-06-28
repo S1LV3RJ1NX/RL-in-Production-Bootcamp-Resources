@@ -640,27 +640,41 @@ Two things change in the mechanics:
 
 The return $G_t = r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \dots$ was defined in the [MDPs & Bellman](../02-mdps-and-bellman/README.md) post. Discounting and returns were explored in the [DP, MC & TD](../03-dp-mc-td/README.md) post. REINFORCE waits for the full episode to compute $G_t$, exactly like Monte Carlo prediction from that same post.
 
-**Deriving the policy gradient with states.** With those two changes, the objective $J(\theta)$ is now the expected return over whole episodes, and we need its gradient $\nabla_\theta J(\theta)$ so we can climb it. That gradient is the equation at the end of this subsection. Getting there is the same derivation as the bandit, with two extra facts that only show up once there are states. Four moves.
+**Deriving the policy gradient with states.** With those two changes, the objective $J(\theta)$ is the average return over whole episodes, and we want its gradient $\nabla_\theta J(\theta)$ so we can climb it. It is the same derivation as the bandit, with trajectories in place of single shots. Five small steps.
 
-First, write the objective over whole trajectories. A trajectory $\tau = (s_0, a_0, r_0, s_1, a_1, \dots)$ has return $R(\tau) = \sum_t \gamma^t r_t$, and we want $J(\theta) = \mathbb{E}_\tau[R(\tau)] = \sum_\tau P(\tau; \theta)\, R(\tau)$. The probability of a trajectory factorizes into the start state, our policy at each step, and the environment's transitions:
+**Step 0: name the pieces.** A trajectory $\tau$ is one full episode written out, $\tau = (s_0, a_0, r_0, s_1, a_1, r_1, \dots)$, and its return is $R(\tau) = \sum_t \gamma^t r_t$ (all the discounted rewards in that episode). The objective is the average return over every episode the policy could produce:
+
+$$J(\theta) = \mathbb{E}_\tau[R(\tau)] = \sum_\tau P(\tau; \theta)\, R(\tau)$$
+
+Read it aloud: "$J$ of $\theta$ is the expected return, which is the sum over every possible trajectory $\tau$ of how likely that trajectory is, $P(\tau; \theta)$, times its return $R(\tau)$." This is the exact same shape as the bandit's $J(\theta) = \sum_a \pi_\theta(a)\, R(a)$, with whole trajectories $\tau$ now playing the role single actions $a$ played before.
+
+**Step 1: write how likely a trajectory is.** A trajectory unrolls one step at a time: you start somewhere, then over and over the policy picks an action and the environment picks the next state. Multiply all those chances together:
 
 $$P(\tau; \theta) = \rho(s_0) \prod_t \pi_\theta(a_t \mid s_t)\, P(s_{t+1} \mid s_t, a_t)$$
 
-We control only the $\pi_\theta$ factors; the start distribution $\rho(s_0)$ and the dynamics $P(s_{t+1} \mid s_t, a_t)$ belong to the environment and do not depend on $\theta$. Keep that in mind, it is the point of move 2.
+Symbol by symbol: $\rho(s_0)$ is the chance of the starting state; $\prod_t$ means "multiply over every timestep"; $\pi_\theta(a_t \mid s_t)$ is our policy's chance of the action it took (the only factor with $\theta$ in it, the only part we control); and $P(s_{t+1} \mid s_t, a_t)$ is the environment's chance of the next state, which we do not control and which carries no $\theta$. Remember that last point, it is the whole trick in Step 3.
 
-**Move 1: the log-derivative trick, again.** $R(\tau)$ does not depend on $\theta$ directly, so the gradient lands on $P(\tau; \theta)$, and the same trick from Section 2.3 ($\nabla P = P \nabla \log P$) turns it back into an expectation we can sample:
+**Step 2: differentiate, and reuse the log trick.** We want $\nabla_\theta J$. Since $R(\tau)$ does not depend on $\theta$ directly, the gradient only hits $P(\tau; \theta)$:
 
-$$\nabla_\theta J = \sum_\tau \nabla_\theta P(\tau; \theta)\, R(\tau) = \mathbb{E}_\tau\big[R(\tau)\, \nabla_\theta \log P(\tau; \theta)\big]$$
+$$\nabla_\theta J = \sum_\tau \nabla_\theta P(\tau; \theta)\, R(\tau)$$
 
-**Move 2: the environment cancels.** Take the log of the trajectory probability (which turns the product into a sum) and differentiate. The start-state term and every transition term are constants in $\theta$, so their gradients are zero:
+That is a gradient of a probability, which we cannot sample, the exact wall we hit in the bandit. Apply the same log-derivative trick from Section 2.3, $\nabla P = P \nabla \log P$, to turn it back into an expectation:
+
+$$\nabla_\theta J = \sum_\tau P(\tau; \theta)\, \nabla_\theta \log P(\tau; \theta)\, R(\tau) = \mathbb{E}_\tau\big[R(\tau)\, \nabla_\theta \log P(\tau; \theta)\big]$$
+
+**Step 3: take the log, and watch the environment cancel.** The log of a product is a sum of logs, so $\log P(\tau; \theta)$ breaks into three pieces, and we differentiate each:
 
 $$\nabla_\theta \log P(\tau; \theta) = \underbrace{\nabla_\theta \log \rho(s_0)}_{=\,0} + \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t) + \underbrace{\sum_t \nabla_\theta \log P(s_{t+1} \mid s_t, a_t)}_{=\,0}$$
 
-Only the policy terms survive, $\nabla_\theta \log P(\tau; \theta) = \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)$. The unknown dynamics drop out entirely, and that one fact is **why REINFORCE is model-free**: you never need to know how the world transitions. Substituting back:
+The start-state term and every transition term have no $\theta$ in them (they are the environment's, from Step 1), and the derivative of something with no $\theta$ is $0$. Only the policy terms survive:
+
+$$\nabla_\theta \log P(\tau; \theta) = \sum_t \nabla_\theta \log \pi_\theta(a_t \mid s_t)$$
+
+This is the payoff: the unknown environment dynamics vanish from the gradient. That single fact is **why REINFORCE is model-free**, you never need to know how the world transitions. Put it back into Step 2:
 
 $$\nabla_\theta J = \mathbb{E}_\tau\Big[\sum_t R(\tau)\, \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big]$$
 
-**Move 3: causality, the reward-to-go.** Each action $a_t$ is still weighted by the whole-episode return $R(\tau)$, but an action cannot affect rewards that happened before it. Those earlier rewards are uncorrelated with $\nabla_\theta \log \pi_\theta(a_t \mid s_t)$, so by the same zero-expectation argument as the baseline proof, dropping them leaves the mean unchanged and only trims variance. Keep just the return from $t$ onward, $G_t = \sum_{t' \ge t} \gamma^{t'-t} r_{t'}$, and you land on the complete REINFORCE gradient with states:
+**Step 4: only count rewards an action could cause (reward-to-go).** Right now every action $a_t$ is weighted by the full-episode return $R(\tau)$, including rewards that arrived _before_ it. But an action cannot change the past. Those earlier rewards are uncorrelated with the push $\nabla_\theta \log \pi_\theta(a_t \mid s_t)$, so by the same zero-expectation argument as the baseline proof, dropping them does not change the average, it only trims variance. Keep just the return from step $t$ onward, the reward-to-go $G_t = \sum_{t' \ge t} \gamma^{t'-t} r_{t'}$, and you arrive at the complete REINFORCE gradient with states:
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_\tau \Big[\sum_t G_t \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\Big]$$
 
