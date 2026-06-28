@@ -86,7 +86,23 @@ Keep them visually consistent across the whole series. The established style is 
 - Crisp bold white title (the blog title) with a smaller lighter-gray subtitle beneath it. Modern image models render short titles cleanly, so put the real title in the prompt.
 - Generous negative space and soft neon glow.
 
-How to generate: use the image tool and **pass a previous blog's banner (e.g. `marketing/blog3/blog3-x-banner.png`) as a style reference** so the new one matches. Generate the X banner and the social cover as a pair, then drop both into `marketing/blogN/`.
+How to generate (repeatable workflow):
+
+1. **Generate the pair** with the image tool, and **pass a previous blog's banner and cover (e.g. `marketing/blog4/blog4-x-banner.png` and `marketing/blog4/blog4-social-cover.png`) as style references** so the new ones match the series. Put the real blog title and subtitle in the prompt.
+2. The image tool returns **1536x1024 (3:2)** images. The **social cover is done as-is** (3:2 is the target).
+3. The **X banner must be cropped to 5:2** (the tool will not output 5:2 natively). Crop the 3:2 render down by trimming the top and bottom negative space, centered:
+
+```
+sips -c 614 1536 marketing/blogN/blogN-x-banner.png
+```
+
+(`sips -c <height> <width>` crops centered; 1536 wide at 5:2 is 614 tall. Compose the banner with generous top/bottom margin so the crop keeps the diagram and title.)
+
+4. Drop both final images into `marketing/blogN/`.
+
+5. **Export the blog's key figures to PNG** for embedding (X does not support SVG; see below).
+
+**Aspect ratios are strict:** social cover **3:2**, X banner **5:2**. Verify after cropping with `sips -g pixelWidth -g pixelHeight <file>`.
 
 **X does not support SVG.** Most blog figures are SVG, so export a PNG before embedding in an X article. Convert with:
 
