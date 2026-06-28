@@ -767,12 +767,16 @@ The advantage is the TD error from the [DP, MC & TD](../03-dp-mc-td/README.md) p
 
 $$A = r + \gamma V_w(s') - V_w(s)$$
 
-Read it as: "the reward I just got ($r$), plus what the critic thinks the next state is worth ($\gamma V_w(s')$), minus what the critic thought this state was worth ($V_w(s)$)." If $A > 0$, reality beat the critic's expectation, so push the action up; if $A < 0$, reality was worse, so push it down.
+Read it as: "the reward I just got ($r$), plus what the critic thinks the next state is worth ($\gamma V_w(s')$), minus what the critic thought this state was worth ($V_w(s)$)."
+
+Why the minus? Split the formula into two halves. The first half, $r + \gamma V_w(s')$, is a _fresh, better_ estimate of how good $s$ was, because it is built from one **real** reward we actually observed plus the critic's value for wherever we landed. The second half, $V_w(s)$, is the critic's _old_ guess for $s$, made before we took the step. Subtracting the old guess from the updated estimate leaves only the **surprise**: how much better or worse the step turned out than the critic had predicted.
+
+That subtraction is exactly the baseline idea from Sections 2.6 and 2.8. Without the $-V_w(s)$ term we would weight every action by its raw value, a big, almost-always-positive number that barely separates good moves from bad. Subtracting $V_w(s)$ re-centers everything around zero, so only moves that beat the local expectation get pushed up. If $A > 0$, reality beat the critic, push the action up; if $A < 0$, reality was worse, push it down; if $A \approx 0$, the step was about as expected, so barely move.
 
 Two losses, one pass:
 
-- **Critic:** regress $V(s)$ toward the TD target $r + \gamma V(s')$: minimize $(r + \gamma V(s') - V(s))^2$.
-- **Actor:** push each action by its advantage: minimize $-(A \cdot \log \pi(a \mid s))$.
+- **Critic:** make its prediction $V(s)$ match what actually happened. The TD target $r + \gamma V(s')$ is the better estimate from above, so we minimize the squared gap $(r + \gamma V(s') - V(s))^2$. The minus here is plain prediction error, how far the guess $V(s)$ sits from the target; squaring makes it positive and punishes big misses harder, so gradient descent slides $V(s)$ toward the target. The target is treated as a fixed number (via `detach`), so $V(s)$ chases it instead of both sides drifting.
+- **Actor:** push each action by its advantage. We _want_ to **maximize** $A \cdot \log \pi(a \mid s)$, raising the log-probability of actions whose advantage is positive. But PyTorch optimizers only **minimize**, so we flip the sign and minimize $-(A \cdot \log \pi(a \mid s))$. This minus is the same gradient-ascent-as-loss bookkeeping from the bandit in Section 2.4, not new math: minimizing the negative is identical to maximizing the original.
 
 **Why `detach`?** The advantage is meant to be a fixed weight telling the actor how much to push. If the actor's gradient flowed into $V$, the actor could "cheat" by changing the critic to make its chosen actions look good (lowering $V(s)$) instead of improving the policy. `detach` keeps the two objectives clean.
 
