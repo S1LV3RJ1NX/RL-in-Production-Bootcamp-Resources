@@ -1094,9 +1094,11 @@ def fig_variance_ladder() -> None:
     ax.bar(methods, variances, color=ACCENT, width=0.55)
     ax.set_yscale("log")
     ax.set_ylabel("gradient variance (log scale)")
+    # extra top headroom so the tallest bar's value label clears the title
+    ax.set_ylim(top=max(variances) * 4)
     ax.set_title("The variance ladder: baseline cuts noise by ~73×, critic by ~110×")
     for i, v in enumerate(variances):
-        ax.text(i, v * 1.5, f"{v:.4f}", ha="center", fontsize=10, color=INK, fontweight="bold")
+        ax.text(i, v * 1.3, f"{v:.4f}", ha="center", fontsize=10, color=INK, fontweight="bold")
     save(fig, BLOG05, "fig-variance-ladder")
 
 
