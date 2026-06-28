@@ -640,7 +640,7 @@ Two things change in the mechanics:
 
 The return $G_t = r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \dots$ was defined in the [MDPs & Bellman](../02-mdps-and-bellman/README.md) post. Discounting and returns were explored in the [DP, MC & TD](../03-dp-mc-td/README.md) post. REINFORCE waits for the full episode to compute $G_t$, exactly like Monte Carlo prediction from that same post.
 
-**How we derive this gradient.** The goal is the equation at the end of this subsection, the complete REINFORCE gradient with states. Getting there is the same derivation as the bandit, with two extra facts that only show up once there are states. Four moves.
+**Deriving the policy gradient with states.** With those two changes, the objective $J(\theta)$ is now the expected return over whole episodes, and we need its gradient $\nabla_\theta J(\theta)$ so we can climb it. That gradient is the equation at the end of this subsection. Getting there is the same derivation as the bandit, with two extra facts that only show up once there are states. Four moves.
 
 First, write the objective over whole trajectories. A trajectory $\tau = (s_0, a_0, r_0, s_1, a_1, \dots)$ has return $R(\tau) = \sum_t \gamma^t r_t$, and we want $J(\theta) = \mathbb{E}_\tau[R(\tau)] = \sum_\tau P(\tau; \theta)\, R(\tau)$. The probability of a trajectory factorizes into the start state, our policy at each step, and the environment's transitions:
 
