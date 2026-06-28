@@ -735,9 +735,11 @@ Same outcome, opposite lesson, because "good" is judged relative to what is typi
 
 The advantage can also be written $A(s,a) = Q(s,a) - V(s)$: how much better is taking $a$ than acting typically from $s$? Its sign sets the direction; its magnitude sets how hard to push. That is all the policy needs.
 
-Where did the $\sum_t$ go? It got folded into the expectation. In Section 2.7 we had $\nabla_\theta J = \mathbb{E}_\tau\big[\sum_t G_t \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\big]$: average over trajectories, and inside each trajectory sum the per-step push over every timestep. But summing one quantity over every timestep of every trajectory is the same as averaging that quantity over all the state-action pairs $(s, a)$ the policy actually visits. So the trajectory average $\mathbb{E}_\tau$ and the timestep sum $\sum_t$ merge into a single expectation over visited $(s, a)$ pairs, and we swap the weight $G_t$ for the lower-variance advantage $A(s, a)$:
+The policy-gradient theorem becomes:
 
 $$\nabla_\theta J(\theta) = \mathbb{E}_{s,a}\big[A(s,a) \cdot \nabla_\theta \log \pi_\theta(a \mid s)\big]$$
+
+Where did the $\sum_t$ go? It got folded into the expectation. In Section 2.7 we had $\nabla_\theta J = \mathbb{E}_\tau\big[\sum_t G_t \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\big]$: average over trajectories, and inside each trajectory sum the per-step push over every timestep. Summing one quantity over every timestep of every trajectory is the same as averaging that quantity over all the state-action pairs $(s, a)$ the policy actually visits, so the trajectory average $\mathbb{E}_\tau$ and the timestep sum $\sum_t$ merge into the single expectation $\mathbb{E}_{s,a}$ above. We also swapped the weight $G_t$ for the lower-variance advantage $A(s, a)$.
 
 This is the form that every method in the rest of reinforcement learning shares. They differ only in how they estimate $A$.
 
