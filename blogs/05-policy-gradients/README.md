@@ -702,44 +702,7 @@ Read it against the bandit: the bandit was the one-step case, a single term with
 
 ![Credit assignment across the Archer MDP trajectory, showing the return at each distance building up from the final reward](./images/fig-credit-assignment.svg)
 
-The figure traces one trajectory from far (40 m) to the final shot. Each bar is that step's return $G_t$, and you can see the big +10 at the shot flowing backwards: the discount shrinks it a little at every earlier step, but even the first quiet move inherits most of it. That backward flow is credit assignment, and the snippet below computes those exact bars.
-
-```python
-import numpy as np
-
-# a 5-step Archer MDP trajectory: 4 "step closer" moves (cost -0.2 each)
-# followed by a final shot that earns +10
-rewards = [-0.2, -0.2, -0.2, -0.2, 10.0]
-states  = ["40m", "30m", "20m", "10m", "shoot"]
-# discount factor: future rewards are worth 90% per step
-gamma   = 0.9
-
-# compute the discounted return G_t at every step, working BACKWARDS;
-# G_t = r_t + γ·G_{t+1} is the recursive definition of the return, so
-# iterating in reverse lets each step reuse the already-computed future
-G, returns = 0.0, []
-for r in reversed(rewards):
-    # accumulate: this reward + discounted future
-    G = r + gamma * G
-    returns.append(G)
-# flip back to chronological order
-returns.reverse()
-
-# even the earliest "step closer" at 40 m gets a large positive return
-# because the discounted +10 final shot propagates back to it: this is
-# CREDIT ASSIGNMENT, quiet moves credited for the future they set up,
-# not just their own immediate -0.2
-for s, Gt in zip(states, returns):
-    print(f"  {s:>5s}: G = {Gt:+.3f}")
-```
-
-```text title="Output"
-    40m: G = +5.873
-    30m: G = +6.748
-    20m: G = +7.720
-    10m: G = +8.800
-  shoot: G = +10.000
-```
+The figure traces one trajectory from far (40 m) to the final shot. Each bar is that step's return $G_t$, and you can see the big +10 at the shot flowing backwards: the discount shrinks it a little at every earlier step, but even the first quiet move inherits most of it. That backward flow is credit assignment.
 
 "Step closer at 40 m" has a return of +5.87, not -0.2, because the discounted future includes the +10 shot it set up. That is how an end-of-episode reward teaches the quiet moves that set it up.
 
@@ -772,9 +735,9 @@ Same outcome, opposite lesson, because "good" is judged relative to what is typi
 
 The advantage can also be written $A(s,a) = Q(s,a) - V(s)$: how much better is taking $a$ than acting typically from $s$? Its sign sets the direction; its magnitude sets how hard to push. That is all the policy needs.
 
-The policy-gradient theorem becomes:
+Where did the $\sum_t$ go? It got folded into the expectation. In Section 2.7 we had $\nabla_\theta J = \mathbb{E}_\tau\big[\sum_t G_t \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\big]$: average over trajectories, and inside each trajectory sum the per-step push over every timestep. But summing one quantity over every timestep of every trajectory is the same as averaging that quantity over all the state-action pairs $(s, a)$ the policy actually visits. So the trajectory average $\mathbb{E}_\tau$ and the timestep sum $\sum_t$ merge into a single expectation over visited $(s, a)$ pairs, and we swap the weight $G_t$ for the lower-variance advantage $A(s, a)$:
 
-$$\nabla_\theta J(\theta) = \mathbb{E}\big[A(s,a) \cdot \nabla_\theta \log \pi_\theta(a \mid s)\big]$$
+$$\nabla_\theta J(\theta) = \mathbb{E}_{s,a}\big[A(s,a) \cdot \nabla_\theta \log \pi_\theta(a \mid s)\big]$$
 
 This is the form that every method in the rest of reinforcement learning shares. They differ only in how they estimate $A$.
 
