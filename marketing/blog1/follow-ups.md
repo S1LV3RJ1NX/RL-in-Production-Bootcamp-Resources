@@ -29,7 +29,7 @@ Link in comments.
 
 ---
 
-## Follow-up 2 (Sun Jun 28) — expectation (attach fig-lln.png)
+## Follow-up 2 (Sun Jun 28) — expectation (attach fig-lln.png) - DONE
 
 "How good is this state?" really means "how good on average."
 
