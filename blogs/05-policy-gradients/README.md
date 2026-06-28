@@ -654,7 +654,13 @@ $$P(\tau; \theta) = \rho(s_0) \prod_t \pi_\theta(a_t \mid s_t)\, P(s_{t+1} \mid 
 
 Symbol by symbol: $\rho(s_0)$ is the chance of the starting state; $\prod_t$ means "multiply over every timestep"; $\pi_\theta(a_t \mid s_t)$ is our policy's chance of the action it took (the only factor with $\theta$ in it, the only part we control); and $P(s_{t+1} \mid s_t, a_t)$ is the environment's chance of the next state, which we do not control and which carries no $\theta$. Remember that last point, it is the whole trick in Step 3.
 
-**Step 2: differentiate, and reuse the log trick.** We have $J(\theta) = \sum_\tau P(\tau; \theta)\, R(\tau)$ and we want $\nabla_\theta J$. Three small derivative rules get us there, one at a time.
+Dropping this $P(\tau; \theta)$ back into Step 0, our full objective now reads:
+
+$$J(\theta) = \sum_\tau \Big[\rho(s_0) \prod_t \pi_\theta(a_t \mid s_t)\, P(s_{t+1} \mid s_t, a_t)\Big] R(\tau)$$
+
+This is the thing we will differentiate next. It looks busy, but only the $\pi_\theta$ factor depends on $\theta$, so everything else will fall away once we take the gradient.
+
+**Step 2: differentiate, and reuse the log trick.** We want $\nabla_\theta J$ of the objective we just wrote. We will keep writing the bracketed product compactly as $P(\tau; \theta)$, so the thing to differentiate is $J(\theta) = \sum_\tau P(\tau; \theta)\, R(\tau)$. Three small derivative rules get us there, one at a time.
 
 _Rule 1, the sum rule._ The derivative of a sum is the sum of the derivatives, so we can push the gradient inside the sum and deal with one trajectory at a time:
 
