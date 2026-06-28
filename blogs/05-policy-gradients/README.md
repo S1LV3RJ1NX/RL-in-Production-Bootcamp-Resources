@@ -778,9 +778,9 @@ Two losses, one pass:
 - **Critic:** make its prediction $V(s)$ match what actually happened. The TD target $r + \gamma V(s')$ is the better estimate from above, so we minimize the squared gap $(r + \gamma V(s') - V(s))^2$. The minus here is plain prediction error, how far the guess $V(s)$ sits from the target; squaring makes it positive and punishes big misses harder, so gradient descent slides $V(s)$ toward the target. The target is treated as a fixed number (via `detach`), so $V(s)$ chases it instead of both sides drifting.
 - **Actor:** push each action by its advantage. We _want_ to **maximize** $A \cdot \log \pi(a \mid s)$, raising the log-probability of actions whose advantage is positive. But PyTorch optimizers only **minimize**, so we flip the sign and minimize $-(A \cdot \log \pi(a \mid s))$. This minus is the same gradient-ascent-as-loss bookkeeping from the bandit in Section 2.4, not new math: minimizing the negative is identical to maximizing the original.
 
-**Why `detach`?** The advantage is meant to be a fixed weight telling the actor how much to push. If the actor's gradient flowed into $V$, the actor could "cheat" by changing the critic to make its chosen actions look good (lowering $V(s)$) instead of improving the policy. `detach` keeps the two objectives clean.
+We will build the Actor-Critic in five pieces, each right after the idea it implements: the environment, the two networks, the action helper, the training loop, and a greedy evaluation. Read them top to bottom and they concatenate into the full runnable program (also linked from the assignment).
 
-Here is the complete, runnable Actor-Critic for the Archer MDP: the environment, both networks, the act helper, the training loop, and a greedy evaluation. It is the algorithm in full, so the rest of the post just analyzes what it does.
+Start with the environment. The Archer MDP adds a **distance** to the bandit: the archer can step closer, step back, or shoot. Shooting ends the episode with a reward that is largest at 10 m and shrinks with distance, and every walk step costs a small $-0.2$, which pressures the policy to close in before firing.
 
 ```python
 import gymnasium as gym
@@ -826,7 +826,11 @@ class ArcherMDP(gym.Env):
         self.d = float(np.clip(
             self.d + (-10. if a == self.CLOSER else 10.), self.MIN_D, self.MAX_D))
         return self._obs(), -0.2, False, self.t >= self.max_steps, {}
+```
 
+Next, the two heads. The **actor** is the policy: state in, one logit per action out, and a softmax (applied inside `Categorical` later) turns those logits into $\pi(a \mid s)$. The **critic** is the value: state in, a single scalar $V(s)$ out, its estimate of the return from that state. Same input, two different jobs, two separate small networks.
+
+```python
 # ── Actor (Policy network) ──────────────────────────────────────
 # maps state -> one logit per action; softmax (inside Categorical) converts
 # logits to π(a|s). This IS the policy we are optimizing
@@ -844,7 +848,11 @@ class Value(nn.Module):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(), nn.Linear(h, 1))
     def forward(self, x): return self.net(x).squeeze(-1)
+```
 
+The `act` helper samples an action from the current policy and returns the three things the update needs: the action itself, its log-probability $\log \pi(a \mid s)$ (the "score" the gradient pushes on), and the entropy $H(\pi)$ (how spread out the policy is, used later for the exploration bonus).
+
+```python
 # ── Action sampling ─────────────────────────────────────────────
 def act(policy, s):
     st = torch.tensor(s, dtype=torch.float32)
@@ -855,7 +863,11 @@ def act(policy, s):
     # log_prob = log π(a|s) is the "score" in the REINFORCE gradient;
     # entropy = H(π) measures exploration breadth
     return a, dist.log_prob(a), dist.entropy()
+```
 
+Now the training loop, the heart of the algorithm. Each episode runs in five beats: roll out a full episode, build the TD target, turn it into the advantage, update the critic, then update the actor. The walkthrough right after the block unpacks each beat.
+
+```python
 # ── Actor-Critic training loop ──────────────────────────────────
 def actor_critic(env, episodes=2000, lr_a=0.004, lr_c=0.03, ent_coef=0.01, warmup=150):
     # actor: learns WHAT to do
@@ -921,7 +933,17 @@ def actor_critic(env, episodes=2000, lr_a=0.004, lr_c=0.03, ent_coef=0.01, warmu
             popt.step()
         curve.append(sum(R))
     return pol, val, curve
+```
 
+The five beats inside the loop, one at a time:
+
+1. **Roll out an episode.** Step with the stochastic policy until the episode ends, storing each transition's state, log-probability, entropy, reward, next state, and done flag.
+2. **Build the TD target.** For every step compute $r + \gamma V(s')$, under `torch.no_grad()` because the target is a fixed goal we are not backpropagating through. The $(1 - \text{done})$ factor zeroes the $V(s')$ bootstrap at the terminal step, since nothing follows the final shot.
+3. **Turn it into the advantage.** $A = (r + \gamma V(s')) - V(s)$, then `.detach()`. This detach is the key safety step. The advantage is meant to be a **fixed weight** telling the actor how hard to push. If the actor's gradient were allowed to flow back into $V$ through this term, the actor could "cheat" by nudging the critic to make its own chosen actions look good (shrinking $V(s)$) instead of improving the policy. Detaching freezes the advantage into a plain number, so the actor and critic optimize separate, clean objectives.
+4. **Update the critic.** Minimize $(r + \gamma V(s') - V(s))^2$, pulling $V(s)$ toward the target so its predictions sharpen over time.
+5. **Update the actor (after warmup).** Minimize $-(A \cdot \log \pi(a \mid s)) - \beta\, H(\pi)$: the advantage-weighted REINFORCE term (negated for descent) plus an entropy bonus that keeps the policy exploring. The `warmup` delay lets the critic learn a sane $V(s)$ first, so the early, random advantages do not shove the actor around as noise.
+
+```python
 # ── Greedy evaluation ───────────────────────────────────────────
 # after training, test the policy deterministically (argmax, no sampling)
 # to measure what it has actually learned, free from exploration noise
