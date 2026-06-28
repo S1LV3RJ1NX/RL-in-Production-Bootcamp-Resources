@@ -213,7 +213,7 @@ The width $\sigma = 1.5$ is a deliberate choice, not a magic constant. It sets h
 
 The episode ends after that single shot, so there is no next state and no future reward. That is exactly what the code below sets up: a `Box` observation, a `Discrete` action space, and this reward in `step`.
 
-**One training knob: the entropy bonus.** The policy is a probability distribution over the 9 angles, and its _entropy_ $H(\pi) = -\sum_a \pi(a) \log \pi(a)$ measures how spread out it is: high when the nine probabilities are even (the policy is still exploring), near zero when one angle dominates (the policy has committed). Each call to `act` returns this entropy next to the log-probability, straight from the `Categorical` distribution. We add a small $+\,\texttt{ent\_coef} \cdot H$ term to the objective so the policy pays a penalty for collapsing onto one angle too soon, which keeps it trying all nine until it has actually found the bullseye. It appears in the loss as the `- ent_coef * ent` piece, and Section 2.12 ablates it.
+**One training knob: the entropy bonus.** The policy is a probability distribution over the 9 angles, and its _entropy_ $H(\pi) = -\sum_a \pi(a) \log \pi(a)$ measures how spread out it is: high when the nine probabilities are even (the policy is still exploring), near zero when one angle dominates (the policy has committed). Each call to `act` returns this entropy next to the log-probability, straight from the `Categorical` distribution. We add a small $+\,\texttt{ent\_coef} \cdot H$ term to the objective so the policy pays a penalty for collapsing onto one angle too soon, which keeps it trying all nine until it has actually found the bullseye. It appears in the loss as the `- ent_coef * ent` piece, and a Check in Section 2.11 shows what happens without it.
 
 Here is the full bandit training loop. The policy network maps the constant state to 9 logits, `Categorical` turns them into probabilities, and we sample one angle. Because the bandit always terminates after one shot, **each episode is a single step**, so there is no inner while-loop here (the MDP in Section 2.9 adds one):
 
@@ -1109,8 +1109,6 @@ The first figure plots the gradient variance on a log scale, so each step down t
 
 The second figure shows what that variance buys: the greedy return each method actually achieves. The two low-variance methods reach the near-optimal score while plain REINFORCE stalls well short. Lower variance is not a cosmetic win, it is the difference between learning the task and not.
 
-**The baseline slashes variance by about 73x** (0.0437 / 0.0006). The Actor-Critic cuts it by another ~1.5x (0.0006 / 0.0004). But the performance gap is stark: plain REINFORCE barely learns, while both variance-reduced methods reach the near-optimal return of ~9.6.
-
 Why does the baseline help so much? In the Archer MDP, rewards are mostly positive ($-0.2$ per step, $+10$ for shooting close). Without a baseline, the advantage $A = G_t$ is almost always positive, so every action gets pushed up. The signal is a tiny difference on top of a big positive offset, drowned in noise. The baseline centers it: good moves get pushed up ($A > 0$), bad moves pushed down ($A < 0$), so the gradient is sharper and more informative.
 
 <details>
@@ -1134,27 +1132,6 @@ Why does the baseline help so much? In the Archer MDP, rewards are mostly positi
 
 </details>
 
-### 2.12 Entropy and the ablations
-
-The entropy $H(\pi) = -\sum_a \pi(a) \log \pi(a)$ measures how spread out the policy is. Adding $+\texttt{ent\_coef} \cdot H$ to the objective discourages premature collapse: the policy pays a "tax" for becoming too certain too early.
-
-Our ablation experiments:
-
-**Ablation A (remove entropy, `ent_coef=0.0`):** Without entropy regularization, Actor-Critic's learning becomes much more unstable. Mean greedy return drops and the variance across seeds increases significantly. The policy commits to one action early and loses the ability to explore alternatives.
-
-**Ablation B (remove critic warmup, `warmup=0`):** Starting actor updates from episode 0 degrades performance. Without warmup, the critic's early predictions are random, so the advantage signal is garbage, and the actor learns from noise. A short warmup lets the critic settle before the actor acts on its advice.
-
-**Ablation C (large learning rate for bandit REINFORCE, `lr=0.2`):** A large learning rate makes the bandit's REINFORCE training faster (fewer episodes to converge) but noisier: the reward curve oscillates more, and unlucky seeds can converge to non-optimal angles. The right learning rate balances speed and stability.
-
-<details>
-<summary><strong>Check:</strong> Ablation B found that removing the critic warmup hurts performance. Why specifically does a "cold" critic hurt the ACTOR, not just the critic?</summary>
-
-**Answer.** Because the actor's gradient uses the critic's advantage signal. A cold critic outputs near-random values, so the advantage $A = r + \gamma V(s') - V(s)$ is garbage: its sign and magnitude are noise. The actor follows this random signal and drifts aimlessly, potentially into a policy from which recovery is hard. The warmup gives the critic time to produce meaningful advantages before the actor starts trusting them.
-
-</details>
-
----
-
 ## 3. Putting it all together
 
 A quick recap of every concept in this post and how it maps to code:
@@ -1168,10 +1145,6 @@ A quick recap of every concept in this post and how it maps to code:
 | TD advantage (Actor-Critic) | $A = r + \gamma V(s') - V(s)$            | `target = rew + GAMMA * val(snext) * (1 - dn)`     |
 | Entropy bonus               | $H(\pi) = -\sum \pi\log\pi$              | `- ent_coef * ent.mean()`                          |
 | Critic loss                 | $(r + \gamma V(s') - V(s))^2$            | `(target - v).pow(2).mean()`                       |
-
-Every concept above already appeared as a small snippet right next to its explanation, and §2.9 has the complete Actor-Critic loop that produced the 9.58 result. There is no separate capstone to paste here. The full end-to-end runnable program (the Archer bandit, the Archer MDP, and the whole climb from REINFORCE to Actor-Critic) lives in the assignment notebook:
-
-> **[Assignment — Policy Gradients from Scratch (The Archer)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture3.ipynb)**
 
 <details>
 <summary><strong>Check:</strong> In the Actor-Critic loop, why do we use `(1 - dn)` in the TD target? What would go wrong without it?</summary>
