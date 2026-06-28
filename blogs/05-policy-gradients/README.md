@@ -566,7 +566,11 @@ The policy automatically spends its learning budget where it matters most: on ac
 
 The curve is just $1 - \pi(a)$. On the left, an action the policy thought unlikely (small $\pi$) gets a near-1 push when it pays off. On the right, an action the policy was already sure of (large $\pi$) barely moves. The downward slope is the policy spending its learning budget on surprises, exactly the two cases above.
 
-Back to the baseline itself: the near-optimal constant baseline is approximately the average return, $b^* \approx \mathbb{E}[G_t]$. An even better baseline is a _learned, per-state_ value $V(s)$, which we will see in Section 2.8.
+Back to the baseline itself: what value should we actually subtract? Two answers, one better than the other.
+
+The simplest choice is a single **constant**, the same number for every state and action. The one that cuts variance the most is approximately the average return, $b^* \approx \mathbb{E}[G_t]$. Subtracting it _centers_ the weights: shots that beat the average get a positive weight (push up), shots below it get a negative weight (push down), and the pushes now take both signs and largely cancel instead of all piling up.
+
+A **learned, per-state** value $V(s)$ does even better. A single constant judges every state by the same bar, so it unfairly marks every action from a hard state (low returns) as "bad" and every action from an easy state (high returns) as "good," even the best move in a hard state. Using $V(s)$, the expected return _from this particular state_, the centered weight becomes the advantage $A = G_t - V(s)$: "how much better than typical-from-here did this action do?" That is exactly the right question, and it removes even more variance. That learned $V(s)$ is the **critic** we build in Section 2.8.
 
 <details>
 <summary><strong>Check:</strong> We subtract a baseline b to cut variance. A skeptic worries: "you changed the gradient, now you're optimizing the wrong thing." Why is the skeptic wrong?</summary>
