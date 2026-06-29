@@ -399,7 +399,7 @@ Read it as: the loss $L$ averages three pieces over the batch. The first, $L^\te
 - **Value loss (critic).** Improving the actor needs the advantage $A = G - V(s)$, and that needs a critic, so the critic has to be trained too. We fold its training into the same objective: pull $V(s)$ toward the observed return $G_t$ by mean-squared error, so next iteration's advantage is sharper. The weight $c_1$ sets how much critic training counts against actor improvement, and the actor and critic often even share a network body, which is the other reason to write a single combined objective.
 - **Entropy bonus.** Reward a bit of randomness ($H[\pi]$ is the entropy of the policy) so the policy does not collapse to one action too early.
 
-**Why is the critic loss subtracted?** $L$ is a quantity we *maximize* (gradient ascent), but the value error $\big(V_\theta(s) - G_t\big)^2$ is a quantity we want *small*. Maximizing the negative of an error is the same as minimizing the error, so we put a minus sign in front of it: pushing $L$ up pushes the critic's mistakes down. The entropy term carries a plus sign for the mirror-image reason, more entropy is desirable, so maximizing $L$ should reward it. The coefficients $c_1$ and $c_2$ just balance the three pulls. (In the code below we keep it simple and take a separate gradient step for the actor and the critic, which is equivalent to this one combined objective, and we leave out the optional entropy bonus.)
+**Why is the critic loss subtracted?** $L$ is a quantity we _maximize_ (gradient ascent), but the value error $\big(V_\theta(s) - G_t\big)^2$ is a quantity we want _small_. Maximizing the negative of an error is the same as minimizing the error, so we put a minus sign in front of it: pushing $L$ up pushes the critic's mistakes down. The entropy term carries a plus sign for the mirror-image reason, more entropy is desirable, so maximizing $L$ should reward it. The coefficients $c_1$ and $c_2$ just balance the three pulls. (In the code below we keep it simple and take a separate gradient step for the actor and the critic, which is equivalent to this one combined objective, and we leave out the optional entropy bonus.)
 
 Because the clip keeps each step safe, we can reuse the same batch for **K epochs** (typically 3-10). Each epoch shuffles the batch into minibatches and takes clipped SGD steps. As the policy drifts during the epochs, the ratios for some samples leave $[1-\varepsilon, 1+\varepsilon]$; those samples' gradients go to zero and they quietly stop driving the update. The frozen `logp_old` (recorded at collection time) is the denominator of the ratio: because it never moves, the ratio measures true drift from the data-collecting policy.
 
@@ -655,7 +655,7 @@ The policy steadily reduces its penalties. The per-batch mean return climbs from
 
 ### 2.7 Does it work? The Pendulum curve and an ablation
 
-This section uses two plots, and they answer two different questions. The first asks **does PPO learn at all?** It dissects a single run. The second asks **why does it learn, which ingredient does the work?** It overlays three separate runs. Same axes on both (PPO iteration on x, mean episode return on y), so you can read them side by side, but they are doing different jobs: one is a *within-run* learning curve, the other is a *between-run* controlled comparison.
+This section uses two plots, and they answer two different questions. The first asks **does PPO learn at all?** It dissects a single run. The second asks **why does it learn, which ingredient does the work?** It overlays three separate runs. Same axes on both (PPO iteration on x, mean episode return on y), so you can read them side by side, but they are doing different jobs: one is a _within-run_ learning curve, the other is a _between-run_ controlled comparison.
 
 **Graph 1: the learning curve (one run, dissected).** We ran the loop above for 60 iterations on `Pendulum-v1` ($\gamma = 0.95$, 2048 steps per batch, $K = 10$ epochs, $\varepsilon = 0.2$):
 
@@ -663,11 +663,11 @@ This section uses two plots, and they answer two different questions. The first 
 
 This single run is drawn as three lines so you can separate signal from noise:
 
-- **Faint line, raw per-batch return.** Noisy because every batch is a fresh set of episodes, each starting from a random pendulum angle and acting under a *stochastic* policy. The jitter is sampling noise, not the policy getting worse.
+- **Faint line, raw per-batch return.** Noisy because every batch is a fresh set of episodes, each starting from a random pendulum angle and acting under a _stochastic_ policy. The jitter is sampling noise, not the policy getting worse.
 - **Bold line, 5-iteration moving average.** Smooths that sampling noise so the trend is visible. It climbs from about $-1137$ to about $-704$: the pendulum goes from hanging down to swinging up and holding near vertical.
 - **Dashed line, greedy evaluation at $-619$.** A separate evaluation where the policy acts at its mean $\mu$ with no exploration noise.
 
-The deeper point is the gap between the bold line ($-704$) and the dashed line ($-619$). The training return is *pessimistic*: while learning, the policy keeps injecting Gaussian exploration noise (the learned $\sigma$ from `log_std`), and that noise costs return on every step. Greedy evaluation removes the noise (act at $\mu$, never sample), so it scores higher. That gap is, roughly, the return the policy is still "spending" on exploration. As $\sigma$ shrinks over training the two lines would converge. So graph 1 is really showing two things at once: the policy is improving (the climb) and it is still exploring (the gap).
+The deeper point is the gap between the bold line ($-704$) and the dashed line ($-619$). The training return is _pessimistic_: while learning, the policy keeps injecting Gaussian exploration noise (the learned $\sigma$ from `log_std`), and that noise costs return on every step. Greedy evaluation removes the noise (act at $\mu$, never sample), so it scores higher. That gap is, roughly, the return the policy is still "spending" on exploration. As $\sigma$ shrinks over training the two lines would converge. So graph 1 is really showing two things at once: the policy is improving (the climb) and it is still exploring (the gap).
 
 **Graph 2: the ablation (three runs, compared).** Now we ask which part causes that climb. Turn one ingredient off at a time and rerun from scratch for 40 iterations each:
 
@@ -681,11 +681,11 @@ The deeper point is the gap between the bold line ($-704$) and the dashed line (
 
 How this graph differs from the first, concretely:
 
-- It overlays **three runs** instead of dissecting one. Each line is a *different algorithm*, not a different view of the same data.
+- It overlays **three runs** instead of dissecting one. Each line is a _different algorithm_, not a different view of the same data.
 - Only the **smoothed** curve is shown for each (no faint raw lines), because three raw curves would overlap into a mush. Smoothing is what makes the separation legible.
 - All three are truncated to **40 iterations** so every variant gets the same compute budget, which is what makes the comparison fair. The orange "full PPO" line here is literally the first 40 iterations of the run in graph 1, so the two plots share a curve: graph 2's orange is a prefix of graph 1's bold line.
 
-Read the *shape*, not just the endpoints. **Removing the clip hurt the most.** Without it, the surrogate $r \cdot A$ is unbounded: a large advantage lets the ratio grow without limit in a single step, shoving the policy far from where the batch was collected. So that curve is both the lowest *and* the most jagged, lurching up and down batch to batch as good updates get undone by destructive ones. The visible variance is the instability, not just bad luck.
+Read the _shape_, not just the endpoints. **Removing the clip hurt the most.** Without it, the surrogate $r \cdot A$ is unbounded: a large advantage lets the ratio grow without limit in a single step, shoving the policy far from where the batch was collected. So that curve is both the lowest _and_ the most jagged, lurching up and down batch to batch as good updates get undone by destructive ones. The visible variance is the instability, not just bad luck.
 
 **Removing reuse was costly too**, but in a different way. Its curve is comparatively smooth (no destructive jumps) yet flat, drifting sideways. With $K=1$ each batch feeds a single gradient step instead of 10, so you extract about a tenth of the learning per batch while paying the full collection cost. The failure mode is slowness, not instability.
 
@@ -775,9 +775,7 @@ Every piece of PPO has now appeared inline next to the idea it implements. Here 
 | Gaussian policy   | $a \sim \mathcal{N}(\mu_\theta(s), \sigma)$          | `dist = Normal(mu, log_std.exp()); a = dist.sample()`             |
 | K-epoch reuse     | K sweeps over the same batch                         | `for _ in range(K): for idx in randperm(n).split(mb):`            |
 
-The complete, runnable program is exactly the training loop assembled in Section 2.6: the Gaussian policy, the critic, `collect`, `ppo_update`, the training loop, and the greedy evaluation. Rather than repeat it here as a capstone dump, the full end-to-end version, packaged as a notebook you can run and extend to other continuous-control tasks, lives in the assignment:
-
-> **[Assignment: PPO from Scratch (Continuous Control)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture4.ipynb)**
+The complete, runnable program is exactly the training loop assembled in Section 2.6: the Gaussian policy, the critic, `collect`, `ppo_update`, the training loop, and the greedy evaluation. Rather than repeat it here as a capstone dump, the full end-to-end version, packaged as a notebook you can run and extend to other continuous-control tasks, lives in the assignment.
 
 ---
 
@@ -793,8 +791,4 @@ Implement PPO from scratch and train a continuous-control agent (no discrete act
 
 PPO is the workhorse of modern RL, and its most famous job is alignment: it is the algorithm that taught ChatGPT to follow instructions. But that raises a question this post quietly skipped. On Pendulum the reward came from the environment. Where does the reward come from when the task is "be helpful and honest," something no simulator can score?
 
-The next post builds that missing piece. A language model only ever predicts the next token. The [RLHF](../07-rlhf/README.md) post turns text generation into an MDP, learns a reward model from human comparisons, then runs exactly the clipped PPO update from this post to optimize it, with the KL-to-reference leash we met in Section 2.8 keeping the model from gaming a flawed reward. The reward model rests on the Bradley-Terry equation, the probability that a human prefers response $A$ over response $B$:
-
-$$P(A \succ B) = \frac{e^{r(A)}}{e^{r(A)} + e^{r(B)}}$$
-
-Read it as: the chance a human picks $A$ over $B$ is $A$'s exponentiated reward divided by the total over both responses. The left side is a preference probability; on the right, $r(A)$ and $r(B)$ are the scalar rewards the model assigns to each response. When $r(A)$ is much larger than $r(B)$ the fraction approaches 1 ($A$ almost always preferred), and when they are equal it is exactly $0.5$ (a toss-up). That single equation turns a pile of human "this one is better" judgments into a trainable reward, and PPO does the rest. See the [RLHF](../07-rlhf/README.md) post.
+The next post builds that missing piece. A language model only ever predicts the next token. The [RLHF](../07-rlhf/README.md) post turns text generation into an MDP, learns a reward model from human comparisons, then runs exactly the clipped PPO update from this post to optimize it, with the KL-to-reference leash we met in Section 2.8 keeping the model from gaming a flawed reward. Next, read the [RLHF](../07-rlhf/README.md) post.
