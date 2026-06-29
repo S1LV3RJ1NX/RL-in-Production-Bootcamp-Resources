@@ -655,13 +655,21 @@ The policy steadily reduces its penalties. The per-batch mean return climbs from
 
 ### 2.7 Does it work? The Pendulum curve and an ablation
 
-We just ran the loop above for 60 iterations on `Pendulum-v1` ($\gamma = 0.95$, 2048 steps per batch, $K = 10$ epochs, $\varepsilon = 0.2$). Plotting the per-batch mean return shows the learning:
+This section uses two plots, and they answer two different questions. The first asks **does PPO learn at all?** It dissects a single run. The second asks **why does it learn, which ingredient does the work?** It overlays three separate runs. Same axes on both (PPO iteration on x, mean episode return on y), so you can read them side by side, but they are doing different jobs: one is a *within-run* learning curve, the other is a *between-run* controlled comparison.
+
+**Graph 1: the learning curve (one run, dissected).** We ran the loop above for 60 iterations on `Pendulum-v1` ($\gamma = 0.95$, 2048 steps per batch, $K = 10$ epochs, $\varepsilon = 0.2$):
 
 ![PPO learning curve on Pendulum-v1, improving from about minus 1137 to minus 704 over 60 iterations](./images/fig-pendulum-curve.svg)
 
-The faint line is the raw per-batch return, noisy because each batch is a fresh set of episodes. The bold line is a 5-iteration moving average. The trend is clearly upward: the smoothed return climbs from about $-1137$ to about $-704$, and the dashed line marks the greedy evaluation at $-619$. The pendulum starts by hanging down and ends by swinging up to near vertical and holding it. This is the whole §2.6 program, measured.
+This single run is drawn as three lines so you can separate signal from noise:
 
-Which ingredient does the work? Turn one off at a time (40 iterations each):
+- **Faint line, raw per-batch return.** Noisy because every batch is a fresh set of episodes, each starting from a random pendulum angle and acting under a *stochastic* policy. The jitter is sampling noise, not the policy getting worse.
+- **Bold line, 5-iteration moving average.** Smooths that sampling noise so the trend is visible. It climbs from about $-1137$ to about $-704$: the pendulum goes from hanging down to swinging up and holding near vertical.
+- **Dashed line, greedy evaluation at $-619$.** A separate evaluation where the policy acts at its mean $\mu$ with no exploration noise.
+
+The deeper point is the gap between the bold line ($-704$) and the dashed line ($-619$). The training return is *pessimistic*: while learning, the policy keeps injecting Gaussian exploration noise (the learned $\sigma$ from `log_std`), and that noise costs return on every step. Greedy evaluation removes the noise (act at $\mu$, never sample), so it scores higher. That gap is, roughly, the return the policy is still "spending" on exploration. As $\sigma$ shrinks over training the two lines would converge. So graph 1 is really showing two things at once: the policy is improving (the climb) and it is still exploring (the gap).
+
+**Graph 2: the ablation (three runs, compared).** Now we ask which part causes that climb. Turn one ingredient off at a time and rerun from scratch for 40 iterations each:
 
 | Variant          | Start | End      | Notes                                 |
 | ---------------- | ----- | -------- | ------------------------------------- |
@@ -671,11 +679,19 @@ Which ingredient does the work? Turn one off at a time (40 iterations each):
 
 ![Ablation study on Pendulum showing full PPO beats both ablations](./images/fig-ablation.svg)
 
-The three curves separate cleanly. Full PPO (orange) is the only one that improves; both ablations stall or drift downward. **Removing the clip hurt the most.** Without it, the surrogate $r \cdot A$ is unbounded: a large advantage lets the ratio grow without limit in a single step, shoving the policy far from where the batch was collected. That curve is both the lowest and the most unstable.
+How this graph differs from the first, concretely:
 
-**Removing reuse was costly too.** Each batch feeds a single gradient step instead of 10, so learning per iteration is much slower: you pay the same collection cost for a tenth of the learning.
+- It overlays **three runs** instead of dissecting one. Each line is a *different algorithm*, not a different view of the same data.
+- Only the **smoothed** curve is shown for each (no faint raw lines), because three raw curves would overlap into a mush. Smoothing is what makes the separation legible.
+- All three are truncated to **40 iterations** so every variant gets the same compute budget, which is what makes the comparison fair. The orange "full PPO" line here is literally the first 40 iterations of the run in graph 1, so the two plots share a curve: graph 2's orange is a prefix of graph 1's bold line.
 
-**Together:** clip matters most (it keeps the update safe), reuse matters second (it extracts more learning per batch). Full PPO is a trust region via clipping plus sample efficiency via reuse.
+Read the *shape*, not just the endpoints. **Removing the clip hurt the most.** Without it, the surrogate $r \cdot A$ is unbounded: a large advantage lets the ratio grow without limit in a single step, shoving the policy far from where the batch was collected. So that curve is both the lowest *and* the most jagged, lurching up and down batch to batch as good updates get undone by destructive ones. The visible variance is the instability, not just bad luck.
+
+**Removing reuse was costly too**, but in a different way. Its curve is comparatively smooth (no destructive jumps) yet flat, drifting sideways. With $K=1$ each batch feeds a single gradient step instead of 10, so you extract about a tenth of the learning per batch while paying the full collection cost. The failure mode is slowness, not instability.
+
+**Together:** clip matters most (it keeps each update safe, killing the jaggedness), reuse matters second (it extracts more learning per batch, killing the flatness). Full PPO is a trust region via clipping plus sample efficiency via reuse, and it is the only curve that steadily climbs.
+
+One honest caveat: each variant here is a single seed, so treat the gaps as illustrative rather than statistically airtight. The separations are large relative to the within-run wobble, which is why the story is believable, but a rigorous claim would average several seeds per variant and show the spread.
 
 <details>
 <summary><strong>Check:</strong> Turning the clip off makes the training curve the worst. Why specifically does an unbounded surrogate collapse?</summary>
