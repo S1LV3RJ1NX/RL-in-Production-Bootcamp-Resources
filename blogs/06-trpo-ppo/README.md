@@ -111,43 +111,6 @@ $$\mathbb{E}_{x \sim p}[f(x)] = \mathbb{E}_{x \sim q}\!\left[\frac{p(x)}{q(x)} \
 
 Read it as: "draw from the distribution you _have_ ($q$), correct each sample by how much more or less the target distribution $p$ would have weighted it, and average." The ratio $w(x) = p(x)/q(x)$ is called the **importance weight**. Where $p$ puts more mass than $q$ ($w > 1$), the sample was under-represented, so scale it up; where $p$ puts less ($w < 1$), $q$ over-produced it, so scale it down.
 
-```python
-import numpy as np
-
-# two distributions over three outcomes, and a function f we want to average
-# p: target distribution (what we want); q: sampling distribution (what we have)
-p = np.array([0.1, 0.2, 0.7])
-q = np.array([0.5, 0.3, 0.2])
-f = np.array([1, 2, 3])
-
-# E_p[f]: the true answer
-target = (p * f).sum()
-# E_q[f]: wrong distribution, wrong answer
-naive = (q * f).sum()
-# importance weights w = p(x)/q(x)
-w = p / q
-# E_q[w·f] = E_p[f]: the corrected estimate
-reweighted = (q * w * f).sum()
-
-print(f"Target   E_p[f]        = {target:.1f}")
-print(f"Naive    E_q[f]        = {naive:.1f}  (wrong distribution)")
-print(f"Reweighted E_q[w·f]    = {reweighted:.1f}  (matches target)")
-print(f"Weights  w = p/q       = {[f'{x:.2f}' for x in w]}")
-```
-
-```text title="Output"
-Target   E_p[f]        = 2.6
-Naive    E_q[f]        = 1.7  (wrong distribution)
-Reweighted E_q[w·f]    = 2.6  (matches target)
-Weights  w = p/q       = ['0.20', '0.67', '3.50']
-```
-
-The naive average under $q$ gives 1.7 (the mean under the _wrong_ distribution). The reweighted average recovers 2.6 exactly. The rare-under-$q$ but important-under-$p$ outcome $x=3$ carries a big weight (3.5) and contributes the lion's share, while the over-sampled $x=1$ is damped to almost nothing.
-
-![Importance sampling: naive average under q gives 1.7, reweighted average recovers the correct 2.6](./images/fig-importance-sampling.svg)
-
-The two panels make the correction visible. On the left, averaging $f$ under $q$ (the bars we actually sampled) lands at the wrong value, 1.7. On the right, multiplying each bar by its importance weight $w = p/q$ before averaging stretches the rare-but-important outcome and shrinks the over-sampled one, pulling the estimate back to the true 2.6. This is exactly the trick we will use to score a new policy from old data.
-
 **Applying it to RL.** We want the expected advantage under $\pi_\text{new}$, but our batch was collected by $\pi_\text{old}$. Substituting $p = \pi_\text{new}$ and $q = \pi_\text{old}$:
 
 $$\mathbb{E}_{a \sim \pi_\text{new}}[A] = \mathbb{E}_{a \sim \pi_\text{old}}\!\left[\frac{\pi_\text{new}(a \mid s)}{\pi_\text{old}(a \mid s)} \cdot A\right] = \mathbb{E}_{a \sim \pi_\text{old}}[r \cdot A]$$
@@ -162,21 +125,21 @@ where $r = \pi_\text{new}(a \mid s) \;/\; \pi_\text{old}(a \mid s)$ is the **pro
 
 **A worked example: reweighting at one checkpoint.** Consider a single state with two actions, $a_1$ and $a_2$. We have already collected a batch under the old policy, so we know each action's advantage $A$ from that data. We now have a candidate new policy and want to ask: would it have scored better, without running it in the environment?
 
-| action  | $\pi_\text{old}$ | $\pi_\text{new}$ | $r = \pi_\text{new}/\pi_\text{old}$ | $A$ (from the batch) | $r \cdot A$ |
-| ------- | ---------------- | ---------------- | ----------------------------------- | -------------------- | ----------- |
-| $a_1$   | 0.5              | 0.8              | 1.6                                 | +2                   | **+3.2**    |
-| $a_2$   | 0.5              | 0.2              | 0.4                                 | -1                   | **-0.4**    |
+| action | $\pi_\text{old}$ | $\pi_\text{new}$ | $r = \pi_\text{new}/\pi_\text{old}$ | $A$ (from the batch) | $r \cdot A$ |
+| ------ | ---------------- | ---------------- | ----------------------------------- | -------------------- | ----------- |
+| $a_1$  | 0.5              | 0.8              | 1.6                                 | +2                   | **+3.2**    |
+| $a_2$  | 0.5              | 0.2              | 0.4                                 | -1                   | **-0.4**    |
 
 Two columns deserve a closer look, because they answer a natural question: if we already have $\pi_\text{new}$, why not just sample from it?
 
 - **The advantages $A$ are given, not recomputed.** They were measured once, when the batch was collected under $\pi_\text{old}$. We reuse those same numbers; we do not run $\pi_\text{new}$ to get fresh advantages.
-- **$\pi_\text{new}$ enters only through the ratio $r$.** We *evaluate* the probability it assigns to each already-sampled action (a forward pass through the network), but we never *sample* from it. Sampling would mean rolling $\pi_\text{new}$ out in the environment and collecting new data, which is exactly the expensive step importance sampling lets us skip.
+- **$\pi_\text{new}$ enters only through the ratio $r$.** We _evaluate_ the probability it assigns to each already-sampled action (a forward pass through the network), but we never _sample_ from it. Sampling would mean rolling $\pi_\text{new}$ out in the environment and collecting new data, which is exactly the expensive step importance sampling lets us skip.
 
 Now score the new policy three ways:
 
 - **Old policy's score**: $\mathbb{E}_{\pi_\text{old}}[A] = 0.5(+2) + 0.5(-1) = +0.5$. This measures $\pi_\text{old}$, the wrong question.
 - **Reweighted score**: $\mathbb{E}_{\pi_\text{old}}[r \cdot A] = 0.5(3.2) + 0.5(-0.4) = +1.4$. This is $\pi_\text{new}$, scored from the old data.
-- **Direct check**: $\mathbb{E}_{\pi_\text{new}}[A] = 0.8(+2) + 0.2(-1) = +1.4$. This is what we would get if we *could* sample fresh from $\pi_\text{new}$.
+- **Direct check**: $\mathbb{E}_{\pi_\text{new}}[A] = 0.8(+2) + 0.2(-1) = +1.4$. This is what we would get if we _could_ sample fresh from $\pi_\text{new}$.
 
 The reweighted score matches the direct check exactly. Importance sampling recovered the new policy's expected advantage with no new data.
 
@@ -220,7 +183,7 @@ A 50-sample batch holds roughly one instance of the rare action, yet at weight 3
 
 ### 2.3 The surrogate objective
 
-We assemble the idea on a batch. The **surrogate objective** scores a candidate new policy using only the old policy's data:
+We now have both halves of the puzzle. The advantage $A$ from the last post says how good each action was, and the ratio $r$ from Section 2.2 reweights old data to score a new policy. Combine them over a whole batch and you get the single objective that TRPO and PPO actually optimize, the **surrogate objective**. It scores a candidate new policy using only the old policy's data:
 
 $$L(\theta) = \mathbb{E}_{(s,a) \sim \pi_\text{old}}\big[r_t(\theta) \cdot A_t\big]$$
 
@@ -255,7 +218,7 @@ Raw advantages:          [0.5, -1.0, 2.5, -2.0, 1.0]
 Standardized advantages: ['0.171', '-0.684', '1.312', '-1.255', '0.456']
 ```
 
-Standardizing centers the advantages to mean 0 and standard deviation 1, so the gradient scale stays steady from batch to batch regardless of the reward magnitude.
+Why standardize? The advantage multiplies the gradient. In $\nabla_\theta L \approx \mathbb{E}\big[A \cdot \nabla_\theta \log \pi_\theta\big]$, each sample's $A$ acts like a per-sample step size. Raw advantages can be small in one batch and large in the next, because rewards vary and an untrained critic mis-estimates $V$, so the gradient magnitude (and with it the effective learning rate) would swing from update to update. Subtracting the mean and dividing by the standard deviation forces every batch onto the same scale, mean 0 and standard deviation 1. Only the relative ranking of the advantages decides the direction, so re-scaling them does not change which actions get encouraged; it just keeps the step size steady so one learning rate works across all batches. Subtracting the mean is also the baseline trick from the [Policy Gradients](../05-policy-gradients/README.md) post: it lowers variance without adding bias.
 
 <details>
 <summary><strong>Check:</strong> The surrogate L(theta) = E[r * A] makes exactly one approximation. Which one, and when is it valid?</summary>
@@ -389,31 +352,6 @@ for i in range(len(ratio)):
 - $r=1.10$ inside the band, same story.
 - $r=1.50$ with $A < 0$ (safety valve): the unclipped term $-3.0$ is more negative, so `min` picks it, the gradient keeps pulling the bad action back.
 - $r=0.60 < 0.8$ with $A < 0$ (already cut enough): the clipped term $-1.6$ is more negative, so `min` picks it, the value is fixed, gradient 0. The clip stops us from over-suppressing.
-
-**Clip by hand, a good action ($A = +2$).** One action did better than expected ($A = +2$), with $\varepsilon = 0.2$ and $\pi_\text{old}(a) = 0.20$. The band is $[0.8, 1.2]$. As training proceeds and $\pi_\theta$ shifts this action's probability:
-
-| $\pi_\theta(a)$ | $r$  | $r \cdot A$ | $\text{clip}(r) \cdot A$ | $\min$ (objective) | status              |
-| --------------- | ---- | ----------- | ------------------------ | ------------------ | ------------------- |
-| 0.20            | 1.00 | 2.00        | 2.00                     | **2.00**           | start               |
-| 0.22            | 1.10 | 2.20        | 2.20                     | **2.20**           | inside band, rising |
-| 0.24            | 1.20 | 2.40        | 2.40                     | **2.40**           | at the edge         |
-| 0.26            | 1.30 | 2.60        | 2.40                     | **2.40**           | capped, flat        |
-| 0.30            | 1.50 | 3.00        | 2.40                     | **2.40**           | capped, flat        |
-
-At $r = 1.20$ both terms agree at 2.40. Past that, the unclipped term keeps climbing but the clipped term is frozen at $1.2 \times 2 = 2.4$, so `min` picks 2.4 and the gradient is 0. **PPO moves $r$ up to 1.2 and stops.** The good action gets more likely by a bounded amount. Next batch, $\pi_\text{old}$ resets and it can climb again.
-
-**Clip by hand, a bad action ($A = -2$).** Same action, but now it did worse than expected ($A = -2$). We want to push $r$ below 1:
-
-| $\pi_\theta(a)$ | $r$  | $r \cdot A$ | $\text{clip}(r) \cdot A$ | $\min$ (objective) | status                        |
-| --------------- | ---- | ----------- | ------------------------ | ------------------ | ----------------------------- |
-| 0.20            | 1.00 | -2.00       | -2.00                    | **-2.00**          | start                         |
-| 0.18            | 0.90 | -1.80       | -1.80                    | **-1.80**          | inside band, less negative    |
-| 0.16            | 0.80 | -1.60       | -1.60                    | **-1.60**          | at the edge                   |
-| 0.12            | 0.60 | -1.20       | -1.60                    | **-1.60**          | capped, flat                  |
-| 0.30            | 1.50 | -3.00       | -2.40                    | **-3.00**          | **safety valve, NOT clipped** |
-
-At $r = 0.60$ the raw term is $-1.2$ and the clipped term is $-1.6$. The min picks $-1.6$ (more negative), which is fixed, so the gradient is 0 and we stop suppressing. At $r = 1.50$ (an accidental increase) the raw term is $-3.0$ and the clipped term is $-2.4$. The min picks $-3.0$ (more negative), so this branch is not clipped and the gradient keeps pulling the bad action back down. That is the safety valve: a bad action that grew is always corrected.
-
 <details>
 <summary><strong>Check:</strong> For a good action (A > 0), once the ratio passes 1 + epsilon the gradient is zero. Doesn't that mean PPO just ignores very good actions and stops learning from them?</summary>
 
