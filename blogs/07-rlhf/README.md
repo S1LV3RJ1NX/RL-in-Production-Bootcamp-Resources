@@ -1,7 +1,7 @@
 ---
 title: "RLHF: Teaching a Language Model What \"Good\" Means"
 shortName: "RLHF"
-date: "2026-06-20"
+date: "2026-06-16"
 summary: "A language model only ever predicts the next token. This post earns the sentence \"PPO aligned ChatGPT\": how generating text becomes an MDP, how human comparisons become a Bradley-Terry reward model, how a value head turns one end-of-answer score into a per-token signal, and how the KL leash keeps PPO from gaming a flawed reward, grounded in a hands-on build that aligns a tiny GPT-2 assistant."
 tags: ["reinforcement-learning", "rlhf", "reward-model", "bradley-terry", "ppo", "kl-penalty"]
 order: 7

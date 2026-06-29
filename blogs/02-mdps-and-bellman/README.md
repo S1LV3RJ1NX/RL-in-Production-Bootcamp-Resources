@@ -1,7 +1,7 @@
 ---
 title: "MDPs and the Bellman Equation: The Recursion Behind Every RL Algorithm"
 shortName: "MDPs & Bellman"
-date: "2026-06-14"
+date: "2026-05-12"
 summary: "How to formalize an environment as a Markov Decision Process, why the value of a state splits into V and Q, and the Bellman equation that ties them together recursively. Derive it once, verify it by hand, then solve it exactly on FrozenLake in Gymnasium."
 tags: ["reinforcement-learning", "mdp", "bellman-equation", "gymnasium"]
 order: 2

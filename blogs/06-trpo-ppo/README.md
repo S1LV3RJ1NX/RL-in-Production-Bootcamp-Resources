@@ -1,7 +1,7 @@
 ---
 title: "TRPO and PPO: The Largest Safe Step a Policy Can Take"
 shortName: "TRPO & PPO"
-date: "2026-06-19"
+date: "2026-06-09"
 summary: "The gradient gives a direction, but who chooses the step size? This post explores the step-size crisis in RL, builds importance sampling from scratch, derives the surrogate objective, fences it with TRPO's KL constraint, then clips it with PPO, all grounded in a continuous-control example where PPO learns to swing a pendulum upright."
 tags:
   [

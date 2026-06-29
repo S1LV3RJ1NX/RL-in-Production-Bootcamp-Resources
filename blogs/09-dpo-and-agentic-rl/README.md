@@ -1,7 +1,7 @@
 ---
 title: "DPO and Agentic RL: Align Without a Reward Model, Then Step Into the World"
 shortName: "DPO & Agentic RL"
-date: "2026-06-24"
+date: "2026-06-30"
 summary: "Two moves close the series. First we simplify: Direct Preference Optimization reaches the same aligned model as RLHF while firing both the reward model and the RL loop, and SimPO and KTO trim it further. Then we expand: point the same group-relative gradient at a multi-step world and the model stops answering and starts acting, calling tools, reading observations, and earning a reward only at the end. You will see the DPO loss derived from the RLHF objective, every number of a worked preference, and a runnable multi-turn agent that learns to use a tool from reward alone."
 tags: ["reinforcement-learning", "dpo", "simpo", "kto", "preference-optimization", "agentic-rl", "rl-environments", "llm"]
 order: 9

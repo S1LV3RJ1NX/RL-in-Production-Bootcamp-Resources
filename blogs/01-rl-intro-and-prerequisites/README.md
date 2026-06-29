@@ -1,7 +1,7 @@
 ---
 title: "Reinforcement Learning from First Principles (and the Math You Actually Need)"
 shortName: "RL Foundations"
-date: "2026-06-14"
+date: "2026-05-05"
 summary: "What RL really is, why 'how good' means 'how good on average', and the five pieces of math (expectation, the Markov property, variance, running averages, and discounting) that the rest of the field is built on. Intuition first, one clean derivation each, a worked example, then code with Gymnasium."
 tags: ["reinforcement-learning", "fundamentals", "probability", "gymnasium"]
 order: 1

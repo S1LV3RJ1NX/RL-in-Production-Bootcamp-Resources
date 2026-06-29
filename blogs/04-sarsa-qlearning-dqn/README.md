@@ -1,7 +1,7 @@
 ---
 title: "SARSA, Q-learning, and DQN: From a Table to a Network That Plays Atari"
 shortName: "SARSA, Q-learning & DQN"
-date: "2026-06-15"
+date: "2026-05-26"
 summary: "Control = prediction + a max. We turn the TD update into Q-learning and SARSA, watch them disagree on a cliff, then swap the table for a neural network and train a DQN that learns Pong from raw pixels."
 tags:
   [

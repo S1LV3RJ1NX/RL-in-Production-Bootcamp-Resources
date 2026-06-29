@@ -1,7 +1,7 @@
 ---
 title: "Policy Gradients: Learning the Policy Directly, from a Bandit to Actor-Critic"
 shortName: "Policy Gradients"
-date: "2026-06-17"
+date: "2026-06-02"
 summary: "Stop learning values and reading a policy off them: parameterize the policy and climb expected reward directly. We derive the score-function trick on a one-state Archer bandit, watch one softmax update touch all nine logits, kill the variance with a baseline, add states and credit assignment, and end on an Actor-Critic that solves the Archer MDP."
 tags:
   [

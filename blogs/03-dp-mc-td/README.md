@@ -1,7 +1,7 @@
 ---
 title: "DP, Monte Carlo, and TD: Three Ways to Solve the Bellman Equation"
 shortName: "DP, MC & TD"
-date: "2026-06-14"
+date: "2026-05-19"
 summary: "Three algorithms (Dynamic Programming, Monte Carlo, and TD(0)) all solve the same Bellman equation. You'll implement each on a custom Mars Rover gridworld and watch them converge to the same values from different starting assumptions."
 tags:
   [
