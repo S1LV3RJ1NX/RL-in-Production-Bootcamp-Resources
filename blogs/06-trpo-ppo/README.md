@@ -41,6 +41,8 @@ flowchart LR
     end
 ```
 
+That loop is the whole PPO rhythm. Collect a batch with the current policy ($\pi_\text{old}$), score every step with its advantage $A = G - V$, then squeeze $K$ clipped epochs of learning out of that one batch before discarding it and collecting again. The two questions above map straight onto it: thrift is why we run $K$ epochs instead of one, and safety is what keeps those reused epochs from drifting too far from the policy that collected the data.
+
 TRPO and PPO answer the same question with two temperaments. **TRPO builds a fence** (a hard KL constraint) and works hard to respect it. **PPO swaps the fence for a tether** woven into the objective: wander past the safe band and the payoff just goes flat. Same destination, different enforcement. Almost everyone took the PPO road.
 
 **The equation that ties it all together is unchanged from the last post:**
@@ -100,15 +102,20 @@ Read it as: "draw from the distribution you *have* ($q$), correct each sample by
 ```python
 import numpy as np
 
-# Two distributions over three outcomes, and a function f we want to average.
-p = np.array([0.1, 0.2, 0.7])          # target distribution (what we want)
-q = np.array([0.5, 0.3, 0.2])          # sampling distribution (what we have)
+# two distributions over three outcomes, and a function f we want to average
+# p: target distribution (what we want); q: sampling distribution (what we have)
+p = np.array([0.1, 0.2, 0.7])
+q = np.array([0.5, 0.3, 0.2])
 f = np.array([1, 2, 3])
 
-target = (p * f).sum()                  # E_p[f] — the true answer
-naive  = (q * f).sum()                  # E_q[f] — wrong distribution, wrong answer
-w = p / q                              # importance weights  w = p(x)/q(x)
-reweighted = (q * w * f).sum()         # E_q[w·f] = E_p[f]  — corrected
+# E_p[f]: the true answer
+target = (p * f).sum()
+# E_q[f]: wrong distribution, wrong answer
+naive = (q * f).sum()
+# importance weights w = p(x)/q(x)
+w = p / q
+# E_q[w·f] = E_p[f]: the corrected estimate
+reweighted = (q * w * f).sum()
 
 print(f"Target   E_p[f]        = {target:.1f}")
 print(f"Naive    E_q[f]        = {naive:.1f}  (wrong distribution)")
@@ -126,6 +133,8 @@ Weights  w = p/q       = ['0.20', '0.67', '3.50']
 The naive average under $q$ gives 1.7 (the mean under the *wrong* distribution). The reweighted average recovers 2.6 exactly. The rare-under-$q$ but important-under-$p$ outcome $x=3$ carries a big weight (3.5) and contributes the lion's share, while the over-sampled $x=1$ is damped to almost nothing.
 
 ![Importance sampling: naive average under q gives 1.7, reweighted average recovers the correct 2.6](./images/fig-importance-sampling.svg)
+
+The two panels make the correction visible. On the left, averaging $f$ under $q$ (the bars we actually sampled) lands at the wrong value, 1.7. On the right, multiplying each bar by its importance weight $w = p/q$ before averaging stretches the rare-but-important outcome and shrinks the over-sampled one, pulling the estimate back to the true 2.6. This is exactly the trick we will use to score a new policy from old data.
 
 **Applying it to RL.** We want the expected advantage under $\pi_\text{new}$, but our batch was collected by $\pi_\text{old}$. Substituting $p = \pi_\text{new}$ and $q = \pi_\text{old}$:
 
@@ -147,7 +156,8 @@ import torch
 logp_new = torch.tensor([-1.20, -0.85, -2.10])
 logp_old = torch.tensor([-1.30, -0.90, -1.80])
 
-ratio = (logp_new - logp_old).exp()   # r = π_new/π_old = exp(log π_new − log π_old)
+# r = π_new / π_old = exp(log π_new − log π_old)
+ratio = (logp_new - logp_old).exp()
 print(f"Ratios: {[f'{r:.3f}' for r in ratio.tolist()]}")
 ```
 
@@ -156,6 +166,55 @@ Ratios: ['1.105', '1.051', '0.741']
 ```
 
 The first two actions became slightly more likely under the new policy ($r > 1$), the third became less likely ($r < 1$). These ratios reweight the old advantages to score the new policy.
+
+**A worked example: reweighting at one checkpoint.** The explorer stands at a checkpoint with two directions, $a_1$ and $a_2$, with advantages from the old logbook:
+
+| direction | $\pi_\text{old}$ | $\pi_\text{new}$ | $r = \pi_\text{new}/\pi_\text{old}$ | $A$ | $r \cdot A$ |
+|---|---|---|---|---|---|
+| to the ridge ($a_1$) | 0.5 | 0.8 | 1.6 | +2 | **+3.2** |
+| to the stream ($a_2$) | 0.5 | 0.2 | 0.4 | -1 | **-0.4** |
+
+Old habits' score: $0.5(+2) + 0.5(-1) = +0.5$. This tells us about $\pi_\text{old}$, the wrong question. Reweighted (new habits' score): $0.5(1.6 \cdot 2) + 0.5(0.4 \cdot (-1)) = 0.5(3.2) + 0.5(-0.4) = +1.4$. Sanity check: directly under $\pi_\text{new}$, $0.8(+2) + 0.2(-1) = +1.4$. Identical. The reweighting recovers the new policy's true expected advantage with no new data.
+
+Now suppose the explorer's logbook is all forest legs, and a bold new plan heads into the desert:
+
+| logged leg | $\pi_\text{old}$ | $\pi_\text{new}$ | $r$ |
+|---|---|---|---|
+| cut to the dunes | 0.02 | 0.60 | **30** |
+| stay on the trail | 0.49 | 0.20 | 0.41 |
+| follow the creek | 0.49 | 0.20 | 0.41 |
+
+A 50-leg logbook holds roughly one dune-ward leg, yet at weight 30 it alone is about 60% of the estimate. One fluke leg decides everything. That is a guess, not data. **Stay near the forest, and the logbook holds.**
+
+```python
+import numpy as np
+
+pi_old = np.array([0.5, 0.5])
+pi_new = np.array([0.8, 0.2])
+A = np.array([2.0, -1.0])
+
+# importance ratio r = π_new / π_old
+r = pi_new / pi_old
+
+# E_{π_old}[A]: scores the OLD policy
+old_score = (pi_old * A).sum()
+# E_{π_old}[r·A]: IS-reweighted estimate for π_new
+new_score = (pi_old * r * A).sum()
+# E_{π_new}[A]: direct computation (sanity check)
+direct = (pi_new * A).sum()
+
+print(f"Old habits' score (E_old[A]):   {old_score:+.1f}")
+print(f"Reweighted score  (E_old[rA]):  {new_score:+.1f}")
+print(f"Direct check      (E_new[A]):   {direct:+.1f}")
+```
+
+```text title="Output"
+Old habits' score (E_old[A]):   +0.5
+Reweighted score  (E_old[rA]):  +1.4
+Direct check      (E_new[A]):   +1.4
+```
+
+The reweighted score matches the direct calculation perfectly: the old data, correctly reweighted, scores the new policy exactly.
 
 <details>
 <summary><strong>Check:</strong> In one sentence, what is the importance ratio r(theta) measuring?</summary>
@@ -200,13 +259,15 @@ Read it as: "for each transition in the batch, multiply its advantage by the rat
 In code, the advantage is computed once per batch:
 
 ```python
-import torch, numpy as np
+import torch
 
 returns = torch.tensor([5.0, 3.0, 8.0, 1.0, 6.0])
-values  = torch.tensor([4.5, 4.0, 5.5, 3.0, 5.0])
+values = torch.tensor([4.5, 4.0, 5.5, 3.0, 5.0])
 
-adv = returns - values                                  # A = G - V(s)
-adv = (adv - adv.mean()) / (adv.std() + 1e-8)          # standardize
+# A = G - V(s)
+adv = returns - values
+# standardize to mean 0, std 1
+adv = (adv - adv.mean()) / (adv.std() + 1e-8)
 print(f"Raw advantages:          {(returns - values).tolist()}")
 print(f"Standardized advantages: {[f'{a:.3f}' for a in adv.tolist()]}")
 ```
@@ -295,6 +356,8 @@ where $\varepsilon \approx 0.2$. Two ingredients do the work:
 
 ![PPO clip objective for a good action with A greater than 0, rising linearly then going flat at r equals 1 plus epsilon](./images/fig-clip-positive.svg)
 
+The orange curve traces the PPO objective as the ratio grows. It climbs with the dashed unclipped line while $r$ stays inside the shaded band $[1-\varepsilon, 1+\varepsilon]$, then flattens the instant $r$ crosses $1+\varepsilon$. That flat stretch is the zero-gradient zone: the action has been made as much more likely as one batch is allowed to allow, so optimization stops pushing it. The clip, not a separate constraint, is what draws the line.
+
 **When $A < 0$ (bad action):** we want the action *less* likely, so we push $r$ below 1. Since $A$ is negative, the objective $r \cdot A$ is negative everywhere; "improving" it means making it less negative. Three regions:
 
 1. **$r < 1 - \varepsilon$ (flat).** Already cut about 20%. No further reward for suppressing it more. Gradient 0. We do not zero out an action on one noisy batch.
@@ -303,6 +366,8 @@ where $\varepsilon \approx 0.2$. Two ingredients do the work:
 
 ![PPO clip objective for a bad action with A less than 0, showing the safety valve for large r](./images/fig-clip-negative.svg)
 
+Read the curve left to right. Below $1-\varepsilon$ the objective is flat: we stop suppressing a bad action we have already cut enough. Through the band it slopes, so the gradient pushes $r$ down and the action becomes less likely. Above $1+\varepsilon$ it keeps falling alongside the unclipped line instead of flattening. That last branch, the one the clip deliberately leaves open, is the safety valve: an action that wrongly grew more likely is always pulled back.
+
 **The asymmetry in one line:** for a bad action the clip caps how hard you *suppress* it (a floor at $1-\varepsilon$), but never caps how hard you *undo* an accidental increase (no ceiling). Pessimism, by design.
 
 Here is the core of the PPO update:
@@ -310,14 +375,17 @@ Here is the core of the PPO update:
 ```python
 import torch
 
-ratio     = torch.tensor([0.95, 1.10, 1.50, 0.60])
+ratio = torch.tensor([0.95, 1.10, 1.50, 0.60])
 advantage = torch.tensor([2.0, 2.0, -2.0, -2.0])
 eps = 0.2
 
-# L^CLIP: min(r·A, clip(r, 1-ε, 1+ε)·A)
-unclipped = ratio * advantage                                  # r·A (unbounded)
-clipped   = torch.clamp(ratio, 1 - eps, 1 + eps) * advantage   # clip(r)·A (bounded)
-objective = torch.min(unclipped, clipped)                       # pessimistic choice
+# L^CLIP = min(r·A, clip(r, 1-ε, 1+ε)·A)
+# r·A: the unbounded surrogate
+unclipped = ratio * advantage
+# clip(r)·A: the bounded surrogate
+clipped = torch.clamp(ratio, 1 - eps, 1 + eps) * advantage
+# the pessimistic (smaller) of the two
+objective = torch.min(unclipped, clipped)
 
 for i in range(len(ratio)):
     print(f"  r={ratio[i]:.2f}  A={advantage[i]:+.1f}  "
@@ -336,6 +404,30 @@ for i in range(len(ratio)):
 - $r=1.10$ inside the band, same story.
 - $r=1.50$ with $A < 0$ (safety valve): the unclipped term $-3.0$ is more negative, so `min` picks it, the gradient keeps pulling the bad action back.
 - $r=0.60 < 0.8$ with $A < 0$ (already cut enough): the clipped term $-1.6$ is more negative, so `min` picks it, the value is fixed, gradient 0. The clip stops us from over-suppressing.
+
+**Clip by hand, a good action ($A = +2$).** One action did better than expected ($A = +2$), with $\varepsilon = 0.2$ and $\pi_\text{old}(a) = 0.20$. The band is $[0.8, 1.2]$. As training proceeds and $\pi_\theta$ shifts this action's probability:
+
+| $\pi_\theta(a)$ | $r$ | $r \cdot A$ | $\text{clip}(r) \cdot A$ | $\min$ (objective) | status |
+|---|---|---|---|---|---|
+| 0.20 | 1.00 | 2.00 | 2.00 | **2.00** | start |
+| 0.22 | 1.10 | 2.20 | 2.20 | **2.20** | inside band, rising |
+| 0.24 | 1.20 | 2.40 | 2.40 | **2.40** | at the edge |
+| 0.26 | 1.30 | 2.60 | 2.40 | **2.40** | capped, flat |
+| 0.30 | 1.50 | 3.00 | 2.40 | **2.40** | capped, flat |
+
+At $r = 1.20$ both terms agree at 2.40. Past that, the unclipped term keeps climbing but the clipped term is frozen at $1.2 \times 2 = 2.4$, so `min` picks 2.4 and the gradient is 0. **PPO moves $r$ up to 1.2 and stops.** The good action gets more likely by a bounded amount. Next batch, $\pi_\text{old}$ resets and it can climb again.
+
+**Clip by hand, a bad action ($A = -2$).** Same action, but now it did worse than expected ($A = -2$). We want to push $r$ below 1:
+
+| $\pi_\theta(a)$ | $r$ | $r \cdot A$ | $\text{clip}(r) \cdot A$ | $\min$ (objective) | status |
+|---|---|---|---|---|---|
+| 0.20 | 1.00 | -2.00 | -2.00 | **-2.00** | start |
+| 0.18 | 0.90 | -1.80 | -1.80 | **-1.80** | inside band, less negative |
+| 0.16 | 0.80 | -1.60 | -1.60 | **-1.60** | at the edge |
+| 0.12 | 0.60 | -1.20 | -1.60 | **-1.60** | capped, flat |
+| 0.30 | 1.50 | -3.00 | -2.40 | **-3.00** | **safety valve, NOT clipped** |
+
+At $r = 0.60$ the raw term is $-1.2$ and the clipped term is $-1.6$. The min picks $-1.6$ (more negative), which is fixed, so the gradient is 0 and we stop suppressing. At $r = 1.50$ (an accidental increase) the raw term is $-3.0$ and the clipped term is $-2.4$. The min picks $-3.0$ (more negative), so this branch is not clipped and the gradient keeps pulling the bad action back down. That is the safety valve: a bad action that grew is always corrected.
 
 <details>
 <summary><strong>Check:</strong> For a good action (A > 0), once the ratio passes 1 + epsilon the gradient is zero. Doesn't that mean PPO just ignores very good actions and stops learning from them?</summary>
@@ -373,6 +465,8 @@ A working PPO is a full actor-critic system. Three terms, three jobs:
 
 $$L = \mathbb{E}\!\left[L^\text{CLIP} - c_1 \big(V_\theta(s) - G_t\big)^2 + c_2 \, H[\pi_\theta]\right]$$
 
+Read it as: the loss $L$ averages three pieces over the batch. The first, $L^\text{CLIP}$, is the clipped actor objective from Section 2.5. The second, $\big(V_\theta(s) - G_t\big)^2$, is the critic's squared prediction error, scaled by $c_1$ and subtracted because we want it small. The third, $H[\pi_\theta]$, is the policy's entropy, scaled by $c_2$ and added because we want to keep a little randomness. In plain terms: improve the actor, sharpen the critic, and stay exploratory, all in one update.
+
 - **Clip (actor).** Improve the policy safely. The star of Section 2.5.
 - **Value loss (critic).** Train $V(s)$ to predict the return $G_t$ by mean-squared error, so the next iteration's advantage is sharper.
 - **Entropy bonus.** Reward a bit of randomness ($H[\pi]$ is the entropy of the policy) so the policy does not collapse to one action too early.
@@ -385,7 +479,7 @@ For continuous actions (Pendulum torque, LunarLander thrusters), the policy outp
 import torch
 import torch.nn as nn
 
-# π(a|s) = N(μ_θ(s), σ): a Gaussian whose mean depends on state,
+# π(a|s) = N(μ_θ(s), σ): a Gaussian whose mean depends on the state,
 # whose std is a free parameter (learned, not state-dependent).
 class GaussianPolicy(nn.Module):
     def __init__(self, obs_dim, act_dim, h=64):
@@ -394,19 +488,25 @@ class GaussianPolicy(nn.Module):
             nn.Linear(obs_dim, h), nn.Tanh(),
             nn.Linear(h, h), nn.Tanh(),
         )
-        self.mean = nn.Linear(h, act_dim)         # μ_θ(s): center of Gaussian
-        self.log_std = nn.Parameter(torch.zeros(act_dim) - 0.5)  # log σ (learned)
+        # μ_θ(s): center of the Gaussian
+        self.mean = nn.Linear(h, act_dim)
+        # log σ (learned), stored as a log so σ stays positive after exp()
+        self.log_std = nn.Parameter(torch.zeros(act_dim) - 0.5)
 
     def dist(self, obs):
-        m = self.mean(self.body(obs))              # state-dependent mean
-        return torch.distributions.Normal(m, self.log_std.exp())  # N(μ, σ)
+        # state-dependent mean
+        m = self.mean(self.body(obs))
+        # N(μ, σ)
+        return torch.distributions.Normal(m, self.log_std.exp())
 
 torch.manual_seed(0)
 obs_dim, act_dim = 3, 1
 pol = GaussianPolicy(obs_dim, act_dim)
 obs = torch.randn(1, obs_dim)
-d = pol.dist(obs)                                  # distribution for this state
-a = d.sample()                                     # sample a continuous action
+# the action distribution for this state
+d = pol.dist(obs)
+# sample one continuous action
+a = d.sample()
 print(f"mu = {d.loc.item():.3f}, sigma = {d.scale.item():.3f}, "
       f"sampled a = {a.item():.3f}, log_prob = {d.log_prob(a).sum().item():.3f}")
 ```
@@ -416,6 +516,184 @@ mu = -0.060, sigma = 0.607, sampled a = -0.231, log_prob = -0.459
 ```
 
 The mean $\mu(s)$ is state-dependent (from the network); the standard deviation $\sigma$ is a learned parameter (not state-dependent). Sampling from this Gaussian gives a continuous action, and `log_prob(a)` gives the log-density, the score needed for the ratio.
+
+The rest of the program builds on this actor. We need a critic to estimate $V(s)$, a way to turn rewards into returns, a rollout to fill a batch, and the clipped update itself. First, a few hyperparameters for `Pendulum-v1`:
+
+```python
+# γ, clip ε, K epochs, batch size, minibatch size, learning rate
+GAMMA, CLIP_EPS, EPOCHS, MIN_STEPS, MB_SIZE, LR = 0.95, 0.2, 10, 2048, 64, 3e-4
+```
+
+The **critic** is a small network trained to predict the return from each state:
+
+```python
+import torch.nn as nn
+
+# V_θ(s): maps an observation to a scalar value estimate.
+# Trained by MSE against the discounted return: loss = (V(s) − G_t)².
+class Value(nn.Module):
+    def __init__(self, obs_dim, h=64):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(),
+                                 nn.Linear(h, h), nn.Tanh(), nn.Linear(h, 1))
+
+    def forward(self, x):
+        # squeeze the trailing dim so V(s) is one scalar per state
+        return self.net(x).squeeze(-1)
+```
+
+**Returns** accumulate future rewards backward through each episode:
+
+```python
+# G_t = r_t + γ r_{t+1} + γ² r_{t+2} + ...
+# walk the rewards backward so each G picks up the rewards that follow it
+def discounted_returns(rewards, gamma):
+    G, out = 0.0, []
+    for r in reversed(rewards):
+        # G_t = r_t + γ · G_{t+1}
+        G = r + gamma * G
+        out.append(G)
+    return list(reversed(out))
+```
+
+**Collect** rolls out the current policy (which is $\pi_\text{old}$ for the upcoming update) and records everything the update needs, including the frozen log-probs that become the ratio's denominator:
+
+```python
+import numpy as np
+
+# roll out π_old until the batch holds at least min_steps transitions.
+# record (s, a, log π_old(a|s), G_t) for every step.
+def collect(env, policy, gamma, min_steps=MIN_STEPS):
+    S, A, LOGP, RET, ep_rets = [], [], [], [], []
+    lo, hi = env.action_space.low, env.action_space.high
+    steps = 0
+    while steps < min_steps:
+        s, _ = env.reset()
+        ep_s, ep_a, ep_lp, ep_r = [], [], [], []
+        done = False
+        while not done:
+            with torch.no_grad():
+                dist = policy.dist(torch.as_tensor(s, dtype=torch.float32))
+                # a ~ π_old(·|s)
+                a = dist.sample()
+                # log π_old(a|s)
+                lp = dist.log_prob(a).sum(-1)
+            # respect the environment's action bounds
+            a_np = np.clip(a.numpy(), lo, hi)
+            s2, r, term, trunc, _ = env.step(a_np)
+            ep_s.append(s); ep_a.append(a.numpy())
+            ep_lp.append(float(lp)); ep_r.append(r)
+            s = s2; done = term or trunc; steps += 1
+        S += ep_s; A += ep_a; LOGP += ep_lp
+        # G_t for each step of this episode
+        RET += discounted_returns(ep_r, gamma)
+        ep_rets.append(sum(ep_r))
+    return (np.array(S, np.float32), np.array(A, np.float32),
+            np.array(LOGP, np.float32), np.array(RET, np.float32),
+            float(np.mean(ep_rets)))
+```
+
+The **update** is the heart of PPO: compute the advantage once, then sweep the batch for $K$ epochs of clipped minibatch SGD.
+
+```python
+# K epochs of clipped SGD on the collected batch. The advantage is
+# computed once and frozen; the batch is then shuffled into minibatches
+# and swept K times. As the policy drifts, ratios leave [1−ε, 1+ε] and
+# their gradients vanish on their own.
+def ppo_update(policy, value, popt, vopt, batch):
+    S, A, LOGP_old, RET, _ = batch
+    S = torch.as_tensor(S); A = torch.as_tensor(A)
+    LOGP_old = torch.as_tensor(LOGP_old); RET = torch.as_tensor(RET)
+    with torch.no_grad():
+        # A = G_t − V(s_t)
+        adv = RET - value(S)
+    # standardize to mean 0, std 1
+    adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+    n = S.shape[0]
+    # K-epoch reuse
+    for _ in range(EPOCHS):
+        # random minibatches
+        for idx in torch.randperm(n).split(MB_SIZE):
+            dist = policy.dist(S[idx])
+            # log π_θ(a|s) under the current policy
+            logp = dist.log_prob(A[idx]).sum(-1)
+            # r = π_new / π_old
+            ratio = (logp - LOGP_old[idx]).exp()
+            # r · A
+            unclipped = ratio * adv[idx]
+            # clip(r) · A
+            clipped = torch.clamp(ratio, 1 - CLIP_EPS,
+                                  1 + CLIP_EPS) * adv[idx]
+            # −L^CLIP: minimize the negative to maximize the objective
+            actor_loss = -torch.min(unclipped, clipped).mean()
+            popt.zero_grad(); actor_loss.backward(); popt.step()
+            # critic MSE: (V(s) − G)²
+            v_loss = (value(S[idx]) - RET[idx]).pow(2).mean()
+            vopt.zero_grad(); v_loss.backward(); vopt.step()
+```
+
+The **training loop** ties it together: collect with $\pi_\text{old}$, run the clipped update, repeat. We seed everything (including the environment) so the run is reproducible.
+
+```python
+import gymnasium as gym
+
+# seed everything so the captured output below is reproducible
+torch.manual_seed(0); np.random.seed(0)
+
+env = gym.make("Pendulum-v1")
+# seed the env RNG once; the first reset seeds the whole run
+env.reset(seed=0); env.action_space.seed(0)
+pol = GaussianPolicy(env.observation_space.shape[0], env.action_space.shape[0])
+val = Value(env.observation_space.shape[0])
+popt = torch.optim.Adam(pol.parameters(), LR)
+vopt = torch.optim.Adam(val.parameters(), LR)
+
+curve = []
+for it in range(60):
+    # roll out π_old, recording (s, a, logp, G)
+    batch = collect(env, pol, GAMMA)
+    # K clipped epochs on this one batch
+    ppo_update(pol, val, popt, vopt, batch)
+    curve.append(batch[-1])
+    if (it + 1) % 20 == 0:
+        print(f"  iter {it+1:3d}  mean episode return {batch[-1]:.1f}")
+```
+
+Finally, a **greedy evaluation** takes the Gaussian mean with no sampling noise, to measure the learned policy without exploration:
+
+```python
+# greedy action = μ(s): the Gaussian mean, no sampling noise
+def greedy_eval(env_id, policy, n=10, seed=123):
+    env = gym.make(env_id)
+    lo, hi = env.action_space.low, env.action_space.high
+    total = 0.0
+    for i in range(n):
+        s, _ = env.reset(seed=seed + i)
+        done = False
+        while not done:
+            with torch.no_grad():
+                # μ(s): the mean of the Gaussian
+                a = policy.dist(torch.as_tensor(s, dtype=torch.float32)).loc
+            s, r, term, trunc, _ = env.step(np.clip(a.numpy(), lo, hi))
+            total += r; done = term or trunc
+    env.close()
+    return total / n
+
+g = greedy_eval("Pendulum-v1", pol)
+env.close()
+print(f"\nPendulum PPO:  start {np.mean(curve[:3]):.1f}  "
+      f"end {np.mean(curve[-3:]):.1f}  greedy {g:.1f}")
+```
+
+```text title="Output"
+  iter  20  mean episode return -1038.2
+  iter  40  mean episode return -919.3
+  iter  60  mean episode return -672.0
+
+Pendulum PPO:  start -1137.3  end -703.8  greedy -619.0
+```
+
+The policy steadily reduces its penalties. The per-batch mean return climbs from about $-1137$ (the arm hanging down, accruing large penalties) to about $-704$ by the end, and the iteration-60 batch reaches $-672$. Greedy evaluation, taking the Gaussian mean with no exploration noise, scores $-619$: the policy has learned to swing the pendulum up and hold it near vertical. Every piece above is doing its job: the Gaussian policy, the discounted returns, the standardized advantage, and the clipped surrogate with $K$-epoch reuse.
 
 <details>
 <summary><strong>Check:</strong> Vanilla policy gradients use a batch once; PPO sweeps it for K epochs. What makes the reuse safe?</summary>
@@ -441,7 +719,49 @@ The mean $\mu(s)$ is state-dependent (from the network); the standard deviation 
 **Answer.** It is the fixed reference policy that collected the batch, the thing we are staying proximal to. If it moved with $\theta$, the ratio would always be about 1 and the clip would never engage; freezing it makes $r$ measure true drift from the data-collecting policy.
 </details>
 
-### 2.7 Where you have already used it: RLHF
+### 2.7 Does it work? The Pendulum curve and an ablation
+
+We just ran the loop above for 60 iterations on `Pendulum-v1` ($\gamma = 0.95$, 2048 steps per batch, $K = 10$ epochs, $\varepsilon = 0.2$). Plotting the per-batch mean return shows the learning:
+
+![PPO learning curve on Pendulum-v1, improving from about minus 1137 to minus 704 over 60 iterations](./images/fig-pendulum-curve.svg)
+
+The faint line is the raw per-batch return, noisy because each batch is a fresh set of episodes. The bold line is a 5-iteration moving average. The trend is clearly upward: the smoothed return climbs from about $-1137$ to about $-704$, and the dashed line marks the greedy evaluation at $-619$. The pendulum starts by hanging down and ends by swinging up to near vertical and holding it. This is the whole §2.6 program, measured.
+
+Which ingredient does the work? Turn one off at a time (40 iterations each):
+
+| Variant | Start | End | Notes |
+|---|---|---|---|
+| **full PPO** | -1137 | **-996** | best: clip + reuse |
+| NO reuse ($K=1$) | -1144 | -1238 | each batch used once, slower learning |
+| NO clip | -1404 | -1301 | worst, most unstable |
+
+![Ablation study on Pendulum showing full PPO beats both ablations](./images/fig-ablation.svg)
+
+The three curves separate cleanly. Full PPO (orange) is the only one that improves; both ablations stall or drift downward. **Removing the clip hurt the most.** Without it, the surrogate $r \cdot A$ is unbounded: a large advantage lets the ratio grow without limit in a single step, shoving the policy far from where the batch was collected. That curve is both the lowest and the most unstable.
+
+**Removing reuse was costly too.** Each batch feeds a single gradient step instead of 10, so learning per iteration is much slower: you pay the same collection cost for a tenth of the learning.
+
+**Together:** clip matters most (it keeps the update safe), reuse matters second (it extracts more learning per batch). Full PPO is a trust region via clipping plus sample efficiency via reuse.
+
+<details>
+<summary><strong>Check:</strong> Turning the clip off makes the training curve the worst. Why specifically does an unbounded surrogate collapse?</summary>
+
+**Answer.** Without the clip, if the advantage $A$ happens to be large for some transition, the ratio $r = \pi_\text{new}/\pi_\text{old}$ can grow without limit in a single gradient step, shoving the policy far from where the batch was collected. That one over-large update can land the policy in a bad region it never recovers from. Nothing in the unclipped surrogate prevents this.
+</details>
+
+<details>
+<summary><strong>Check:</strong> With use_reuse=False (K=1) each batch is used once. How does learning speed per iteration change, and why is it safe to reuse a batch K times in full PPO but riskier without the clip?</summary>
+
+**Answer.** Learning per iteration is much slower: each batch feeds one gradient step instead of 10. In full PPO it is safe to reuse because the clip bounds how far each epoch can push the policy: once $r$ hits the $[1-\varepsilon, 1+\varepsilon]$ boundary, the gradient is zero and no further movement happens. Without the clip there is no such brake; reusing the batch with an unbounded surrogate compounds the over-large-ratio problem.
+</details>
+
+<details>
+<summary><strong>Check:</strong> If we train the critic on the return G, why isn't the advantage A = G - V always zero?</summary>
+
+**Answer.** The critic is trained toward the *average* return, while $G$ is a single noisy draw. Under squared-error loss, $V(s)$ settles on $\mathbb{E}[G \mid s]$, the mean return from $s$. Each individual $G$ deviates from that mean, so $A = G - V(s)$ is a real, nonzero signal: "how much better than typical this run was." The training *succeeds* when $V$ equals the average, not when $V$ equals every $G$, which is impossible.
+</details>
+
+### 2.8 Where you have already used it: RLHF
 
 PPO is the algorithm that aligned ChatGPT. The only thing that moves is the dictionary:
 
@@ -462,7 +782,7 @@ A reward model (trained on human preferences) scores each response. PPO updates 
 
 Same mathematical tool, two roles: one stabilizes the *update*, the other anchors the *destination*.
 
-**GRPO** (the algorithm behind DeepSeek's reasoning models) keeps PPO's clipped objective but drops the critic entirely. For each prompt it samples a group of answers and uses their average reward as the baseline. The advantage is simply "how much better than its siblings." That is the next lecture.
+**GRPO** (the algorithm behind DeepSeek's reasoning models) keeps PPO's clipped objective but drops the critic entirely. For each prompt it samples a group of answers and uses their average reward as the baseline. The advantage is simply "how much better than its siblings." We will return to it in a later post.
 
 <details>
 <summary><strong>Check:</strong> In RLHF, what plays the role of state, action, policy, and reward?</summary>
@@ -484,135 +804,9 @@ Same mathematical tool, two roles: one stabilizes the *update*, the other anchor
 
 ---
 
-## 3. Worked examples by hand
+## 3. Putting it all together
 
-### 3.1 Importance-sampling reweighting at one checkpoint
-
-The explorer stands at a checkpoint with two directions, $a_1$ and $a_2$, with advantages from the old logbook:
-
-| direction | $\pi_\text{old}$ | $\pi_\text{new}$ | $r = \pi_\text{new}/\pi_\text{old}$ | $A$ | $r \cdot A$ |
-|---|---|---|---|---|---|
-| to the ridge ($a_1$) | 0.5 | 0.8 | 1.6 | +2 | **+3.2** |
-| to the stream ($a_2$) | 0.5 | 0.2 | 0.4 | -1 | **-0.4** |
-
-**Old habits' score:** $0.5(+2) + 0.5(-1) = +0.5$. This tells us about $\pi_\text{old}$, the wrong question.
-
-**Reweighted (new habits' score):** $0.5(1.6 \cdot 2) + 0.5(0.4 \cdot (-1)) = 0.5(3.2) + 0.5(-0.4) = +1.4$.
-
-Sanity check: directly under $\pi_\text{new}$, $0.8(+2) + 0.2(-1) = +1.4$. Identical. The reweighting recovers the new policy's true expected advantage with no new data.
-
-Now suppose the explorer's logbook is all forest legs, and a bold new plan heads into the desert:
-
-| logged leg | $\pi_\text{old}$ | $\pi_\text{new}$ | $r$ |
-|---|---|---|---|
-| cut to the dunes | 0.02 | 0.60 | **30** |
-| stay on the trail | 0.49 | 0.20 | 0.41 |
-| follow the creek | 0.49 | 0.20 | 0.41 |
-
-A 50-leg logbook holds roughly one dune-ward leg, yet at weight 30 it alone is about 60% of the estimate. One fluke leg decides everything. That is a guess, not data. **Stay near the forest, and the logbook holds.**
-
-```python
-import numpy as np
-
-pi_old = np.array([0.5, 0.5])
-pi_new = np.array([0.8, 0.2])
-A      = np.array([2.0, -1.0])
-r      = pi_new / pi_old               # importance ratio r = π_new / π_old
-
-old_score = (pi_old * A).sum()          # E_{π_old}[A] — scores the OLD policy
-new_score = (pi_old * r * A).sum()      # E_{π_old}[r·A] — IS-reweighted for π_new
-direct    = (pi_new * A).sum()          # E_{π_new}[A] — direct (sanity check)
-
-print(f"Old habits' score (E_old[A]):   {old_score:+.1f}")
-print(f"Reweighted score  (E_old[rA]):  {new_score:+.1f}")
-print(f"Direct check      (E_new[A]):   {direct:+.1f}")
-```
-
-```text title="Output"
-Old habits' score (E_old[A]):   +0.5
-Reweighted score  (E_old[rA]):  +1.4
-Direct check      (E_new[A]):   +1.4
-```
-
-The reweighted score matches the direct calculation perfectly.
-
-### 3.2 Clip by hand: A = +2
-
-One action did better than expected ($A = +2$), with $\varepsilon = 0.2$ and $\pi_\text{old}(a) = 0.20$. The band is $[0.8, 1.2]$. As training proceeds and $\pi_\theta$ shifts this action's probability:
-
-| $\pi_\theta(a)$ | $r$ | $r \cdot A$ | $\text{clip}(r) \cdot A$ | $\min$ (objective) | status |
-|---|---|---|---|---|---|
-| 0.20 | 1.00 | 2.00 | 2.00 | **2.00** | start |
-| 0.22 | 1.10 | 2.20 | 2.20 | **2.20** | inside band, rising |
-| 0.24 | 1.20 | 2.40 | 2.40 | **2.40** | at the edge |
-| 0.26 | 1.30 | 2.60 | 2.40 | **2.40** | capped, flat |
-| 0.30 | 1.50 | 3.00 | 2.40 | **2.40** | capped, flat |
-
-At $r = 1.20$: both terms agree at 2.40. Past that, the unclipped term keeps climbing but the clipped term is frozen at $1.2 \times 2 = 2.4$; `min` picks 2.4; gradient = 0. **PPO moves $r$ up to 1.2 and stops.** The good action gets more likely by a bounded amount. Next batch, $\pi_\text{old}$ resets and it can climb again.
-
-### 3.3 Clip by hand: A = -2
-
-Same action, but now it did *worse* than expected ($A = -2$). We want to push $r$ below 1:
-
-| $\pi_\theta(a)$ | $r$ | $r \cdot A$ | $\text{clip}(r) \cdot A$ | $\min$ (objective) | status |
-|---|---|---|---|---|---|
-| 0.20 | 1.00 | -2.00 | -2.00 | **-2.00** | start |
-| 0.18 | 0.90 | -1.80 | -1.80 | **-1.80** | inside band, less negative |
-| 0.16 | 0.80 | -1.60 | -1.60 | **-1.60** | at the edge |
-| 0.12 | 0.60 | -1.20 | -1.60 | **-1.60** | capped, flat |
-| 0.30 | 1.50 | -3.00 | -2.40 | **-3.00** | **safety valve, NOT clipped** |
-
-At $r = 0.60$: raw $= -1.2$, clipped $= -1.6$. The min picks $-1.6$ (more negative), which is fixed, so gradient = 0. We stop suppressing.
-
-At $r = 1.50$ (accidental increase): raw $= -3.0$, clipped $= -2.4$. The min picks $-3.0$ (more negative). **Not clipped.** The gradient keeps pulling the bad action back down. This is the safety valve: a bad action that grew is always corrected.
-
-### 3.4 Real numbers: Pendulum learning curve and ablation
-
-Training PPO on `Pendulum-v1` (60 iterations, $\gamma=0.95$, 2048 steps/batch, $K=10$ epochs, $\varepsilon=0.2$):
-
-**Full PPO:** start mean return $\approx -1137$ (the pendulum hangs down, accruing penalties), end mean return $\approx -704$, greedy evaluation $\approx -619$ (the policy learned to swing the arm upright and hold it).
-
-![PPO learning curve on Pendulum-v1, improving from about minus 1137 to minus 704 over 60 iterations](./images/fig-pendulum-curve.svg)
-
-The ablation study (40 iterations each) reveals which ingredient matters most:
-
-| Variant | Start | End | Notes |
-|---|---|---|---|
-| **full PPO** | -1137 | **-996** | best: clip + reuse |
-| NO reuse ($K=1$) | -1144 | -1238 | each batch used once, slower learning |
-| NO clip | -1404 | -1302 | worst, most unstable |
-
-![Ablation study on Pendulum showing full PPO beats both ablations](./images/fig-ablation.svg)
-
-**Removing the clip hurt the most.** Without it, the surrogate $r \cdot A$ is unbounded: a large advantage lets the ratio grow without limit in a single step, shoving the policy far from where the batch was collected. The curve is both the lowest and the most unstable.
-
-**Removing reuse was costly too.** Each batch feeds a single gradient step instead of 10, so learning per iteration is much slower: you pay the same collection cost for a tenth of the learning.
-
-**Together:** clip matters most (it keeps the update safe), reuse matters second (it extracts more learning per batch). Full PPO = trust region via clipping + sample efficiency via reuse.
-
-<details>
-<summary><strong>Check:</strong> Turning the clip off makes the training curve the worst. Why specifically does an unbounded surrogate collapse?</summary>
-
-**Answer.** Without the clip, if the advantage $A$ happens to be large for some transition, the ratio $r = \pi_\text{new}/\pi_\text{old}$ can grow without limit in a single gradient step, shoving the policy far from where the batch was collected. That one over-large update can land the policy in a bad region it never recovers from. Nothing in the unclipped surrogate prevents this.
-</details>
-
-<details>
-<summary><strong>Check:</strong> With use_reuse=False (K=1) each batch is used once. How does learning speed per iteration change, and why is it safe to reuse a batch K times in full PPO but riskier without the clip?</summary>
-
-**Answer.** Learning per iteration is much slower: each batch feeds one gradient step instead of 10. In full PPO it is safe to reuse because the clip bounds how far each epoch can push the policy: once $r$ hits the $[1-\varepsilon, 1+\varepsilon]$ boundary, the gradient is zero and no further movement happens. Without the clip there is no such brake; reusing the batch with an unbounded surrogate compounds the over-large-ratio problem.
-</details>
-
-<details>
-<summary><strong>Check:</strong> If we train the critic on the return G, why isn't the advantage A = G - V always zero?</summary>
-
-**Answer.** The critic is trained toward the *average* return, while $G$ is a single noisy draw. Under squared-error loss, $V(s)$ settles on $\mathbb{E}[G \mid s]$, the mean return from $s$. Each individual $G$ deviates from that mean, so $A = G - V(s)$ is a real, nonzero signal: "how much better than typical this run was." The training *succeeds* when $V$ equals the average, not when $V$ equals every $G$, which is impossible.
-</details>
-
----
-
-## 4. Putting it all together: PPO on Pendulum-v1
-
-Before the capstone, a quick recap of every concept and how it maps to code:
+Every piece of PPO has now appeared inline next to the idea it implements. Here is the whole algorithm at a glance, each concept mapped to its math and its code:
 
 | Concept | Math | In code |
 |---|---|---|
@@ -625,179 +819,26 @@ Before the capstone, a quick recap of every concept and how it maps to code:
 | Gaussian policy | $a \sim \mathcal{N}(\mu_\theta(s), \sigma)$ | `dist = Normal(mu, log_std.exp()); a = dist.sample()` |
 | K-epoch reuse | K sweeps over the same batch | `for _ in range(K): for idx in randperm(n).split(mb):` |
 
-```python
-import numpy as np
-import torch
-import torch.nn as nn
-import gymnasium as gym
+The complete, runnable program is exactly the training loop assembled in Section 2.6: the Gaussian policy, the critic, `collect`, `ppo_update`, the training loop, and the greedy evaluation. Rather than repeat it here as a capstone dump, the full end-to-end version, packaged as a notebook you can run and extend to other continuous-control tasks, lives in the assignment:
 
-torch.manual_seed(0); np.random.seed(0)
-
-GAMMA, CLIP_EPS, EPOCHS, MIN_STEPS, MB_SIZE, LR = 0.95, 0.2, 10, 2048, 64, 3e-4
-
-# ═══════════════════════════════════════════════════════════════════
-# ACTOR — Gaussian policy π(a|s) = N(μ_θ(s), σ)
-# The body network maps the observation to a hidden representation.
-# A linear head outputs the mean μ(s); the standard deviation σ is
-# a learned parameter (not state-dependent), stored as log σ so it
-# stays positive after exp(). Sampling: a ~ N(μ, σ).
-# ═══════════════════════════════════════════════════════════════════
-class GaussianPolicy(nn.Module):
-    def __init__(self, obs_dim, act_dim, h=64):
-        super().__init__()
-        self.body = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(),
-                                  nn.Linear(h, h), nn.Tanh())
-        self.mean = nn.Linear(h, act_dim)                       # μ_θ(s)
-        self.log_std = nn.Parameter(torch.zeros(act_dim) - 0.5)  # log σ
-    def dist(self, obs):
-        return torch.distributions.Normal(self.mean(self.body(obs)),
-                                          self.log_std.exp())    # N(μ, σ)
-
-# ═══════════════════════════════════════════════════════════════════
-# CRITIC — value network V_θ(s)
-# Maps observation → scalar value estimate. Trained with MSE on
-# the discounted return: loss = (V(s) - G_t)².
-# ═══════════════════════════════════════════════════════════════════
-class Value(nn.Module):
-    def __init__(self, obs_dim, h=64):
-        super().__init__()
-        self.net = nn.Sequential(nn.Linear(obs_dim, h), nn.Tanh(),
-                                 nn.Linear(h, h), nn.Tanh(), nn.Linear(h, 1))
-    def forward(self, x): return self.net(x).squeeze(-1)         # V(s) scalar
-
-# ═══════════════════════════════════════════════════════════════════
-# RETURNS — G_t = r_t + γ r_{t+1} + γ² r_{t+2} + ...
-# Walk the rewards backward so each G accumulates future rewards.
-# ═══════════════════════════════════════════════════════════════════
-def discounted_returns(rewards, gamma):
-    G, out = 0.0, []
-    for r in reversed(rewards):
-        G = r + gamma * G       # G_t = r_t + γ · G_{t+1}
-        out.append(G)
-    return list(reversed(out))
-
-# ═══════════════════════════════════════════════════════════════════
-# COLLECT — roll out π_old to fill a batch of at least MIN_STEPS
-# transitions. Record (s, a, log π_old(a|s), G_t) for each step.
-# The frozen log-probs become the denominator of the ratio later.
-# ═══════════════════════════════════════════════════════════════════
-def collect(env, policy, gamma, min_steps=MIN_STEPS):
-    S, A, LOGP, RET, ep_rets = [], [], [], [], []
-    lo, hi = env.action_space.low, env.action_space.high
-    steps = 0
-    while steps < min_steps:
-        s, _ = env.reset()
-        ep_s, ep_a, ep_lp, ep_r = [], [], [], []
-        done = False
-        while not done:
-            with torch.no_grad():
-                dist = policy.dist(torch.as_tensor(s, dtype=torch.float32))
-                a = dist.sample()                       # a ~ π_old(·|s)
-                lp = dist.log_prob(a).sum(-1)           # log π_old(a|s)
-            a_np = np.clip(a.numpy(), lo, hi)           # respect action bounds
-            s2, r, term, trunc, _ = env.step(a_np)
-            ep_s.append(s); ep_a.append(a.numpy())
-            ep_lp.append(float(lp)); ep_r.append(r)
-            s = s2; done = term or trunc; steps += 1
-        S += ep_s; A += ep_a; LOGP += ep_lp
-        RET += discounted_returns(ep_r, gamma)          # G_t for each step
-        ep_rets.append(sum(ep_r))
-    return (np.array(S, np.float32), np.array(A, np.float32),
-            np.array(LOGP, np.float32), np.array(RET, np.float32),
-            float(np.mean(ep_rets)))
-
-# ═══════════════════════════════════════════════════════════════════
-# PPO UPDATE — K epochs of clipped SGD on the collected batch.
-# Advantage is computed once (frozen), then the batch is shuffled
-# into minibatches and swept K times. As the policy drifts, ratios
-# leave [1-ε, 1+ε] and their gradients go to zero automatically.
-# ═══════════════════════════════════════════════════════════════════
-def ppo_update(policy, value, popt, vopt, batch):
-    S, A, LOGP_old, RET, _ = batch
-    S = torch.as_tensor(S); A = torch.as_tensor(A)
-    LOGP_old = torch.as_tensor(LOGP_old); RET = torch.as_tensor(RET)
-    with torch.no_grad():
-        adv = RET - value(S)                              # A = G_t - V(s_t)
-    adv = (adv - adv.mean()) / (adv.std() + 1e-8)        # standardize
-    n = S.shape[0]
-    for _ in range(EPOCHS):                               # K-epoch reuse
-        for idx in torch.randperm(n).split(MB_SIZE):      # random minibatches
-            dist = policy.dist(S[idx])
-            logp = dist.log_prob(A[idx]).sum(-1)           # log π_θ(a|s) (current)
-            ratio = (logp - LOGP_old[idx]).exp()           # r = π_new / π_old
-            unclipped = ratio * adv[idx]                   # r · A
-            clipped = torch.clamp(ratio, 1 - CLIP_EPS,
-                                  1 + CLIP_EPS) * adv[idx] # clip(r) · A
-            actor_loss = -torch.min(unclipped, clipped).mean()  # -L^CLIP
-            popt.zero_grad(); actor_loss.backward(); popt.step()
-            v_loss = (value(S[idx]) - RET[idx]).pow(2).mean()   # (V - G)²
-            vopt.zero_grad(); v_loss.backward(); vopt.step()
-
-# ═══════════════════════════════════════════════════════════════════
-# TRAINING LOOP — collect with π_old → PPO update → repeat
-# ═══════════════════════════════════════════════════════════════════
-env = gym.make("Pendulum-v1")
-pol = GaussianPolicy(env.observation_space.shape[0], env.action_space.shape[0])
-val = Value(env.observation_space.shape[0])
-popt = torch.optim.Adam(pol.parameters(), LR)
-vopt = torch.optim.Adam(val.parameters(), LR)
-
-curve = []
-for it in range(60):
-    batch = collect(env, pol, GAMMA)       # roll out π_old, record (s, a, logp, G)
-    ppo_update(pol, val, popt, vopt, batch) # K clipped epochs on this batch
-    curve.append(batch[-1])
-    if (it + 1) % 20 == 0:
-        print(f"  iter {it+1:3d}  mean episode return {batch[-1]:.1f}")
-
-# ═══════════════════════════════════════════════════════════════════
-# GREEDY EVAL — action = μ(s) (the Gaussian mean, no sampling noise)
-# ═══════════════════════════════════════════════════════════════════
-def greedy_eval(env_id, policy, n=10, seed=123):
-    env = gym.make(env_id)
-    lo, hi = env.action_space.low, env.action_space.high
-    total = 0.0
-    for i in range(n):
-        s, _ = env.reset(seed=seed + i)
-        done = False
-        while not done:
-            with torch.no_grad():
-                a = policy.dist(torch.as_tensor(s, dtype=torch.float32)).loc  # μ(s)
-            s, r, term, trunc, _ = env.step(np.clip(a.numpy(), lo, hi))
-            total += r; done = term or trunc
-    env.close()
-    return total / n
-
-g = greedy_eval("Pendulum-v1", pol)
-env.close()
-print(f"\nPendulum PPO:  start {np.mean(curve[:3]):.1f}  "
-      f"end {np.mean(curve[-3:]):.1f}  greedy {g:.1f}")
-```
-
-```text title="Output"
-  iter  20  mean episode return -1202.7
-  iter  40  mean episode return -1003.7
-  iter  60  mean episode return -987.9
-
-Pendulum PPO:  start -1154.5  end -1036.9  greedy -1091.7
-```
-
-The policy learns to reduce its penalties over 60 iterations: the mean return improves from about $-1155$ (arm hanging down, accruing large penalties) to about $-1037$, and by iteration 60 the per-batch mean has dropped below $-1000$. Greedy evaluation (action = the Gaussian mean, no exploration noise) reaches $-1092$. With longer training, the policy continues improving to about $-700$, eventually learning to swing the arm fully upright. The entire algorithm is the four pieces introduced in this post: the Gaussian policy, the discounted returns, the standardized advantage, and the clipped surrogate with K-epoch reuse.
+> **[Assignment: PPO from Scratch (Continuous Control)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture4.ipynb)**
 
 ---
 
 ## Practice: assignment
 
-Implement PPO from scratch and train a continuous-control agent (no discrete actions — real torques and forces):
+Implement PPO from scratch and train a continuous-control agent (no discrete actions, real torques and forces):
 
-> **[Assignment — PPO from Scratch (Continuous Control)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture4.ipynb)**
+> **[Assignment: PPO from Scratch (Continuous Control)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture4.ipynb)**
 
 ---
 
 ## Where this goes next
 
-PPO is the workhorse of modern RL, from continuous control to RLHF. But training a value network for an LLM is expensive and unstable. The next lecture drops the critic entirely: **GRPO** samples a group of responses per prompt and uses the group average as the baseline, keeping PPO's clip but replacing the learned critic with a simpler, cheaper alternative. The advantage becomes:
+PPO is the workhorse of modern RL, and its most famous job is alignment: it is the algorithm that taught ChatGPT to follow instructions. But that raises a question this post quietly skipped. On Pendulum the reward came from the environment. Where does the reward come from when the task is "be helpful and honest," something no simulator can score?
 
-$$A_i = \frac{r_i - \text{mean}(r_1, \ldots, r_G)}{\text{std}(r_1, \ldots, r_G)}$$
+The next post builds that missing piece. A language model only ever predicts the next token. The [RLHF](../07-rlhf/README.md) post turns text generation into an MDP, learns a reward model from human comparisons, then runs exactly the clipped PPO update from this post to optimize it, with the KL-to-reference leash we met in Section 2.8 keeping the model from gaming a flawed reward. The reward model rests on the Bradley-Terry equation, the probability that a human prefers response $A$ over response $B$:
 
-Read it as: "how many standard deviations better (or worse) response $i$ was compared to its group." Same clip, cheaper advantage, and the method behind today's reasoning models.
+$$P(A \succ B) = \frac{e^{r(A)}}{e^{r(A)} + e^{r(B)}}$$
+
+Read it as: the chance a human picks $A$ over $B$ is $A$'s exponentiated reward divided by the total over both responses. The left side is a preference probability; on the right, $r(A)$ and $r(B)$ are the scalar rewards the model assigns to each response. When $r(A)$ is much larger than $r(B)$ the fraction approaches 1 ($A$ almost always preferred), and when they are equal it is exactly $0.5$ (a toss-up). That single equation turns a pile of human "this one is better" judgments into a trainable reward, and PPO does the rest. See the [RLHF](../07-rlhf/README.md) post.

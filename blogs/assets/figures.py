@@ -1275,13 +1275,25 @@ def fig_clip_negative() -> None:
     save(fig, BLOG06, "fig-clip-negative")
 
 
+# Real captured PPO curve on Pendulum-v1 (seeded run, 60 iters), from
+# blogs/assets/script-style training; see the post's training-loop output.
+PENDULUM_CURVE = np.array([
+    -1186.26, -1109.08, -1116.52, -1050.95, -1320.04, -1275.57, -1283.24,
+    -1149.33, -1235.07, -1167.18, -1161.82, -1119.36, -1161.15, -1113.66,
+    -1100.72, -1164.39, -1150.98, -1217.96, -1202.83, -1038.21, -1132.15,
+    -1043.34, -1108.30, -1036.66, -1101.16, -1008.08, -1131.34, -1117.14,
+    -1079.83, -1073.12, -1065.73, -1082.63, -1047.29, -1089.48, -1028.96,
+    -1081.89, -1032.79, -1048.10, -1019.36, -919.29, -927.05, -911.60,
+    -864.75, -904.80, -856.84, -884.90, -911.58, -868.22, -964.66, -793.05,
+    -873.71, -893.53, -773.21, -803.60, -792.12, -754.64, -775.77, -769.61,
+    -669.89, -671.97,
+])
+
+
 def fig_pendulum_curve() -> None:
-    """Pendulum-v1 PPO learning curve (synthetic but realistic)."""
-    rng = np.random.default_rng(42)
-    n_iters = 60
-    base = np.linspace(-1137, -704, n_iters)
-    noise = rng.normal(0, 45, size=n_iters)
-    raw = base + noise
+    """Pendulum-v1 PPO learning curve (real seeded run, 60 iters)."""
+    raw = PENDULUM_CURVE
+    n_iters = len(raw)
 
     window = 5
     kernel = np.ones(window) / window
@@ -1302,21 +1314,34 @@ def fig_pendulum_curve() -> None:
     save(fig, BLOG06, "fig-pendulum-curve")
 
 
+# Real captured ablation curves on Pendulum-v1 (seeded runs, 40 iters each).
+# full = first 40 iters of the full-PPO run above.
+ABLATION_FULL = PENDULUM_CURVE[:40]
+ABLATION_NOCLIP = np.array([
+    -1186.26, -1507.00, -1518.95, -1581.11, -1314.04, -1746.75, -1471.50,
+    -1449.01, -1314.21, -1574.89, -1600.10, -1623.29, -1592.74, -1620.10,
+    -1615.54, -1613.21, -1613.55, -1581.84, -1450.06, -1500.85, -1481.49,
+    -1562.32, -1382.53, -1347.87, -1289.69, -1261.61, -1410.21, -1369.75,
+    -1302.48, -1404.88, -1383.02, -1209.20, -1552.34, -1495.30, -1504.08,
+    -1461.10, -1437.88, -1469.79, -1359.78, -1074.83,
+])
+ABLATION_NOREUSE = np.array([
+    -1186.26, -1095.78, -1151.29, -1120.47, -1343.55, -1254.14, -1286.28,
+    -1153.24, -1284.52, -1367.14, -1272.24, -1268.70, -1233.22, -1186.99,
+    -1147.17, -1183.43, -1181.28, -1301.68, -1375.56, -1102.42, -1300.33,
+    -1169.66, -1239.24, -1102.82, -1144.67, -1096.67, -1244.66, -1224.38,
+    -1171.25, -1192.25, -1168.33, -1110.99, -1312.28, -1347.48, -1338.35,
+    -1331.30, -1305.07, -1285.84, -1268.79, -1160.69,
+])
+
+
 def fig_ablation() -> None:
-    """Ablation comparison: full PPO vs NO clip vs NO reuse."""
+    """Ablation comparison: full PPO vs NO clip vs NO reuse (real seeded runs)."""
     n_iters = 40
 
-    rng_full = np.random.default_rng(42)
-    base_full = np.linspace(-1137, -996, n_iters)
-    raw_full = base_full + rng_full.normal(0, 40, size=n_iters)
-
-    rng_noclip = np.random.default_rng(7)
-    base_noclip = np.linspace(-1404, -1302, n_iters)
-    raw_noclip = base_noclip + rng_noclip.normal(0, 60, size=n_iters)
-
-    rng_noreuse = np.random.default_rng(13)
-    base_noreuse = np.linspace(-1144, -1238, n_iters)
-    raw_noreuse = base_noreuse + rng_noreuse.normal(0, 35, size=n_iters)
+    raw_full = ABLATION_FULL
+    raw_noclip = ABLATION_NOCLIP
+    raw_noreuse = ABLATION_NOREUSE
 
     window = 5
     kernel = np.ones(window) / window
