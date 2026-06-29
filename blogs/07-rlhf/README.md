@@ -196,6 +196,8 @@ Shifting every score by +100 leaves the loss bit-for-bit identical: the loss see
 
 ![Left: the sigmoid turns a score gap into a win probability, with sigma(0)=0.5 marked. Right: the Bradley-Terry gradient magnitude 1 minus sigma flattens to zero for large positive gaps, while the naive loss gradient stays constant at one.](./images/fig-bradley-terry.svg)
 
+The two panels are the whole argument for the sigmoid. The left panel is the probability table drawn as a curve: the score gap goes in, a win probability comes out, with a gap of zero sitting at the toss-up line $\sigma(0) = 0.5$. The right panel overlays the two losses' gradients: the naive "make the gap big" loss pushes with constant force one forever (flat dashed line), while the Bradley-Terry gradient $1 - \sigma(g)$ decays to zero once a pair is comfortably correct (shaded region). That decay is the "enough" the naive objective never had, drawn as a shape.
+
 **Why the sigmoid form is so well-behaved: the gradient.** Differentiate the per-example loss $\ell = -\log\sigma(g)$ with respect to the gap $g$. Using $\frac{d}{dz}\log\sigma(z) = 1 - \sigma(z)$,
 
 $$\frac{\partial \ell}{\partial g} = -\big(1 - \sigma(g)\big).$$
@@ -225,6 +227,8 @@ wrong     -1.5     0.182   1.701    0.818
 ```
 
 The hard pair contributes roughly 25 times the gradient of the easy one, and the genuinely wrong pair more still, even though the easy and hard pairs are both "correct" ($g > 0$). The loss has quietly retired the settled pair and is spending its effort where the model is still wrong.
+
+**One gradient step by hand.** Suppose right now the model has a pair *backwards*: it scores the human's chosen winner $r_w = 1.0$ and the loser $r_l = 1.4$. The gap is $1.0 - 1.4 = -0.4$, so $\sigma(-0.4) \approx 0.40$: the model thinks the winner only wins 40% of the time, and the loss $-\log\sigma(-0.4) \approx 0.92$ is high. The gradient $1 - \sigma(-0.4) \approx 0.60$ is large and pushes $r_w$ up and $r_l$ down. After a few steps the gap might be $+1.5$, giving $\sigma(1.5) \approx 0.82$. Notice what is *not* pinned: the absolute values. Only the difference is trained, so the reward is meaningful only relative to other answers, the point that forces us to normalize rewards during RL.
 
 <details>
 <summary><strong>Check:</strong> Why collect pairwise comparisons instead of asking labelers for a 0-10 score?</summary>
@@ -271,9 +275,11 @@ import torch
 # A tiny scalar head: w in R^d (plus bias b) maps one hidden vector -> one number.
 w = torch.tensor([0.5, -1.0, 2.0])
 b = torch.tensor(0.1)
-h_last = torch.tensor([1.2, 0.3, 0.4])  # hidden state at the last token
+# hidden state at the last token
+h_last = torch.tensor([1.2, 0.3, 0.4])
 
-r = w @ h_last + b  # r_phi = w^T h_last + b
+# r_phi = w^T h_last + b
+r = w @ h_last + b
 print(f"r_phi = w . h_last + b = {r.item():.1f}")
 
 # Dimension bookkeeping for a real model: d = 768, vocab |V| = 50,000.
@@ -377,18 +383,22 @@ import torch.nn.functional as F
 
 torch.manual_seed(0)
 d = 768
-v_head = torch.nn.Linear(d, 1)  # the value head: one linear layer, hidden -> scalar
+# the value head: one linear layer, hidden -> scalar
+v_head = torch.nn.Linear(d, 1)
 
 # Pretend the shared trunk produced a hidden state for each of 4 response tokens.
 H = torch.randn(4, d)
-V = v_head(H).squeeze(-1)       # one value V(s_t) per position, in a single pass
+# one value V(s_t) per position, in a single pass
+V = v_head(H).squeeze(-1)
 
 
 def value_loss(v, G):
-    return F.mse_loss(v, G)     # regress V(s_t) toward the realised return G_t
+    # regress V(s_t) toward the realised return G_t
+    return F.mse_loss(v, G)
 
 
-G = torch.tensor([1.79, 1.79, 1.87, 1.89])  # returns from the gravity example (2.6)
+# returns from the gravity example (2.6)
+G = torch.tensor([1.79, 1.79, 1.87, 1.89])
 print("V(s_t) untrained:", [f"{x:+.2f}" for x in V.tolist()])
 print(f"value loss = MSE(V, G) = {value_loss(V, G).item():.2f}")
 ```
@@ -410,6 +420,8 @@ MSE at FIRST token 6.04   vs   LAST token 4.54
 Two things to read off. The mean squared error drops tenfold and the correlation between value and realized return reaches 0.94: the critic *learns*. And it is more accurate at the **last** token than the first, because early in an answer many endings are still possible, so $V$ is uncertain; as the answer commits, $V$ sharpens. An imperfect critic is fine: a baseline only has to be roughly right to reduce variance, not be an oracle.
 
 ![A scatter of the value head's predictions against realised returns after training, hugging the diagonal, with correlation r equal to 0.94.](./images/fig-value-head-fit.svg)
+
+Each point is one state: its realized return on the x-axis, the trained value head's prediction on the y-axis. After training they cluster tightly around the diagonal $V = G$, which is what a correlation of 0.94 looks like. That tight band is the visual proof the critic learned to predict returns from a half-written answer, which is exactly the baseline PPO subtracts to turn a noisy return into a low-variance advantage.
 
 <details>
 <summary><strong>Check:</strong> The reward model and the value head both output one number from a transformer. Aren't they the same? Name the difference.</summary>
@@ -455,17 +467,23 @@ Read the symbols first: "$A_t$ equals the return $G_t$ minus the critic's value 
 import math
 
 tokens = ["Gravity", "pulls", "objects", "down"]
-pi_theta = [0.50, 0.45, 0.60, 0.85]   # current policy prob of the chosen token
-pi_ref = [0.50, 0.30, 0.55, 0.50]     # frozen reference prob of the same token
-V = [1.50, 1.60, 1.85, 1.95]          # value-head (critic) predictions
-beta, r_phi = 0.2, 2.0                # KL coefficient, reward-model verdict
+# current policy prob of the chosen token
+pi_theta = [0.50, 0.45, 0.60, 0.85]
+# frozen reference prob of the same token
+pi_ref = [0.50, 0.30, 0.55, 0.50]
+# value-head (critic) predictions
+V = [1.50, 1.60, 1.85, 1.95]
+# KL coefficient, reward-model verdict
+beta, r_phi = 0.2, 2.0
 
 # 1) per-token reward: a KL toll on every token, the RM score only on the last.
 R = []
 for t, (pt, pr) in enumerate(zip(pi_theta, pi_ref)):
-    Rt = -beta * math.log(pt / pr) + 0.0      # -beta * log(pi_theta / pi_ref)
+    # -beta * log(pi_theta / pi_ref)
+    Rt = -beta * math.log(pt / pr) + 0.0
     if t == len(tokens) - 1:
-        Rt += r_phi                           # + r_phi * [t = last]
+        # + r_phi * [t = last]
+        Rt += r_phi
     R.append(Rt)
 
 # 2) returns, right to left: G_t = R_t + G_{t+1}  (gamma = 1)
@@ -491,9 +509,22 @@ objects    -0.02    1.88   1.85   +0.03
 down       +1.89    1.89   1.95   -0.06
 ```
 
-The single $+2.0$ has been spread across the sentence as four signed nudges. We unpack these numbers by hand in Section 3.
+The single $+2.0$ has been spread across the sentence as four signed nudges. It is worth unpacking these numbers by hand. The policy drifted *above* the reference on "pulls" and "down" (it likes those continuations more than the reference did) and matches it on "Gravity" and "objects", which sets each token's KL toll:
+
+| token | $\pi_\theta$ | $\pi_{\text{ref}}$ | $\log(\pi_\theta/\pi_{\text{ref}})$ | $-\beta\log(\cdot)$ | +RM | $R_t$ |
+|---|---|---|---|---|---|---|
+| Gravity | 0.50 | 0.50 | 0.00 | 0.00 | | **0.00** |
+| pulls | 0.45 | 0.30 | 0.41 | −0.08 | | **−0.08** |
+| objects | 0.60 | 0.55 | 0.09 | −0.02 | | **−0.02** |
+| down | 0.85 | 0.50 | 0.53 | −0.11 | +2.00 | **+1.89** |
+
+Work the last row in full: $-0.2 \cdot \log(0.85/0.50) = -0.2 \cdot 0.53 = -0.11$, and because it is the final token, add the verdict: $-0.11 + 2.00 = +1.89$. The KL tolls are *tiny*, a few hundredths each; the reward-model score dwarfs them and lands entirely on the last token.
+
+Now read the story off the advantage column in the output above. The $+2.0$ flowed all the way back, so "Gravity" carries a return of about 1.80 even though it earned nothing locally. The critic expected only 1.50 at the start, the answer beat that, so "Gravity" and "pulls" earn **positive** advantage and PPO makes them more likely. By the final token the critic already expected 1.95, but the realized 1.89 came in a hair lower (that token's own KL toll ate into it), so "down" gets a tiny **negative** push: it drifted from the reference for too little net gain. (Rounding the tolls first by hand gives $G \approx 1.79$ at the front instead of the code's 1.80, a cosmetic difference.) One scalar from the reward model has become four separate, signed, per-token instructions, each fed into the clipped PPO update from the [TRPO & PPO](../06-trpo-ppo/README.md) post.
 
 ![Left: per-token rewards, a small KL toll on every token and the large reward-model score landing only on the last token. Right: the resulting advantages, positive for the early tokens and slightly negative for the last.](./images/fig-per-token-credit.svg)
+
+The two panels show the credit assignment happen. On the left, the raw per-token reward $R_t$ is almost flat: a tiny KL toll on every token and one tall bar where the reward model's $+2.0$ lands on the last token. On the right, after rolling the return backward and subtracting the critic, that single spike has become a spread of signed advantages: positive for the early tokens that beat the critic's expectation, slightly negative for the last. This is the section's whole claim in one picture: one verdict at the end becomes a per-token training signal.
 
 <details>
 <summary><strong>Check:</strong> The reward arrives once, at the last token. Why can't we just train only the last token?</summary>
@@ -536,7 +567,7 @@ KL #1 is precisely the trust region from the [TRPO & PPO](../06-trpo-ppo/README.
 <details>
 <summary><strong>Check:</strong> Set the KL coefficient β to zero, so there is no leash. The reward-model score will climb beautifully. Why is this a trap?</summary>
 
-**Answer.** With $\beta = 0$ the policy is free to drift anywhere that scores high under $r_\varphi$, including the reward model's blind spots. It discovers degenerate, repetitive, or sycophantic text the reward model rates highly but humans find useless (reward hacking). The measured reward rises while true quality collapses (Goodhart's law). The leash keeps the policy in the region where the reward model was trained and trustworthy, and preserves the base model's fluency. We watch this happen live in Section 4.
+**Answer.** With $\beta = 0$ the policy is free to drift anywhere that scores high under $r_\varphi$, including the reward model's blind spots. It discovers degenerate, repetitive, or sycophantic text the reward model rates highly but humans find useless (reward hacking). The measured reward rises while true quality collapses (Goodhart's law). The leash keeps the policy in the region where the reward model was trained and trustworthy, and preserves the base model's fluency. We watch this happen live in Section 2.10.
 </details>
 
 <details>
@@ -553,7 +584,7 @@ $$\max_\theta \;\; \mathbb{E}_{x \sim D,\; y \sim \pi_\theta}\big[\, r_\varphi(x
 
 **Term 1, earn reward:** over prompts from $D$, generate answers with the policy and make the (learned, frozen) reward model happy. **Term 2, stay anchored:** subtract $\beta$ times the drift from the frozen reference, so the policy improves without forgetting how to speak. PPO is simply *how* we climb this safely, by sampling answers, scoring them, and taking small clipped steps.
 
-Running it costs real memory: at any moment RLHF holds **four** big models, the trainable policy (actor plus value head), the frozen reference (for the leash), and the frozen reward model (the judge, often as large as the policy). Generation and training happen in the same loop. This weight is exactly what the later methods in Section 5 try to cut.
+Running it costs real memory: at any moment RLHF holds **four** big models, the trainable policy (actor plus value head), the frozen reference (for the leash), and the frozen reward model (the judge, often as large as the policy). Generation and training happen in the same loop. This weight is exactly what the later methods in Section 4 try to cut.
 
 <details>
 <summary><strong>Check:</strong> In the RLHF rollout, what replaces the "environment" that DQN's agent stepped through?</summary>
@@ -561,59 +592,21 @@ Running it costs real memory: at any moment RLHF holds **four** big models, the 
 **Answer.** There is no real environment. Generation is deterministic concatenation, and the "reward" comes from a frozen reward model, not a world. The policy generates an answer (its own trajectory) and the reward model grades it. The loop is policy to answer to reward model to score, entirely in software.
 </details>
 
-## 3. Worked examples by hand
+### 2.9 The RLHF loop in code
 
-### 3.1 One reward-model gradient step
-
-Suppose right now the model has a pair *backwards*: it scores the human's chosen winner $r_w = 1.0$ and the loser $r_l = 1.4$. The gap is $1.0 - 1.4 = -0.4$, so $\sigma(-0.4) \approx 0.40$: the model thinks the winner only wins 40% of the time, and the loss $-\log\sigma(-0.4) \approx 0.92$ is high. The gradient $1 - \sigma(-0.4) \approx 0.60$ is large and pushes $r_w$ up and $r_l$ down. After a few steps the gap might be $+1.5$, giving $\sigma(1.5) \approx 0.82$. Notice what is *not* pinned: the absolute values. Only the difference is trained, so the reward is meaningful only relative to other answers, the point from Section 2.2 that forces us to normalize rewards during RL.
-
-### 3.2 "Gravity pulls objects down," token by token
-
-Take the prompt "Explain gravity simply" and a four-token answer, *Gravity pulls objects down*, with $\beta = 0.2$, $\gamma = 1$, and a reward-model verdict $r_\varphi = +2.0$. The policy drifted *above* the reference on "pulls" and "down" (it likes those continuations more than the reference did) and matches it on "Gravity" and "objects":
-
-| token | $\pi_\theta$ | $\pi_{\text{ref}}$ | $\log(\pi_\theta/\pi_{\text{ref}})$ | $-\beta\log(\cdot)$ | +RM | $R_t$ |
-|---|---|---|---|---|---|---|
-| Gravity | 0.50 | 0.50 | 0.00 | 0.00 | | **0.00** |
-| pulls | 0.45 | 0.30 | 0.41 | −0.08 | | **−0.08** |
-| objects | 0.60 | 0.55 | 0.09 | −0.02 | | **−0.02** |
-| down | 0.85 | 0.50 | 0.53 | −0.11 | +2.00 | **+1.89** |
-
-Work the last row in full: $-0.2 \cdot \log(0.85/0.50) = -0.2 \cdot 0.53 = -0.11$, and because it is the final token, add the verdict: $-0.11 + 2.00 = +1.89$. The KL tolls are *tiny*, a few hundredths each; the reward-model score dwarfs them and lands entirely on the last token.
-
-Now roll the returns backward with $G_t = R_t + G_{t+1}$, then subtract the critic's predictions $V$:
-
-| token | $R_t$ | $G_t$ | $V(s_t)$ | $A_t = G_t - V(s_t)$ |
-|---|---|---|---|---|
-| Gravity | 0.00 | 1.79 | 1.50 | **+0.29** |
-| pulls | −0.08 | 1.79 | 1.60 | **+0.19** |
-| objects | −0.02 | 1.87 | 1.85 | **+0.02** |
-| down | +1.89 | 1.89 | 1.95 | **−0.06** |
-
-(Computing this exactly in code, as in 2.6, gives $G \approx 1.80, 1.80, 1.88, 1.89$; the hand table rounds the tolls first, hence the 1.79 versus 1.80 cosmetic difference.) Read the story off the last column. The $+2.0$ flowed all the way back, so "Gravity" carries a return of 1.79 even though it earned nothing locally. The critic expected only 1.50 at the start, the answer beat that, so "Gravity" and "pulls" earn **positive** advantage and PPO makes them more likely. By the final token the critic already expected 1.95, but the realized 1.89 came in a hair lower (that token's own KL toll ate into it), so "down" gets a tiny **negative** push: it drifted from the reference for too little net gain. One scalar from the reward model has become four separate, signed, per-token instructions, each fed into the clipped PPO update from the [TRPO & PPO](../06-trpo-ppo/README.md) post.
-
-## 4. Putting it all together: aligning a tiny assistant
-
-Everything above is one machine. Here is the recap of what we built and where each piece lives in code, before the integrative run.
-
-| Concept | Math | In code |
-|---|---|---|
-| Policy = next-token distribution | $\pi_\theta(y_t \mid x, y_{<t})$ | `AutoModelForCausalLMWithValueHead` (actor + value head) |
-| Reward model = scalar head | $r_\varphi = \mathbf{w}^\top \mathbf{h}_{\text{last}} + b$ | `AutoModelForSequenceClassification(num_labels=1)`, frozen |
-| Bradley-Terry loss | $-\log\sigma(r_w - r_l)$ | `-F.logsigmoid(r_chosen - r_rejected).mean()` |
-| Per-token reward | $R_t = -\beta\log\frac{\pi_\theta}{\pi_{\text{ref}}} + r_\varphi[t{=}T]$ | TRL builds it from `compute_rewards` + `init_kl_coef` |
-| Advantage | $A_t = G_t - V(s_t)$ | value head + reward-to-go inside `ppo.step` |
-| Clipped update | $\mathcal{L}^{\text{CLIP}}$ | `ppo.step(queries, responses, rewards)` |
-
-The capstone build runs **stage 3** on a GPT-2 policy with the reward model from earlier. We use TRL's `PPOTrainer` for the machinery; the one piece *you* supply is the reward signal: score each prompt-plus-answer with the frozen reward model and hand back one scalar tensor per answer.
+We now have every part the headline equation named. Stage 3 puts them in one loop, on a GPT-2 policy with the reward model from Section 2.3. We use TRL's `PPOTrainer` for the machinery; the one piece *you* supply is the reward signal: score each prompt-plus-answer with the frozen reward model and hand back one scalar tensor per answer.
 
 ```python
 def compute_rewards(texts):
     # Tokenize the full (prompt + response) strings for the reward model.
     toks = rm_tok(texts, padding=True, truncation=True, return_tensors="pt")
     toks = {k: v.to(rm.device) for k, v in toks.items()}
-    out = rm(**toks)                          # scalar head -> logits of shape [batch, 1]
-    scores = out.logits.squeeze(-1).cpu()     # [batch, 1] -> [batch]: r_phi per answer
-    return [s for s in scores]                # one 1-D tensor per answer, as TRL expects
+    # scalar head -> logits of shape [batch, 1]
+    out = rm(**toks)
+    # [batch, 1] -> [batch]: r_phi per answer
+    scores = out.logits.squeeze(-1).cpu()
+    # one 1-D tensor per answer, as TRL expects
+    return [s for s in scores]
 ```
 
 The loop itself is the [TRPO & PPO](../06-trpo-ppo/README.md) loop wearing language. There is no Gymnasium `env.step` here because the "environment" is just text concatenation; the moral equivalent of `reset()` is sampling a fresh batch of prompts, and `step()` is generate, score, update:
@@ -621,33 +614,43 @@ The loop itself is the [TRPO & PPO](../06-trpo-ppo/README.md) loop wearing langu
 ```python
 def run_rlhf(init_kl_coef=0.2, steps=60, seed=0):
     torch.manual_seed(seed)
-    policy = AutoModelForCausalLMWithValueHead.from_pretrained("gpt2")  # actor + critic
+    # actor + critic
+    policy = AutoModelForCausalLMWithValueHead.from_pretrained("gpt2")
     cfg = PPOConfig(model_name="gpt2", learning_rate=1.41e-5, batch_size=32,
                     mini_batch_size=8, ppo_epochs=4,
-                    init_kl_coef=init_kl_coef,            # the KL leash strength (beta)
+                    # init_kl_coef is the KL leash strength (beta)
+                    init_kl_coef=init_kl_coef,
                     adap_kl_ctrl=(init_kl_coef > 0), seed=seed)
-    ppo = PPOTrainer(cfg, policy, None, tok, dataset=ds,  # None -> TRL clones a frozen ref
+    # passing None as the reference makes TRL clone a frozen ref
+    ppo = PPOTrainer(cfg, policy, None, tok, dataset=ds,
                      data_collator=lambda d: {k: [x[k] for x in d] for k in d[0]})
     gen_kw = dict(min_length=-1, top_k=0.0, top_p=1.0, do_sample=True,
                   pad_token_id=tok.eos_token_id)
-    lens = LengthSampler(16, 24)                          # sample answer length per prompt
+    # sample answer length per prompt
+    lens = LengthSampler(16, 24)
     rew, kl, d2 = [], [], []
     it = iter(ppo.dataloader)
 
     for step in range(steps):
-        batch = next(it)                                  # a fresh batch of prompts ("reset")
+        # a fresh batch of prompts ("reset")
+        batch = next(it)
         q = batch["input_ids"]
-        resp = ppo.generate(q, return_prompt=False, length_sampler=lens, **gen_kw)  # rollout
+        # rollout
+        resp = ppo.generate(q, return_prompt=False, length_sampler=lens, **gen_kw)
         rtxt = [tok.decode(r) for r in resp]
-        rewards = compute_rewards([qq + rr for qq, rr in zip(batch["query"], rtxt)])  # score
-        stats = ppo.step(q, resp, rewards)                # one clipped PPO update ("step")
+        # score
+        rewards = compute_rewards([qq + rr for qq, rr in zip(batch["query"], rtxt)])
+        # one clipped PPO update ("step")
+        stats = ppo.step(q, resp, rewards)
         rew.append(float(torch.stack(rewards).mean()))
-        kl.append(float(stats["objective/kl"]))           # KL from the frozen reference
-        d2.append(distinct2(rtxt))                        # bigram diversity (a hacking alarm)
+        # KL from the frozen reference
+        kl.append(float(stats["objective/kl"]))
+        # bigram diversity (a hacking alarm)
+        d2.append(distinct2(rtxt))
     return {"reward": rew, "kl": kl, "distinct2": d2}
 ```
 
-**Run 1, with the leash ($\beta = 0.2$).** TRL builds the per-token reward (your reward-model score minus the per-token KL toll), the value head supplies the baseline, and the clip keeps each step safe:
+**Run it with the leash ($\beta = 0.2$).** TRL builds the per-token reward (your reward-model score minus the per-token KL toll), the value head supplies the baseline, and the clip keeps each step safe:
 
 ```text title="Output (normal RLHF, beta = 0.2)"
   step   0  reward -0.122  kl 0.0  distinct2 0.980
@@ -662,7 +665,15 @@ final answers: [' Yes.<|endoftext|>', ' Yes.<|endoftext|>', '<|endoftext|>']
 
 Reward rises modestly, KL settles in the single digits, diversity stays near 1.0, and the answers stay coherent (terse, but real English). This is healthy RLHF.
 
-**Run 2, break the leash ($\beta = 0$).** This is the same code as Run 1, just with the KL anchor removed, so the policy is now free to chase the reward model into the blind spots from the reward-hacking experiment:
+<details>
+<summary><strong>Check:</strong> In this pipeline, which models are trainable and which are frozen?</summary>
+
+**Answer.** The policy (`AutoModelForCausalLMWithValueHead`, actor plus value head) is the only thing trained. The reward model (`./rm`, the one we trained earlier) is frozen, supplying scores. The reference policy that TRL clones for the KL term is frozen, a snapshot of the initial policy. The actor head is updated by the clipped PPO objective; the value head by the value (MSE) loss.
+</details>
+
+### 2.10 Does the leash matter? The $\beta = 0$ ablation
+
+To see the KL leash earn its place, run the *same* code with the anchor removed ($\beta = 0$), so the policy is free to chase the reward model into the blind spots Section 2.7 warned about:
 
 ```text title="Output (ablation, beta = 0, no KL leash)"
   step   0  reward -0.122  kl 0.0  distinct2 0.980
@@ -679,21 +690,32 @@ The reward climbs *higher* than the leashed run ($+0.381$ versus $+0.069$). And 
 
 ![Two panels over PPO steps: with the leash beta=0.2 the reward rises modestly and KL stays in single digits, while with beta=0 the reward climbs higher but KL runs off past 40.](./images/fig-ppo-ablation.svg)
 
+The two panels put the leashed and unleashed runs side by side over PPO steps. On the left, the $\beta = 0$ reward (gray) climbs above the leashed $\beta = 0.2$ reward (orange); on the right, that same $\beta = 0$ run's KL from the reference runs off past 40 while the leashed run holds in the single digits. Read together they are the whole case for the leash: the higher reward on the left is bought entirely by the runaway drift on the right, which is exactly the reward hacking Section 2.7 described.
+
 <details>
 <summary><strong>Check:</strong> The β=0 run reaches a higher reward-model score. Why are its answers worse?</summary>
 
 **Answer.** The reward model measures proxies for quality (length, tone, surface features), not quality itself. With no leash, the policy maximizes those proxies directly and finds degenerate, repetitive text the reward model overrates, exactly the verbosity and repetition exploits a reward model is vulnerable to. The score is high; the answer is gibberish.
 </details>
 
-<details>
-<summary><strong>Check:</strong> In this pipeline, which models are trainable and which are frozen?</summary>
+## 3. Putting it all together: aligning a tiny assistant
 
-**Answer.** The policy (`AutoModelForCausalLMWithValueHead`, actor plus value head) is the only thing trained. The reward model (`./rm`, the one we trained earlier) is frozen, supplying scores. The reference policy that TRL clones for the KL term is frozen, a snapshot of the initial policy. The actor head is updated by the clipped PPO objective; the value head by the value (MSE) loss.
-</details>
+Everything above is one machine. Here is the recap of what we built and where each piece lives in code.
 
-## 5. What breaks, and where this is going
+| Concept | Math | In code |
+|---|---|---|
+| Policy = next-token distribution | $\pi_\theta(y_t \mid x, y_{<t})$ | `AutoModelForCausalLMWithValueHead` (actor + value head) |
+| Reward model = scalar head | $r_\varphi = \mathbf{w}^\top \mathbf{h}_{\text{last}} + b$ | `AutoModelForSequenceClassification(num_labels=1)`, frozen |
+| Bradley-Terry loss | $-\log\sigma(r_w - r_l)$ | `-F.logsigmoid(r_chosen - r_rejected).mean()` |
+| Per-token reward | $R_t = -\beta\log\frac{\pi_\theta}{\pi_{\text{ref}}} + r_\varphi[t{=}T]$ | TRL builds it from `compute_rewards` + `init_kl_coef` |
+| Advantage | $A_t = G_t - V(s_t)$ | value head + reward-to-go inside `ppo.step` |
+| Clipped update | $\mathcal{L}^{\text{CLIP}}$ | `ppo.step(queries, responses, rewards)` |
 
-### 5.1 Goodhart's law and reward over-optimization
+The complete, runnable pipeline, the reward model, the value head, the per-token rewards, and the clipped PPO loop assembled across Sections 2.3 through 2.10, is packaged as a notebook you can run and extend in the [flagship assignment](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.5.ipynb).
+
+## 4. What breaks, and where this is going
+
+### 4.1 Goodhart's law and reward over-optimization
 
 The $\beta = 0$ collapse is not a bug; it is a law. **Goodhart's law: "when a measure becomes a target, it ceases to be a good measure."** The active word is *becomes*. The reward model is a faithful descriptor of quality *on the distribution it was trained on*, the outputs of the SFT model. Optimization moves the distribution: every PPO step shifts the policy toward higher reward, which means toward outputs less and less like what the reward model ever saw. The correlation between proxy and truth was a property of the old distribution and does not travel with you.
 
@@ -730,7 +752,7 @@ Padding wins most often, and reward-model score is positively correlated with ra
 **Answer.** A bigger reward model genuinely helps *in-distribution*: it is more accurate and pushes the true-quality peak further out. But it is still finite and still extrapolates off-distribution, and a more confident extrapolator can present a *sharper* fake peak for the optimizer to climb. Size raises and delays the peak; it does not remove it. Retraining on the policy's own outputs addresses the cause more directly (though it risks baking in errors if raters are themselves fooled by fluent nonsense).
 </details>
 
-### 5.2 Three ways people simplified or scaled RLHF
+### 4.2 Three ways people simplified or scaled RLHF
 
 RLHF works, but it is heavy (four models resident, generation plus training in one loop) and fiddly. Each descendant is RLHF minus one expensive piece.
 
@@ -750,11 +772,11 @@ RLHF works, but it is heavy (four models resident, generation plus training in o
 **Answer.** DPO trains directly on preference pairs with a supervised-style loss: no reward model, no sampling, no PPO, far simpler and more stable. It gives up the online loop: it cannot explore new answers and reward them, only re-weight the responses already in the dataset, so it can be less powerful when on-policy exploration matters.
 </details>
 
-## 6. RLHF in the wild
+## 5. RLHF in the wild
 
 The recipe (preferences, then a reward model, then RL on a leash) is domain-agnostic: anywhere "good" is a human judgment with no formula, RLHF shows up. **Assistants** (ChatGPT, Claude, Gemini) are all RLHF-tuned; InstructGPT (2022) showed a 1.3B RLHF model whose answers people preferred over the 175B base GPT-3, alignment beating raw scale. **Summarization** was the first text win (2020): RLHF summaries were preferred over the very reference summaries the model was trained to imitate. **Code** assistants tune on developer preferences and on verifiable signals (does it compile, do the tests pass), which is the bridge to the next lecture. **Images, voice, music** are aligned to human aesthetic preference (Diffusion-DPO, 2023). And RLHF's *roots* are in control: "Deep RL from Human Preferences" (2017) taught a simulated robot a backflip from ~900 "which clip looks better?" comparisons, with no reward function ever written. Different field, same machine: preferences (or a verifiable check), a reward, RL on a leash.
 
-## 7. It was the same gradient all along
+## 6. It was the same gradient all along
 
 Five posts, and a single update rule has not changed once. RLHF is not a new algorithm; it is our old policy gradient, pointed at language, fed by a learned reward, and kept on a leash.
 
@@ -798,20 +820,20 @@ Read the symbols first: "the gradient of the objective $J$ with respect to $\the
 
 The full RLHF pipeline, broken into five focused labs:
 
-> **[Lab A — Build a Reward Model from Human Preferences](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.1.ipynb)**
+> **[Lab A: Build a Reward Model from Human Preferences](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.1.ipynb)**
 
-> **[Lab B — Token-Level Rewards & Advantages](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.2.ipynb)**
+> **[Lab B: Token-Level Rewards and Advantages](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.2.ipynb)**
 
-> **[Lab C — The Reward-Hacking Hunt](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.3.ipynb)**
+> **[Lab C: The Reward-Hacking Hunt](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.3.ipynb)**
 
-> **[Lab D — The Value Head, Dissected](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.4.ipynb)**
+> **[Lab D: The Value Head, Dissected](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.4.ipynb)**
 
-> **[Flagship — Align a Tiny Assistant (RLHF with PPO)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.5.ipynb)**
+> **[Flagship: Align a Tiny Assistant (RLHF with PPO)](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture5.5.ipynb)**
 
 ## Where this goes next
 
-RLHF holds four big models at once, and the most expensive and unstable of them is the value head: training a per-token critic for an LLM is hard. The next post drops it. **GRPO** keeps PPO's clip but replaces the learned critic with a *group baseline*: sample $G$ answers for the same prompt, score them all, and let the group's mean reward stand in for $V$. The advantage becomes
+RLHF holds four big models at once, and the most expensive and unstable of them is the value head: training a per-token critic for an LLM is hard. The next post drops it. The [GRPO](../08-grpo/README.md) post keeps PPO's clip but replaces the learned critic with a *group baseline*: sample $G$ answers for the same prompt, score them all, and let the group's mean reward stand in for $V$. The advantage becomes
 
 $$A_i = \frac{r_i - \text{mean}(r_1, \ldots, r_G)}{\text{std}(r_1, \ldots, r_G)}.$$
 
-Read the symbols first: "$A_i$ equals reward $r_i$ minus the mean reward of the group, divided by the standard deviation of the group", that is, take each answer's reward, subtract the group average, and divide by the group spread. That is just a z-score, read as "how many standard deviations better (or worse) answer $i$ was than its siblings." Same gradient, same clip, a cheaper advantage, and the method behind today's reasoning models, where the reward is often a *verifiable check* (did the proof close, did the tests pass) rather than a learned model. That is the next lecture.
+Read the symbols first: "$A_i$ equals reward $r_i$ minus the mean reward of the group, divided by the standard deviation of the group", that is, take each answer's reward, subtract the group average, and divide by the group spread. That is just a z-score, read as "how many standard deviations better (or worse) answer $i$ was than its siblings." Same gradient, same clip, a cheaper advantage, and the method behind today's reasoning models, where the reward is often a *verifiable check* (did the proof close, did the tests pass) rather than a learned model. That is the [GRPO](../08-grpo/README.md) post.
