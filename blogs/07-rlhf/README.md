@@ -851,7 +851,9 @@ Read the symbols first: "the gradient of the objective $J$ with respect to $\the
 
 Put together, each token contributes "how much better than expected it was" ($A_t$) times "the direction that makes it more likely," and we average those over the batch.
 
-</details> The gradient is the one from the [Policy Gradients](../05-policy-gradients/README.md) post; the clip is from the [TRPO & PPO](../06-trpo-ppo/README.md) post; the value baseline and bootstrapping trace back to [DP, MC & TD](../03-dp-mc-td/README.md); the MDP frame to [MDPs & Bellman](../02-mdps-and-bellman/README.md). No row of the translation required a new idea, only a new noun.
+</details>
+
+The gradient is the one from the [Policy Gradients](../05-policy-gradients/README.md) post; the clip is from the [TRPO & PPO](../06-trpo-ppo/README.md) post; the value baseline and bootstrapping trace back to [DP, MC & TD](../03-dp-mc-td/README.md); the MDP frame to [MDPs & Bellman](../02-mdps-and-bellman/README.md). No row of the translation required a new idea, only a new noun.
 
 | RL         | LLM / RLHF                       |
 | ---------- | -------------------------------- |
@@ -904,8 +906,4 @@ The full RLHF pipeline, broken into five focused labs:
 
 ## Where this goes next
 
-RLHF holds four big models at once, and the most expensive and unstable of them is the value head: training a per-token critic for an LLM is hard. The next post drops it. The [GRPO](../08-grpo/README.md) post keeps PPO's clip but replaces the learned critic with a _group baseline_: sample $G$ answers for the same prompt, score them all, and let the group's mean reward stand in for $V$. The advantage becomes
-
-$$A_i = \frac{r_i - \text{mean}(r_1, \ldots, r_G)}{\text{std}(r_1, \ldots, r_G)}.$$
-
-Read the symbols first: "$A_i$ equals reward $r_i$ minus the mean reward of the group, divided by the standard deviation of the group", that is, take each answer's reward, subtract the group average, and divide by the group spread. That is just a z-score, read as "how many standard deviations better (or worse) answer $i$ was than its siblings." Same gradient, same clip, a cheaper advantage, and the method behind today's reasoning models, where the reward is often a _verifiable check_ (did the proof close, did the tests pass) rather than a learned model. That is the [GRPO](../08-grpo/README.md) post.
+RLHF holds four big models at once, and the most expensive and unstable of them is the value head: training a per-token critic for an LLM is hard. The next post drops it. The [GRPO](../08-grpo/README.md) post keeps PPO's clip but replaces the learned critic with a _group baseline_: sample $G$ answers for the same prompt, score them all, and let the group's mean reward stand in for $V$. Same gradient, same clip, a cheaper advantage, and the method behind today's reasoning models, where the reward is often a _verifiable check_ (did the proof close, did the tests pass) rather than a learned model. That is the [GRPO](../08-grpo/README.md) post.
