@@ -211,7 +211,11 @@ The two panels are the whole argument for the sigmoid. The left panel is the pro
 
 </details>
 
-Start from the definition $\sigma(z) = \frac{1}{1 + e^{-z}}$. First simplify $\log\sigma(z)$ before differentiating. Because $\sigma$ is a fraction, use the quotient rule for logs (with $\log 1 = 0$): $\log\sigma(z) = \log\frac{1}{1 + e^{-z}} = \log 1 - \log(1 + e^{-z}) = -\log\big(1 + e^{-z}\big)$. Now differentiate that, using the log rule $\frac{d}{dz}\log u = \frac{u'}{u}$ with the inside $u = 1 + e^{-z}$ and its derivative $u' = -e^{-z}$:
+Start from the definition $\sigma(z) = \frac{1}{1 + e^{-z}}$. First simplify $\log\sigma(z)$ before differentiating. Because $\sigma$ is a fraction, use the quotient rule for logs (with $\log 1 = 0$):
+
+$$\log\sigma(z) = \log\frac{1}{1 + e^{-z}} = \log 1 - \log(1 + e^{-z}) = -\log\big(1 + e^{-z}\big).$$
+
+Now differentiate that. The log rule says $\frac{d}{dz}\log u = \frac{u'}{u}$; here the inside is $u = 1 + e^{-z}$ with derivative $u' = -e^{-z}$, so
 
 $$\frac{d}{dz}\log\sigma(z) = -\frac{-e^{-z}}{1 + e^{-z}} = \frac{e^{-z}}{1 + e^{-z}}.$$
 
@@ -229,7 +233,11 @@ Split that product into two factors and reuse the numerator trick on the second 
 
 $$\sigma'(z) = \underbrace{\frac{1}{1 + e^{-z}}}_{\sigma(z)}\cdot\underbrace{\frac{e^{-z}}{1 + e^{-z}}}_{1 - \sigma(z)} = \sigma(z)\big(1 - \sigma(z)\big).$$
 
-Read this as "the sigmoid's slope is the sigmoid times one minus the sigmoid," largest at $z = 0$ and vanishing at both tails. Feeding it back through $\frac{d}{dz}\log\sigma = \sigma'/\sigma$ recovers $\frac{\sigma(1 - \sigma)}{\sigma} = 1 - \sigma$, matching the derivation above. Applying this to $\ell = -\log\sigma(g)$, the leading minus sign carries through:
+Read this as "the sigmoid's slope is the sigmoid times one minus the sigmoid," largest at $z = 0$ and vanishing at both tails. Feed it back through the log-derivative rule and it recovers the same result as before:
+
+$$\frac{d}{dz}\log\sigma = \frac{\sigma'}{\sigma} = \frac{\sigma(1 - \sigma)}{\sigma} = 1 - \sigma.$$
+
+Applying this to $\ell = -\log\sigma(g)$, the leading minus sign carries through:
 
 $$\frac{\partial \ell}{\partial g} = -\big(1 - \sigma(g)\big).$$
 
@@ -563,7 +571,11 @@ The single $+2.0$ has been spread across the sentence as four signed nudges. It 
 | objects | 0.60 | 0.55 | 0.09 | −0.02 | | **−0.02** |
 | down | 0.85 | 0.50 | 0.53 | −0.11 | +2.00 | **+1.89** |
 
-Work the last row in full: $-0.2 \cdot \log(0.85/0.50) = -0.2 \cdot 0.53 = -0.11$, and because it is the final token, add the verdict: $-0.11 + 2.00 = +1.89$. The KL tolls are *tiny*, a few hundredths each; the reward-model score dwarfs them and lands entirely on the last token.
+Work the last row in full. The KL toll is
+
+$$-0.2 \cdot \log(0.85/0.50) = -0.2 \cdot 0.53 = -0.11,$$
+
+and because it is the final token, add the verdict: $-0.11 + 2.00 = +1.89$. The KL tolls are *tiny*, a few hundredths each; the reward-model score dwarfs them and lands entirely on the last token.
 
 Now read the story off the advantage column in the output above. The $+2.0$ flowed all the way back, so "Gravity" carries a return of about 1.80 even though it earned nothing locally. The critic expected only 1.50 at the start, the answer beat that, so "Gravity" and "pulls" earn **positive** advantage and PPO makes them more likely. By the final token the critic already expected 1.95, but the realized 1.89 came in a hair lower (that token's own KL toll ate into it), so "down" gets a tiny **negative** push: it drifted from the reference for too little net gain. (Rounding the tolls first by hand gives $G \approx 1.79$ at the front instead of the code's 1.80, a cosmetic difference.) One scalar from the reward model has become four separate, signed, per-token instructions, each fed into the clipped PPO update from the [TRPO & PPO](../06-trpo-ppo/README.md) post.
 
