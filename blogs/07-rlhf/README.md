@@ -198,7 +198,15 @@ Shifting every score by +100 leaves the loss bit-for-bit identical: the loss see
 
 The two panels are the whole argument for the sigmoid. The left panel is the probability table drawn as a curve: the score gap goes in, a win probability comes out, with a gap of zero sitting at the toss-up line $\sigma(0) = 0.5$. The right panel overlays the two losses' gradients: the naive "make the gap big" loss pushes with constant force one forever (flat dashed line), while the Bradley-Terry gradient $1 - \sigma(g)$ decays to zero once a pair is comfortably correct (shaded region). That decay is the "enough" the naive objective never had, drawn as a shape.
 
-**Why the sigmoid form is so well-behaved: the gradient.** Differentiate the per-example loss $\ell = -\log\sigma(g)$ with respect to the gap $g$. Using $\frac{d}{dz}\log\sigma(z) = 1 - \sigma(z)$,
+**Why the sigmoid form is so well-behaved: the gradient.** Differentiate the per-example loss $\ell = -\log\sigma(g)$ with respect to the gap $g$. The one fact we need is the derivative of the log-sigmoid, which is worth deriving once. Start from the definition $\sigma(z) = \frac{1}{1 + e^{-z}}$, so taking the log turns the reciprocal into a negative log: $\log\sigma(z) = -\log\big(1 + e^{-z}\big)$. Differentiate the right side with the chain rule. The inside, $1 + e^{-z}$, has derivative $-e^{-z}$, so
+
+$$\frac{d}{dz}\log\sigma(z) = -\frac{-e^{-z}}{1 + e^{-z}} = \frac{e^{-z}}{1 + e^{-z}}.$$
+
+Read that as "the slope of the log-sigmoid is $e^{-z}$ over $1 + e^{-z}$." It is not yet in a useful form, so apply one trick: add and subtract one in the numerator so the fraction splits in two,
+
+$$\frac{e^{-z}}{1 + e^{-z}} = \frac{(1 + e^{-z}) - 1}{1 + e^{-z}} = 1 - \frac{1}{1 + e^{-z}} = 1 - \sigma(z).$$
+
+Read the result as "the slope of the log-sigmoid at $z$ equals one minus the sigmoid at $z$." It sits near $1$ for very negative $z$ and decays toward $0$ as $z$ grows, because once $\sigma(z) \approx 1$ there is nothing left to push up. (As a cross-check, the standard identity $\sigma'(z) = \sigma(z)\big(1 - \sigma(z)\big)$ gives the same thing through $\frac{d}{dz}\log\sigma = \sigma'/\sigma = 1 - \sigma$.) Applying this to $\ell = -\log\sigma(g)$, the leading minus sign carries through:
 
 $$\frac{\partial \ell}{\partial g} = -\big(1 - \sigma(g)\big).$$
 
