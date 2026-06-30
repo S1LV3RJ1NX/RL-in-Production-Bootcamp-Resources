@@ -557,7 +557,16 @@ $$-0.2 \cdot \log(0.85/0.50) = -0.2 \cdot 0.53 = -0.11,$$
 
 and because it is the final token, add the verdict: $-0.11 + 2.00 = +1.89$. The KL tolls are _tiny_, a few hundredths each; the reward-model score dwarfs them and lands entirely on the last token.
 
-Now read the story off the advantage column in the output above. The $+2.0$ flowed all the way back, so "Gravity" carries a return of about 1.80 even though it earned nothing locally. The critic expected only 1.50 at the start, the answer beat that, so "Gravity" and "pulls" earn **positive** advantage and PPO makes them more likely. By the final token the critic already expected 1.95, but the realized 1.89 came in a hair lower (that token's own KL toll ate into it), so "down" gets a tiny **negative** push: it drifted from the reference for too little net gain. (Rounding the tolls first by hand gives $G \approx 1.79$ at the front instead of the code's 1.80, a cosmetic difference.) One scalar from the reward model has become four separate, signed, per-token instructions, each fed into the clipped PPO update from the [TRPO & PPO](../06-trpo-ppo/README.md) post.
+Now read the story off the last two columns of the output, `V` and `A_t`. The advantage is just the return minus what the critic predicted: $A_t = G_t - V(s_t)$. It asks one question at each token: did things turn out _better_ or _worse_ than the critic expected here? A positive answer is a pleasant surprise, so PPO makes that token more likely; a negative answer is a small disappointment, so PPO makes it less likely.
+
+Walk it token by token:
+
+- **"Gravity", "pulls", "objects"** earn almost nothing locally ($R_t \approx 0$), yet each one carries a return $G_t$ near 1.80. That is the $+2.0$ at the end flowing _backward_ through $G_t = R_t + G_{t+1}$ and piling onto every earlier token. At these positions the critic only expected 1.50, 1.60, and 1.85, so the realized return beats the prediction and the advantage is **positive** ($+0.30, +0.20, +0.03$). PPO nudges these tokens up.
+- **"down"** is the token that actually banked the reward, so you might expect the _biggest_ push. But by the time we reach it, the critic has already watched the answer go well and expects 1.95. The realized return is only 1.89, because "down" paid a small KL toll (it drifted from the reference) that ate into the $+2.0$. Coming in just below expectation gives a small **negative** advantage ($-0.06$): it strayed from the reference for too little extra gain, so PPO nudges it down.
+
+(If you round the KL tolls by hand before adding them up, the front return comes out to $G \approx 1.79$ instead of the code's 1.80: a cosmetic rounding difference, not a real disagreement.)
+
+The point of the whole exercise: one scalar from the reward model, the lone $+2.0$ at the end, has become four separate, signed, per-token instructions, each fed into the clipped PPO update from the [TRPO & PPO](../06-trpo-ppo/README.md) post.
 
 ![Left: per-token rewards, a small KL toll on every token and the large reward-model score landing only on the last token. Right: the resulting advantages, positive for the early tokens and slightly negative for the last.](./images/fig-per-token-credit.svg)
 
