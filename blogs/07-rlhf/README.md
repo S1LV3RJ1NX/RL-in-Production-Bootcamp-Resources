@@ -311,15 +311,6 @@ $$r_\varphi(x, y) = \mathbf{w}^\top \mathbf{h}_{\text{last}} + b.$$
 
 Read the symbols first: "$r_\varphi$ of $x$ and $y$ equals $\mathbf{w}$ transpose times $\mathbf{h}_{\text{last}}$, plus $b$", that is, take the dot product of a learned weight vector $\mathbf{w}$ with the last token's hidden state $\mathbf{h}_{\text{last}}$ and add a bias $b$. In plain terms, the reward is a weighted sum of the final hidden vector's features, plus a bias. Why the last token? Decoder transformers use causal attention: position $t$ can attend to $1, \dots, t$ but nothing after. Only the final position has "read" the entire prompt and answer, so it is the one sensible place to read a verdict on the whole response. The scalar head is tiny next to the language head: a single length-$d$ vector plus a bias, against the language head's full $|V| \times d$ matrix, a few hundred weights versus tens of millions. Almost all of the reward model _is_ the pretrained trunk; only the head, plus a little fine-tuning, learns what humans prefer.
 
-In code, the reward model is exactly an `AutoModelForSequenceClassification` with `num_labels=1` on top of GPT-2, trained for one pass over HH-RLHF with the Bradley-Terry loss above. Preference accuracy (the fraction of held-out pairs where the model scores the chosen answer higher) climbs off the 0.5 chance line:
-
-```text title="Output (reward-model training)"
-accuracy BEFORE training: 0.5138
-accuracy AFTER training: 0.59
-```
-
-A single scalar, learned purely from comparisons, recovers human preference well above chance. It plateaus below 1.0 for two reasons worth holding onto: GPT-2 is small, and human labels are genuinely noisy (annotators disagree, which caps the achievable accuracy). Once trained, $r_\varphi$ is **frozen**: it scores any answer in milliseconds, a scalable stand-in for the human labeler. That is our reward signal, and RL can finally begin.
-
 <details>
 <summary><strong>Check:</strong> Why read the reward off the last token's hidden state, not the first or an average?</summary>
 
@@ -340,6 +331,15 @@ A single scalar, learned purely from comparisons, recovers human preference well
 **Answer.** It collapses toward 0.50 (chance). The chosen and rejected answers share the same prompt and differ only at the _end_ (the assistant's reply). Right-truncation keeps the shared prefix and cuts the differing tail, so the model sees almost identical inputs for winner and loser and cannot tell them apart. Left-truncation keeps the ends, where the signal lives.
 
 </details>
+
+With the architecture settled, we can actually train it. In code, the reward model is exactly an `AutoModelForSequenceClassification` with `num_labels=1` on top of GPT-2, trained for one pass over HH-RLHF with the Bradley-Terry loss above. Preference accuracy (the fraction of held-out pairs where the model scores the chosen answer higher) climbs off the 0.5 chance line:
+
+```text title="Output (reward-model training)"
+accuracy BEFORE training: 0.5138
+accuracy AFTER training: 0.59
+```
+
+A single scalar, learned purely from comparisons, recovers human preference well above chance. It plateaus below 1.0 for two reasons worth holding onto: GPT-2 is small, and human labels are genuinely noisy (annotators disagree, which caps the achievable accuracy). Once trained, $r_\varphi$ is **frozen**: it scores any answer in milliseconds, a scalable stand-in for the human labeler. That is our reward signal, and RL can finally begin.
 
 ### 2.4 The three stages, and where the policy starts
 
