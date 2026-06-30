@@ -486,7 +486,21 @@ Read the symbols first: "$R_t$ equals minus $\beta$ times the gap between the po
 
 $$G_t = \sum_{k=t}^{T} \gamma^{k-t} R_k.$$
 
-Read the symbols first: "$G_t$ is the sum, over future steps $k$ running from the current step $t$ to the end $T$, of each reward $R_k$ discounted by $\gamma$ raised to the power $k - t$." For a single short answer it is standard to take $\gamma = 1$, so $G_t$ is just the plain sum from $t$ to the end. Computed right-to-left, this is the one-line recursion $G_t = R_t + G_{t+1}$. This is the step that solves credit assignment: because the big verdict lives in $R_T$ and $G_t$ sums everything through $T$, **the terminal score flows backward into every earlier token's return**.
+<details>
+<summary><strong>Refresher:</strong> reading the summation $\sum$ and the discount $\gamma$</summary>
+
+- **The $\sum$ symbol** just means "add up a list." $\sum_{k=t}^{T}(\text{expression in } k)$ says: let $k$ start at $t$, step up by one each time until it reaches $T$, evaluate the expression for each $k$, and total the results. So $\sum_{k=t}^{T} R_k = R_t + R_{t+1} + \cdots + R_T$.
+- **The discount $\gamma$** is a number between $0$ and $1$ that shrinks rewards the further into the future they sit. The exponent $k - t$ counts how many steps ahead reward $R_k$ is, so it is multiplied by $\gamma^{k-t}$: the reward now ($k = t$) keeps full weight $\gamma^0 = 1$, the next is worth $\gamma$, the one after $\gamma^2$, and so on. With $\gamma = 1$ nothing is shrunk and the sum is plain.
+
+</details>
+
+Read the symbols first: "$G_t$ is the sum, over future steps $k$ running from the current step $t$ to the end $T$, of each reward $R_k$ discounted by $\gamma$ raised to the power $k - t$." For a single short answer it is standard to take $\gamma = 1$, so $G_t$ is just the plain sum from $t$ to the end.
+
+There is a shortcut hiding in that sum. Write out $G_t$ and the next return $G_{t+1}$ and line them up:
+
+$$G_t = R_t + \gamma R_{t+1} + \gamma^2 R_{t+2} + \cdots, \qquad G_{t+1} = R_{t+1} + \gamma R_{t+2} + \cdots.$$
+
+Every term of $G_t$ after the first $R_t$ is exactly $\gamma$ times the matching term of $G_{t+1}$, so $G_t = R_t + \gamma\,G_{t+1}$. With $\gamma = 1$ this collapses to the one-line recursion $G_t = R_t + G_{t+1}$, computed right-to-left. This is the step that solves credit assignment: because the big verdict lives in $R_T$ and $G_t$ sums everything through $T$, **the terminal score flows backward into every earlier token's return**.
 
 **Move 3, the advantage.** A raw return conflates "how good the answer was" with "how good we already expected it to be." Subtract the critic to get the *surprise*, which is what the policy gradient wants:
 
@@ -813,7 +827,18 @@ Five posts, and a single update rule has not changed once. RLHF is not a new alg
 
 $$\nabla_\theta J = \mathbb{E}\big[\, A_t \cdot \nabla_\theta \log \pi_\theta(a_t \mid s_t)\,\big]$$
 
-Read the symbols first: "the gradient of the objective $J$ with respect to $\theta$ is the expected value of the advantage $A_t$ times the gradient of the log-probability of the action $a_t$ in state $s_t$." In plain terms: push up the log-probability of actions that beat the baseline (positive $A_t$), push down the ones that fell short, weighted by how much. The reward model supplies the reward, the value head supplies the advantage $A_t$, and the KL leash keeps it anchored. The gradient is the one from the [Policy Gradients](../05-policy-gradients/README.md) post; the clip is from the [TRPO & PPO](../06-trpo-ppo/README.md) post; the value baseline and bootstrapping trace back to [DP, MC & TD](../03-dp-mc-td/README.md); the MDP frame to [MDPs & Bellman](../02-mdps-and-bellman/README.md). No row of the translation required a new idea, only a new noun.
+Read the symbols first: "the gradient of the objective $J$ with respect to $\theta$ is the expected value of the advantage $A_t$ times the gradient of the log-probability of the action $a_t$ in state $s_t$." In plain terms: push up the log-probability of actions that beat the baseline (positive $A_t$), push down the ones that fell short, weighted by how much. The reward model supplies the reward, the value head supplies the advantage $A_t$, and the KL leash keeps it anchored.
+
+<details>
+<summary><strong>Refresher:</strong> reading the gradient notation $\nabla_\theta$ and the expectation $\mathbb{E}$</summary>
+
+- **A gradient $\nabla_\theta$** is just the slope, generalized to many parameters at once. It collects the partial derivative of a quantity with respect to every weight in $\theta$ and points in the direction that increases that quantity fastest. "Take a gradient step" means nudge $\theta$ a little in that direction.
+- **$\nabla_\theta \log \pi_\theta(a_t \mid s_t)$** is that slope for one specific number, the log-probability the policy assigns to the token it actually chose. Nudging $\theta$ along it makes that token more likely next time; nudging against it makes it less likely.
+- **The expectation $\mathbb{E}[\cdot]$** is an average. We cannot sum over every possible answer, so we average over the batch of tokens we actually generated, and that sample average estimates the true expectation.
+
+Put together, each token contributes "how much better than expected it was" ($A_t$) times "the direction that makes it more likely," and we average those over the batch.
+
+</details> The gradient is the one from the [Policy Gradients](../05-policy-gradients/README.md) post; the clip is from the [TRPO & PPO](../06-trpo-ppo/README.md) post; the value baseline and bootstrapping trace back to [DP, MC & TD](../03-dp-mc-td/README.md); the MDP frame to [MDPs & Bellman](../02-mdps-and-bellman/README.md). No row of the translation required a new idea, only a new noun.
 
 | RL | LLM / RLHF |
 |---|---|
