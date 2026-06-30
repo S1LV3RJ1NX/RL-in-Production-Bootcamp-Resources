@@ -41,9 +41,10 @@ Link in comments.
 
 ## Comment (post immediately after)
 
-Read the full post: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
+Read the full post: https://prathameshsaraf.com/blogs/02-mdps-and-bellman/
 
 Series so far:
+
 1. RL from First Principles
 2. MDPs and Bellman Equations (this one)
 3. Coming next: DP, Monte Carlo, and TD

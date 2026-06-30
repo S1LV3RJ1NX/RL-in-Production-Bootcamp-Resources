@@ -30,15 +30,15 @@ Before the equation, you need the framework. A Markov Decision Process has four 
 - **Dynamics p(s'|s,a)**: the probability of landing in s' after taking action a in state s
 - **Rewards R(s,a,s')**: what you get for that transition
 
-The Markov property says what happens next depends only on where you are *now*, not how you got here. That's what makes the recursion possible.
+The Markov property says what happens next depends only on where you are _now_, not how you got here. That's what makes the recursion possible.
 
 ---
 
 ### Two ways to measure "how good"
 
-**V(s)**, the state-value, answers "how good is it to *be* in state s?" It's the expected total return from s onward, following policy π.
+**V(s)**, the state-value, answers "how good is it to _be_ in state s?" It's the expected total return from s onward, following policy π.
 
-**Q(s,a)**, the action-value, answers "how good is it to *do* action a in state s?" It's the expected total return after taking a, then following π.
+**Q(s,a)**, the action-value, answers "how good is it to _do_ action a in state s?" It's the expected total return after taking a, then following π.
 
 The bridge from Q back to V:
 
@@ -72,7 +72,7 @@ $$V(s) = \sum_a \pi(a \mid s) \sum_{s'} p(s' \mid s,a)\, \big[R(s,a,s') + \gamma
 
 In words: the value of state s is, over all the actions I might take (weighted by my policy) and all the places I might land (weighted by the dynamics), the sum of the immediate reward plus the discounted value of the future.
 
-It's recursive. V shows up on both sides. The value of *this* state depends on the value of the *next* states, which depend on the states after that, all the way down.
+It's recursive. V shows up on both sides. The value of _this_ state depends on the value of the _next_ states, which depend on the states after that, all the way down.
 
 [EMBED IMAGE HERE: fig-backup-diagram.png — the V to Q to V' tree showing one step of the Bellman backup]
 
@@ -82,7 +82,7 @@ Every RL algorithm is a different way of solving that recursion. Dynamic program
 
 ### From "good" to "optimal"
 
-Replace the policy average (the weighted sum over actions) with a max, and you get the Bellman *optimality* equation:
+Replace the policy average (the weighted sum over actions) with a max, and you get the Bellman _optimality_ equation:
 
 $$V^*(s) = \max_a \sum_{s'} p(s' \mid s,a)\, \big[R + \gamma V^*(s')\big]$$
 
@@ -104,9 +104,9 @@ If you're working with RLHF or GRPO, you're using algorithms that approximate va
 
 ### What's next
 
-Blog 3 is on DP, Monte Carlo, and TD: three ways to actually *solve* this equation, built from scratch on a custom environment.
+Blog 3 is on DP, Monte Carlo, and TD: three ways to actually _solve_ this equation, built from scratch on a custom environment.
 
-Full post with typed Python, backup diagrams, and worked examples on FrozenLake: [YOUR_PORTFOLIO_URL/blogs/02-mdps-and-bellman]
+Full post with typed Python, backup diagrams, and worked examples on FrozenLake: https://prathameshsaraf.com/blogs/02-mdps-and-bellman/
 
 Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the series.
 
@@ -120,6 +120,7 @@ Learning RL for LLMs through the @VizuraAI bootcamp. Follow for the rest of the 
 ## First 30 Minutes Strategy
 
 After publishing:
+
 1. Self-reply with: "The moment it clicked for me: V*(s) = max_a Q*(s,a). The policy probabilities don't vanish, they collapse to a one-hot. A weighted average with a one-hot weight just is 'pick the max.'"
 2. Quote-repost with a one-line hook 4-6 hours later (options below).
 
