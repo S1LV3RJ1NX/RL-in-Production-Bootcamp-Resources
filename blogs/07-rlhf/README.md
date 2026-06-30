@@ -198,7 +198,20 @@ Shifting every score by +100 leaves the loss bit-for-bit identical: the loss see
 
 The two panels are the whole argument for the sigmoid. The left panel is the probability table drawn as a curve: the score gap goes in, a win probability comes out, with a gap of zero sitting at the toss-up line $\sigma(0) = 0.5$. The right panel overlays the two losses' gradients: the naive "make the gap big" loss pushes with constant force one forever (flat dashed line), while the Bradley-Terry gradient $1 - \sigma(g)$ decays to zero once a pair is comfortably correct (shaded region). That decay is the "enough" the naive objective never had, drawn as a shape.
 
-**Why the sigmoid form is so well-behaved: the gradient.** Differentiate the per-example loss $\ell = -\log\sigma(g)$ with respect to the gap $g$. The one fact we need is the derivative of the log-sigmoid, which is worth deriving once. Start from the definition $\sigma(z) = \frac{1}{1 + e^{-z}}$. Taking the log of a reciprocal flips its sign, because $\log\frac{1}{u} = \log 1 - \log u = -\log u$, so $\log\sigma(z) = -\log\big(1 + e^{-z}\big)$. Differentiate the right side with the chain rule. The inside, $1 + e^{-z}$, has derivative $-e^{-z}$, so
+**Why the sigmoid form is so well-behaved: the gradient.** We want the derivative of the per-example loss $\ell = -\log\sigma(g)$ with respect to the gap $g$. The one fact we need is the derivative of the log-sigmoid, which is worth deriving once, slowly, from the ground up. If calculus is rusty, these are the only rules the derivation leans on.
+
+<details>
+<summary><strong>Refresher:</strong> the handful of basic calculus rules used below</summary>
+
+- **Chain rule.** To differentiate a function wrapped inside another, differentiate the outer function, then multiply by the derivative of the inner one: $\frac{d}{dz} f\big(u(z)\big) = f'(u)\cdot u'(z)$.
+- **Derivative of a log.** $\frac{d}{dz}\log u = \frac{u'}{u}$ (this is just the chain rule applied to $\log$).
+- **Derivative of $e^{-z}$.** An exponential differentiates to itself times the derivative of its exponent. The exponent $-z$ has derivative $-1$, so $\frac{d}{dz}e^{-z} = -e^{-z}$.
+- **Power rule.** $\frac{d}{dz}u^{n} = n\,u^{\,n-1}\cdot u'$ (used with $n = -1$ for the cross-check below).
+- **Log of a quotient.** $\log\frac{a}{b} = \log a - \log b$, and $\log 1 = 0$.
+
+</details>
+
+Start from the definition $\sigma(z) = \frac{1}{1 + e^{-z}}$. First simplify $\log\sigma(z)$ before differentiating. Because $\sigma$ is a fraction, use the quotient rule for logs (with $\log 1 = 0$): $\log\sigma(z) = \log\frac{1}{1 + e^{-z}} = \log 1 - \log(1 + e^{-z}) = -\log\big(1 + e^{-z}\big)$. Now differentiate that, using the log rule $\frac{d}{dz}\log u = \frac{u'}{u}$ with the inside $u = 1 + e^{-z}$ and its derivative $u' = -e^{-z}$:
 
 $$\frac{d}{dz}\log\sigma(z) = -\frac{-e^{-z}}{1 + e^{-z}} = \frac{e^{-z}}{1 + e^{-z}}.$$
 
@@ -208,7 +221,7 @@ $$\frac{e^{-z}}{1 + e^{-z}} = \frac{(1 + e^{-z}) - 1}{1 + e^{-z}} = 1 - \frac{1}
 
 Read the result as "the slope of the log-sigmoid at $z$ equals one minus the sigmoid at $z$." It sits near $1$ for very negative $z$ and decays toward $0$ as $z$ grows, because once $\sigma(z) \approx 1$ there is nothing left to push up.
 
-As an independent cross-check, differentiate the sigmoid itself. Write it as $\sigma(z) = (1 + e^{-z})^{-1}$ and apply the chain rule, where the inside again contributes $-e^{-z}$:
+As an independent cross-check, differentiate the sigmoid itself. Write it as $\sigma(z) = (1 + e^{-z})^{-1}$ and apply the power rule together with the chain rule, $\frac{d}{dz}u^{-1} = -u^{-2}\,u'$, where the inside again contributes $u' = -e^{-z}$:
 
 $$\sigma'(z) = -(1 + e^{-z})^{-2}\cdot(-e^{-z}) = \frac{e^{-z}}{(1 + e^{-z})^2}.$$
 
