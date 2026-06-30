@@ -315,9 +315,6 @@ In code, the reward model is exactly an `AutoModelForSequenceClassification` wit
 
 ```text title="Output (reward-model training)"
 accuracy BEFORE training: 0.5138
-step  100  loss 0.5955  margin +0.277  acc 0.5675
-step  500  loss 0.6240  margin +0.181  acc 0.5900
-step 1000  loss 0.5945  margin +0.298  acc 0.5900
 accuracy AFTER training: 0.59
 ```
 
