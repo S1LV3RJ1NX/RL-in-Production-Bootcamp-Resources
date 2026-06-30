@@ -540,7 +540,9 @@ objects    -0.02    1.88   1.85   +0.03
 down       +1.89    1.89   1.95   -0.06
 ```
 
-The single $+2.0$ has been spread across the sentence as four signed nudges. It is worth unpacking these numbers by hand. The policy drifted _above_ the reference on "pulls" and "down" (it likes those continuations more than the reference did) and matches it on "Gravity" and "objects", which sets each token's KL toll:
+That `Output` block is the entire pipeline at a glance, one row per token and one column per stage: the per-token reward `R_t`, the return `G_t` it rolls up into, the critic's prediction `V`, and the resulting advantage `A_t = G_t - V`. The single $+2.0$ has been spread across the sentence as four signed nudges in that final `A_t` column.
+
+Before we trace that spread, it is worth seeing where the _first_ column, `R_t`, comes from, because everything downstream is built on it. The table below decomposes that one column by hand: each token's reward is just a small KL toll (plus the reward model's verdict on the final token). The policy drifted _above_ the reference on "pulls" and "down" (it likes those continuations more than the reference did) and matches it on "Gravity" and "objects", which sets each token's KL toll:
 
 | token   | $\pi_\theta$ | $\pi_{\text{ref}}$ | $\log(\pi_\theta/\pi_{\text{ref}})$ | $-\beta\log(\cdot)$ | +RM   | $R_t$     |
 | ------- | ------------ | ------------------ | ----------------------------------- | ------------------- | ----- | --------- |
