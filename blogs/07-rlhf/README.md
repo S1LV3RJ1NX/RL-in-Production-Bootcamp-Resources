@@ -373,7 +373,7 @@ The pivotal move is at the start of stage 3: we make **two copies** of the SFT m
 
 PPO does not weight an action by its raw return; it weights it by the _advantage_, return minus a baseline. The [Policy Gradients](../05-policy-gradients/README.md) post showed why: subtracting a baseline slashes the variance of the gradient without biasing it. That baseline is the **value function** $V(s_t)$, the critic. In language, this is not a separate network bolted on; it is literally a **second head on the policy's own trunk**.
 
-At a half-written answer (a state $s_t$), the value $V(s_t)$ is the model's best guess of the _final_ reward, given how the answer is going so far: "on track for an 8" versus "heading for a 2." The policy head (the language head) outputs the next-token distribution, the **actor**. A new value head, one linear layer to a scalar, reads each position's hidden state and outputs $V(s_t)$, the **critic**. One forward pass gives both, at every position.
+At a half-written answer (a state $s_t$), the value $V(s_t)$ is the model's best guess of the _final_ reward, given how the answer is going so far. The policy head (the language head) outputs the next-token distribution, the **actor**. A new value head, one linear layer to a scalar, reads each position's hidden state and outputs $V(s_t)$, the **critic**. One forward pass gives both, at every position.
 
 ```mermaid
 flowchart TD
@@ -473,7 +473,7 @@ Read the symbols first: "$R_t$ equals minus $\beta$ times the gap between the po
 $$G_t = \sum_{k=t}^{T} \gamma^{k-t} R_k.$$
 
 <details>
-<summary><strong>Refresher:</strong> reading the summation $\sum$ and the discount $\gamma$</summary>
+<summary><strong>Refresher:</strong> reading the summation Σ and the discount γ</summary>
 
 - **The $\sum$ symbol** just means "add up a list." $\sum_{k=t}^{T}(\text{expression in } k)$ says: let $k$ start at $t$, step up by one each time until it reaches $T$, evaluate the expression for each $k$, and total the results. So $\sum_{k=t}^{T} R_k = R_t + R_{t+1} + \cdots + R_T$.
 - **The discount $\gamma$** is a number between $0$ and $1$ that shrinks rewards the further into the future they sit. The exponent $k - t$ counts how many steps ahead reward $R_k$ is, so it is multiplied by $\gamma^{k-t}$: the reward now ($k = t$) keeps full weight $\gamma^0 = 1$, the next is worth $\gamma$, the one after $\gamma^2$, and so on. With $\gamma = 1$ nothing is shrunk and the sum is plain.
@@ -832,7 +832,7 @@ $$\nabla_\theta J = \mathbb{E}\big[\, A_t \cdot \nabla_\theta \log \pi_\theta(a_
 Read the symbols first: "the gradient of the objective $J$ with respect to $\theta$ is the expected value of the advantage $A_t$ times the gradient of the log-probability of the action $a_t$ in state $s_t$." In plain terms: push up the log-probability of actions that beat the baseline (positive $A_t$), push down the ones that fell short, weighted by how much. The reward model supplies the reward, the value head supplies the advantage $A_t$, and the KL leash keeps it anchored.
 
 <details>
-<summary><strong>Refresher:</strong> reading the gradient notation $\nabla_\theta$ and the expectation $\mathbb{E}$</summary>
+<summary><strong>Refresher:</strong> reading the gradient notation ∇θ and the expectation 𝔼</summary>
 
 - **A gradient $\nabla_\theta$** is just the slope, generalized to many parameters at once. It collects the partial derivative of a quantity with respect to every weight in $\theta$ and points in the direction that increases that quantity fastest. "Take a gradient step" means nudge $\theta$ a little in that direction.
 - **$\nabla_\theta \log \pi_\theta(a_t \mid s_t)$** is that slope for one specific number, the log-probability the policy assigns to the token it actually chose. Nudging $\theta$ along it makes that token more likely next time; nudging against it makes it less likely.
