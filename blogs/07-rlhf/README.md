@@ -309,38 +309,9 @@ A transformer turns each token into an **embedding**, passes the sequence throug
 
 $$r_\varphi(x, y) = \mathbf{w}^\top \mathbf{h}_{\text{last}} + b.$$
 
-Read the symbols first: "$r_\varphi$ of $x$ and $y$ equals $\mathbf{w}$ transpose times $\mathbf{h}_{\text{last}}$, plus $b$", that is, take the dot product of a learned weight vector $\mathbf{w}$ with the last token's hidden state $\mathbf{h}_{\text{last}}$ and add a bias $b$. In plain terms, the reward is a weighted sum of the final hidden vector's features, plus a bias. Why the last token? Decoder transformers use causal attention: position $t$ can attend to $1, \dots, t$ but nothing after. Only the final position has "read" the entire prompt and answer, so it is the one sensible place to read a verdict on the whole response. The algebra is tiny, and it also shows why a scalar head is essentially free next to a language head:
+Read the symbols first: "$r_\varphi$ of $x$ and $y$ equals $\mathbf{w}$ transpose times $\mathbf{h}_{\text{last}}$, plus $b$", that is, take the dot product of a learned weight vector $\mathbf{w}$ with the last token's hidden state $\mathbf{h}_{\text{last}}$ and add a bias $b$. In plain terms, the reward is a weighted sum of the final hidden vector's features, plus a bias. Why the last token? Decoder transformers use causal attention: position $t$ can attend to $1, \dots, t$ but nothing after. Only the final position has "read" the entire prompt and answer, so it is the one sensible place to read a verdict on the whole response. The scalar head is tiny next to the language head: a single length-$d$ vector plus a bias, against the language head's full $|V| \times d$ matrix, a few hundred weights versus tens of millions. Almost all of the reward model _is_ the pretrained trunk; only the head, plus a little fine-tuning, learns what humans prefer.
 
-```python
-import torch
-
-# A tiny scalar head: w in R^d (plus bias b) maps one hidden vector -> one number.
-w = torch.tensor([0.5, -1.0, 2.0])
-b = torch.tensor(0.1)
-# hidden state at the last token
-h_last = torch.tensor([1.2, 0.3, 0.4])
-
-# r_phi = w^T h_last + b
-r = w @ h_last + b
-print(f"r_phi = w . h_last + b = {r.item():.1f}")
-
-# Dimension bookkeeping for a real model: d = 768, vocab |V| = 50,000.
-d, V = 768, 50_000
-print(f"language head params = {V * d:,}")
-print(f"scalar head params   = {d + 1:,}")
-print(f"ratio                = {V * d / (d + 1):,.0f}x larger")
-```
-
-```text title="Output"
-r_phi = w . h_last + b = 1.2
-language head params = 38,400,000
-scalar head params   = 769
-ratio                = 49,935x larger
-```
-
-The scalar head is a rounding error next to the language head: 769 weights versus 38 million. Almost all the reward model _is_ the pretrained trunk; only the head, and a little fine-tuning, learns "what humans prefer." Once trained, $r_\varphi$ is **frozen**: it scores any answer in milliseconds, a scalable stand-in for the human labeler. That is our reward signal, and RL can finally begin.
-
-For the reward model, this is exactly an `AutoModelForSequenceClassification` with `num_labels=1` on top of GPT-2, trained for one pass over HH-RLHF with the Bradley-Terry loss above. Preference accuracy (the fraction of held-out pairs where the model scores the chosen answer higher) climbs off the 0.5 chance line:
+In code, the reward model is exactly an `AutoModelForSequenceClassification` with `num_labels=1` on top of GPT-2, trained for one pass over HH-RLHF with the Bradley-Terry loss above. Preference accuracy (the fraction of held-out pairs where the model scores the chosen answer higher) climbs off the 0.5 chance line:
 
 ```text title="Output (reward-model training)"
 accuracy BEFORE training: 0.5138
@@ -350,7 +321,7 @@ step 1000  loss 0.5945  margin +0.298  acc 0.5900
 accuracy AFTER training: 0.59
 ```
 
-A single scalar, learned purely from comparisons, recovers human preference well above chance. It plateaus below 1.0 for two reasons worth holding onto: GPT-2 is small, and human labels are genuinely noisy (annotators disagree, which caps the achievable accuracy).
+A single scalar, learned purely from comparisons, recovers human preference well above chance. It plateaus below 1.0 for two reasons worth holding onto: GPT-2 is small, and human labels are genuinely noisy (annotators disagree, which caps the achievable accuracy). Once trained, $r_\varphi$ is **frozen**: it scores any answer in milliseconds, a scalable stand-in for the human labeler. That is our reward signal, and RL can finally begin.
 
 <details>
 <summary><strong>Check:</strong> Why read the reward off the last token's hidden state, not the first or an average?</summary>
