@@ -81,7 +81,8 @@ def extract_xml_answer(text: str) -> str:
     return answer.strip()
 
 def correctness_reward(response: str, gold: str) -> float:
-    return 2.0 if extract_xml_answer(response) == gold else 0.0   # +2 iff answer == gold
+    # +2 iff the extracted answer equals the gold answer
+    return 2.0 if extract_xml_answer(response) == gold else 0.0
 
 good = "<reasoning>\n2 + 2*3 = 2 + 6 = 8\n</reasoning>\n<answer>\n8\n</answer>\n"
 bad  = "<reasoning>\nadd first: 4*3 = 12\n</reasoning>\n<answer>\n12\n</answer>\n"
@@ -109,7 +110,8 @@ def count_xml(text) -> float:
     if text.count("\n</reasoning>\n") == 1: count += 0.125
     if text.count("\n<answer>\n") == 1:
         count += 0.125
-        count -= len(text.split("\n</answer>\n")[-1]) * 0.001   # punish trailing junk
+        # punish trailing junk after the answer
+        count -= len(text.split("\n</answer>\n")[-1]) * 0.001
     if text.count("\n</answer>") == 1:
         count += 0.125
         count -= (len(text.split("\n</answer>")[-1]) - 1) * 0.001
@@ -158,14 +160,26 @@ GRPO picks the simplest baseline imaginable: **the group's own average.** For a 
 
 $$\hat{A}_i = \frac{r_i - \text{mean}(r_1, \dots, r_G)}{\text{std}(r_1, \dots, r_G)}.$$
 
-Read it as: "answer $i$'s advantage is its reward minus the group's mean reward, divided by the group's spread." Two pieces, two jobs. **The mean is the baseline** (the critic's old job, now measured for free): it answers "how well does this model typically do on this prompt?" Subtracting it converts a raw score into a verdict, did this answer beat its siblings or fall short? **The std is just a scale normalizer**, putting every prompt on a comparable "how many standard deviations above average" footing. (Section 5 revisits whether the ÷std should be there at all.)
+Read it as: "answer $i$'s advantage is its reward minus the group's mean reward, divided by the group's spread." Two pieces, two jobs. **The mean is the baseline** (the critic's old job, now measured for free): it answers "how well does this model typically do on this prompt?" Subtracting it converts a raw score into a verdict, did this answer beat its siblings or fall short? **The std is just a scale normalizer**, putting every prompt on a comparable "how many standard deviations above average" footing. (Section 4 revisits whether the ÷std should be there at all.)
+
+**A first concrete group of four.** Take the prompt "Compute $2 + 2 \times 3$." The gold answer is 8 (multiplication binds first; the trap answer 12 comes from adding first). Sample $G = 4$ answers and run each through the exact-match verifier:
+
+| answer | verdict | $r_i$ | $\hat{A}_i = (r_i - \mu)/\sigma$ |
+|---|---|---|---|
+| "$\dots = 8$" | correct | 1 | $+1.0$ |
+| "$\dots = 12$" | wrong | 0 | $-1.0$ |
+| "$\dots = 8$" | correct | 1 | $+1.0$ |
+| "$\dots = 10$" | wrong | 0 | $-1.0$ |
+
+The group supplies its own baseline and scale: $\mu = \text{mean}(1,0,1,0) = 0.5$ and $\sigma = 0.5$, so the two correct answers get $\hat{A} = (1 - 0.5)/0.5 = +1$ and the two wrong ones get $(0 - 0.5)/0.5 = -1$. No critic was queried; the four rewards graded each other. The code below runs the same idea on a group of six:
 
 ```python
 import numpy as np
 
 def group_advantages(rewards):
     r = np.asarray(rewards, dtype=float)
-    return (r - r.mean()) / (r.std() + 1e-8)      # A_i = (r_i - mean) / std
+    # A_i = (r_i - mean) / std
+    return (r - r.mean()) / (r.std() + 1e-8)
 
 six = [1, 0, 1, 1, 0, 1]
 print("group {1,0,1,1,0,1}: mean=%.3f std=%.3f" % (np.mean(six), np.std(six)))
@@ -185,12 +199,36 @@ The four correct answers each land above the mean and get a positive push; the t
 
 ![Six reward bars at 0 or 1 with a dashed group-mean line at 0.667, arrows showing each answer's deviation above or below the baseline](./images/fig-group-baseline.svg)
 
-Why is this a legitimate baseline and not a trick? Because it is the same object the critic was approximating, computed more directly. The critic was trained so that $V(s) \to \mathbb{E}[r \mid q]$, the typical reward for this prompt. The group mean is the textbook Monte-Carlo estimate of that very expectation: draw $G$ samples and average them. As $G \to \infty$ the group mean converges to $\mathbb{E}[r \mid q]$. The critic *predicts* the average with a network; GRPO *measures* it from a group drawn fresh for this prompt. Crucially, $\hat{A}_i$ carries a single subscript $i$: **every token of answer $i$ shares the one advantage.** It is an outcome-level signal, not a per-token one. We pay for that simplicity in Section 6, but for a checkable end-of-answer reward it is exactly enough.
+Why is this a legitimate baseline and not a trick? Because it is the same object the critic was approximating, computed more directly. The critic was trained so that $V(s) \to \mathbb{E}[r \mid q]$, the typical reward for this prompt. The group mean is the textbook Monte-Carlo estimate of that very expectation: draw $G$ samples and average them. As $G \to \infty$ the group mean converges to $\mathbb{E}[r \mid q]$. The critic *predicts* the average with a network; GRPO *measures* it from a group drawn fresh for this prompt. Crucially, $\hat{A}_i$ carries a single subscript $i$: **every token of answer $i$ shares the one advantage.** It is an outcome-level signal, not a per-token one. We pay for that simplicity in Section 5, but for a checkable end-of-answer reward it is exactly enough.
+
+![Two grouped bars per answer comparing the numerator-only advantage with the full z-score advantage; both share the same signs and centring](./images/fig-advantage-zscore.svg)
+
+Dividing by the spread never flips a sign. Put the raw numerators $r_i - \mu$ next to the full z-scores $(r_i - \mu)/\sigma$ and the two agree on which answers go up and which go down; only the scale changes. That is all the std-normalization ever does, which is why Section 4 can drop it without changing the direction of a single update.
+
+**The degenerate case: all-same, no signal.** One property of this baseline is worth seeing directly. Run the advantage on a uniform group and a split group:
+
+```python
+print("all correct {1,1,1,1}:", np.round(group_advantages([1, 1, 1, 1]), 3))
+print("all wrong   {0,0,0,0}:", np.round(group_advantages([0, 0, 0, 0]), 3))
+print("split       {1,0,1,0}:", np.round(group_advantages([1, 0, 1, 0]), 3))
+```
+
+```text title="Output"
+all correct {1,1,1,1}: [0. 0. 0. 0.]
+all wrong   {0,0,0,0}: [0. 0. 0. 0.]
+split       {1,0,1,0}: [ 1. -1.  1. -1.]
+```
+
+When every answer agrees, every advantage is zero and the prompt teaches nothing: we drew $G$ rollouts and got no gradient. The signal is strongest exactly when the group is _split_, which is where the model sits on the boundary of being able to solve the problem, and where a gradient step helps most. This is the natural marriage of verifiable rewards and GRPO.
+
+![Three panels of advantages: all-correct and all-wrong groups are flat at zero (no gradient), while the split group has clear positive and negative bars (learning signal)](./images/fig-all-same-no-signal.svg)
+
+The three panels make it visual: the all-correct and all-wrong groups sit flat at zero, no learning signal at all, while only the split group shows the positive and negative bars that actually move the policy.
 
 <details>
 <summary><strong>Check:</strong> If a prompt's group of answers are all correct (every reward = 1), what is each answer's GRPO advantage, and what does that mean for the update?</summary>
 
-**Answer.** Every advantage is zero, so the prompt contributes no gradient. The mean is 1, so $r_i - \text{mean} = 0$ for all answers (the same happens if all are wrong). The group baseline only produces a learning signal when answers *disagree*. This "all-same, no signal" fact is wasteful, and it is exactly what DAPO's dynamic sampling fixes in Section 5.
+**Answer.** Every advantage is zero, so the prompt contributes no gradient. The mean is 1, so $r_i - \text{mean} = 0$ for all answers (the same happens if all are wrong). The group baseline only produces a learning signal when answers *disagree*. This "all-same, no signal" fact is wasteful, and it is exactly what DAPO's dynamic sampling fixes in Section 4.
 </details>
 
 ### 2.3 The clipped surrogate: borrowed wholesale from PPO
@@ -207,8 +245,10 @@ The clip bounds the ratio to $[1-\varepsilon, 1+\varepsilon]$ (typically $\varep
 
 ```python
 def clipped_surrogate(rho, A, eps=0.2):
-    clipped = min(max(rho, 1 - eps), 1 + eps)     # clip(rho, 1-eps, 1+eps)
-    return min(rho * A, clipped * A)              # PPO's pessimistic min
+    # clip(rho, 1-eps, 1+eps)
+    clipped = min(max(rho, 1 - eps), 1 + eps)
+    # PPO's pessimistic min
+    return min(rho * A, clipped * A)
 
 for rho in (1.1, 1.5):
     print("rho=%.1f  A=+1 -> surrogate=%.2f" % (rho, clipped_surrogate(rho, +1.0)))
@@ -232,8 +272,10 @@ Read it as: "subtract $\beta$ times the KL divergence from the reference, where 
 ```python
 import math
 def kl_unbiased(logp_theta, logp_ref):
-    ratio = math.exp(logp_ref - logp_theta)       # pi_ref / pi_theta
-    return ratio - (logp_ref - logp_theta) - 1    # >= 0, and 0 when they match
+    # pi_ref / pi_theta
+    ratio = math.exp(logp_ref - logp_theta)
+    # >= 0, and 0 when the policies match
+    return ratio - (logp_ref - logp_theta) - 1
 
 print("theta == ref    -> %.4f" % kl_unbiased(-1.0, -1.0))
 print("theta drifted   -> %.4f" % kl_unbiased(-1.0, -1.5))
@@ -281,55 +323,125 @@ Maximize it and you have the actor update, with no critic loss term because ther
 **Answer.** Gained: simplicity and no critic, one outcome reward, one group baseline, one advantage per answer. Lost: fine-grained credit assignment, GRPO cannot say "this particular token was the good move," only "this whole answer beat its siblings." For outcome-checkable tasks that coarse signal is enough; for dense per-step rewards PPO's per-token value is more informative.
 </details>
 
-## 3. Worked examples by hand
+### 2.6 The GRPO loop in code
 
-**A group of four, the canonical case.** Prompt: "Compute $2 + 2 \times 3$." The gold answer is 8 (multiplication binds first; the trap answer 12 comes from adding first). Sample $G = 4$ answers and run each through the exact-match verifier:
-
-| answer | verdict | $r_i$ | $\hat{A}_i = (r_i - \mu)/\sigma$ |
-|---|---|---|---|
-| "$\dots = 8$" | correct | 1 | $+1.0$ |
-| "$\dots = 12$" | wrong | 0 | $-1.0$ |
-| "$\dots = 8$" | correct | 1 | $+1.0$ |
-| "$\dots = 10$" | wrong | 0 | $-1.0$ |
-
-The group supplies its own baseline and scale: $\mu = \text{mean}(1,0,1,0) = 0.5$ and $\sigma = 0.5$, so the two correct answers get $\hat{A} = (1 - 0.5)/0.5 = +1$ and the two wrong ones get $(0 - 0.5)/0.5 = -1$. No critic was queried; the four rewards graded each other.
-
-Now zoom into one token of a winning answer ($\hat{A}_i = +1$). Suppose an update nudged its probability up so $\rho_{i,t} = 1.1$, inside the clip window $[0.8, 1.2]$: the term is $\min(1.1 \times 1,\ 1.1 \times 1) = 1.1$, pushed up freely. If a later step over-shoots to $\rho_{i,t} = 1.5$, the clip caps it at 1.2 and the min takes 1.2: the objective stops improving, so the gradient through that token vanishes. That is the trust region doing its job, identical to PPO.
-
-**A group of six, checking the centering.** With rewards $\{1,0,1,1,0,1\}$ the mean is $4/6 = 0.667$, so the numerators are $+0.333$ (four times) and $-0.667$ (twice). They sum to $4(+0.333) + 2(-0.667) \approx 0$: the advantages are well-centered, yet none is zero. Dividing by the spread $\sigma \approx 0.471$ rescales them to $\{+0.71, -1.41, \dots\}$, same signs, same centering, only the scale changes. That is all the std-normalization ever does.
-
-![Two grouped bars per answer comparing the numerator-only advantage with the full z-score advantage; both share the same signs and centring](./images/fig-advantage-zscore.svg)
-
-**The degenerate case, all-same, no signal.** Run the advantage function on a uniform group and a split group:
+We now have every part the objective named; time to run it. Before the GPU-scale lab, here is the _entire_ GRPO algorithm in about 30 lines, on a task small enough to finish in a second on a CPU. The "prompts" are integers $0\dots4$; the "answer" is a single token; the verifiable reward is +1 if the token equals the prompt. No critic, no reward model, just a group baseline and PPO's clip. Watch the policy learn purely from comparing each answer to its siblings:
 
 ```python
-import numpy as np
-def group_advantages(rewards):
-    r = np.asarray(rewards, dtype=float)
-    return (r - r.mean()) / (r.std() + 1e-8)
+import torch
 
-print("all correct {1,1,1,1}:", np.round(group_advantages([1, 1, 1, 1]), 3))
-print("all wrong   {0,0,0,0}:", np.round(group_advantages([0, 0, 0, 0]), 3))
-print("split       {1,0,1,0}:", np.round(group_advantages([1, 0, 1, 0]), 3))
+torch.manual_seed(0)
+# the correct answer for prompt p is the token p
+N_PROMPTS = VOCAB = 5
+G, EPS, LR, STEPS, INNER = 16, 0.2, 0.3, 80, 2
+
+# uniform policy at start
+logits = torch.zeros(N_PROMPTS, VOCAB, requires_grad=True)
+opt = torch.optim.SGD([logits], lr=LR)
+
+
+# the verifiable reward: correct or not
+def verify(prompt, token):
+    return 1.0 if token == prompt else 0.0
+
+
+for step in range(STEPS):
+    # pi_old: frozen snapshot
+    old_logp = torch.log_softmax(logits, -1).detach()
+    P, S, ADV, R = [], [], [], []
+    for p in range(N_PROMPTS):
+        # GROUP of G answers to prompt p
+        toks = torch.distributions.Categorical(logits=old_logp[p]).sample((G,))
+        r = torch.tensor([verify(p, int(t)) for t in toks])
+        # group-relative advantage
+        A = (r - r.mean()) / (r.std() + 1e-8)
+        P += [p] * G; S.append(toks); ADV.append(A); R.append(r)
+    P = torch.tensor(P); S = torch.cat(S); ADV = torch.cat(ADV); R = torch.cat(R)
+
+    # reuse the batch a few times
+    for _ in range(INNER):
+        logp = torch.log_softmax(logits, -1)[P, S]
+        # rho = pi_theta / pi_old
+        ratio = torch.exp(logp - old_logp[P, S])
+        surr = torch.min(ratio * ADV, torch.clamp(ratio, 1 - EPS, 1 + EPS) * ADV)
+        # maximise the clipped surrogate
+        loss = -surr.mean()
+        opt.zero_grad(); loss.backward(); opt.step()
+
+    if step % 16 == 0 or step == STEPS - 1:
+        probs = torch.softmax(logits, -1).detach()
+        p_correct = probs[torch.arange(N_PROMPTS), torch.arange(N_PROMPTS)].mean()
+        print(f"step {step:2d}   group reward = {R.mean():.3f}   P(correct) = {p_correct:.3f}")
 ```
 
 ```text title="Output"
-all correct {1,1,1,1}: [0. 0. 0. 0.]
-all wrong   {0,0,0,0}: [0. 0. 0. 0.]
-split       {1,0,1,0}: [ 1. -1.  1. -1.]
+step  0   group reward = 0.200   P(correct) = 0.209
+step 16   group reward = 0.425   P(correct) = 0.424
+step 32   group reward = 0.738   P(correct) = 0.688
+step 48   group reward = 0.788   P(correct) = 0.847
+step 64   group reward = 0.875   P(correct) = 0.912
+step 79   group reward = 0.962   P(correct) = 0.939
 ```
 
-When every answer agrees, every advantage is zero and the prompt teaches nothing: we drew $G$ rollouts and got no gradient. The signal is strongest exactly when the group is *split*, which is where the model sits on the boundary of being able to solve the problem, and where a gradient step helps most. This is the natural marriage of verifiable rewards and GRPO.
+From a uniform policy (20% correct, pure chance) the model climbs to 96% group reward and a 94% probability on the right answer, with nothing but a verifiable check and a group baseline. Every line maps to a box in the objective: `old_logp` is $\pi_{\text{old}}$, the `Categorical.sample((G,))` is the group, `(r - r.mean())/r.std()` is $\hat{A}_i$, `torch.exp(logp - old_logp)` is $\rho_{i,t}$, and the `torch.min(... clamp ...)` is the clipped surrogate. (Answers here are a single token, so $|o_i| = 1$ and every token "sharing" the advantage is trivial; in the real thing an answer is hundreds of tokens, all sharing the one $\hat{A}_i$.)
 
-![Three panels of advantages: all-correct and all-wrong groups are flat at zero (no gradient), while the split group has clear positive and negative bars (learning signal)](./images/fig-all-same-no-signal.svg)
+### 2.7 GRPO at scale: GSM8K with TRL
 
-<details>
-<summary><strong>Check:</strong> Why is a group whose answers all score the same wasted compute, and what fixes it?</summary>
+The lab (adapted from [Unsloth's GRPO notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide#grpo-notebooks)) runs the same algorithm at scale, with the clip-and-advantage internals handled by TRL's `GRPOTrainer`. Your job is the part that is genuinely GRPO-specific: the verifiable rewards (Section 2.1), the group size $G$, and the wiring. The reward functions are passed as a _list_, summed per answer, then turned into group-relative advantages internally:
 
-**Answer.** Every reward equals the group mean, so every advantage is 0 and the prompt contributes zero gradient: the forward and backward passes were spent for nothing. DAPO's dynamic sampling (Section 5) over-samples and filters, discarding all-same groups and keeping only mixed ones, so every prompt in the batch actually moves the policy.
-</details>
+```python
+training_args = GRPOConfig(
+    learning_rate = 5e-6,
+    # num_generations is G, the group size
+    num_generations = 6,
+    max_prompt_length = 256,
+    max_completion_length = 768,
+    max_steps = 250,
+    max_grad_norm = 0.1,
+    # report_to = "wandb"  -> uncomment to log the reward/kl curves
+)
 
-## 4. The DeepSeek revolution
+trainer = GRPOTrainer(
+    # Llama-3.2-3B + LoRA, no value head
+    model = model,
+    processing_class = tokenizer,
+    # summed per answer, then group-normalised by TRL
+    reward_funcs = [
+        # partial credit for clean XML tags
+        xmlcount_reward_func,
+        soft_format_reward_func,
+        strict_format_reward_func,
+        # answer is a number
+        int_reward_func,
+        # +2 if the answer matches the gold (the real signal)
+        correctness_reward_func,
+    ],
+    args = training_args,
+    # openai/gsm8k, 7,473 grade-school problems
+    train_dataset = dataset,
+)
+trainer.train()
+```
+
+```text title="Output"
+==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
+   Num examples = 7,473 | Num Epochs = 1 | Total steps = 250
+   Batch size per device = 6 | Gradient accumulation steps = 1 | Total batch size = 6
+   Trainable parameters = 48,627,712 of 3,261,377,536 (1.49% trained)
+...
+TrainOutput(global_step=250, training_loss=0.0211,
+            metrics={'train_runtime': 8032.6, 'train_steps_per_second': 0.031})
+```
+
+Notice what is _not_ there: no value head (the model is loaded without one), no reward model (the five `reward_funcs` are plain Python), and only LoRA adapters train (1.49% of the weights). The whole run fits on a single 14.5 GB T4, which is the entire point of dropping the critic.
+
+What do the logs show over 250 steps? Be patient, as the notebook warns: "you'll probably get 0 reward for the first 100 steps." The reward is noisy and stays low, and crucially it is **mostly driven by the format reward, not correctness**: on a 3B model in two hours, the group-mean correctness reward is non-zero in only 19 of 250 steps (peaking when 4 of 6 answers in a group are right). The KL to reference stays tiny throughout, around 0.01, so the policy never bolts.
+
+![Two panels from the real GSM8K run: left, a noisy reward curve that slowly rises with a wide in-group spread band and a best group at step 204; right, the KL to reference staying tiny on a log scale](./images/fig-grpo-training-curve.svg)
+
+The two panels show that story. On the left the reward curve is noisy and only drifts up slowly, with a wide band for the in-group spread and a best group near step 204; on the right the KL to the reference stays tiny on a log scale, confirming the policy never bolts. This short demo run teaches the _machinery_ (sample a group, verify, advantage, clipped step) and the _format shaping_, while real reasoning gains need bigger models, longer chains, and many more steps, exactly the regime DeepSeek-R1 ran (Section 3). The `reward_std` column is the thing to watch: it is non-zero precisely on the prompts where the group disagrees, which (Section 2.2) is where every bit of the learning actually happens.
+
+## 3. The DeepSeek revolution
 
 GRPO began life as a quiet efficiency trick. It first appeared in the **DeepSeekMath** paper (2024, arXiv:2402.03300) described undramatically as "a variant of PPO that enhances mathematical reasoning while concurrently optimizing the memory usage of PPO." The motivation was exactly Section 1: the value network is expensive, so drop it and use the group. No one called it a revolution.
 
@@ -361,9 +473,9 @@ R1-Zero reasoned well but wrote messily (mixed languages, hard to read), so **De
 **Answer.** R1-Zero reasoned well but produced unreadable output (language mixing, poor formatting) because nothing rewarded readability. A little curated SFT before RL gave it a clean, human-friendly starting style, which the subsequent GRPO preserved while improving reasoning, trading a touch of purity for a much more usable model.
 </details>
 
-## 5. Fixing GRPO's rough edges: DAPO and Dr. GRPO
+## 4. Fixing GRPO's rough edges: DAPO and Dr. GRPO
 
-Once everyone ran vanilla GRPO, three weak spots showed up. **Entropy collapse:** the policy becomes over-confident too fast, stops exploring, and plateaus. **Wasted prompts:** all-correct or all-wrong groups give zero gradient (the Section 3 quiz). **Hidden biases:** the way GRPO averages and normalizes quietly rewards longer answers and over-weights easy prompts. Two responses matter most, and both are small edits to the same gradient.
+Once everyone ran vanilla GRPO, three weak spots showed up. **Entropy collapse:** the policy becomes over-confident too fast, stops exploring, and plateaus. **Wasted prompts:** all-correct or all-wrong groups give zero gradient (the all-same case in Section 2.2). **Hidden biases:** the way GRPO averages and normalizes quietly rewards longer answers and over-weights easy prompts. Two responses matter most, and both are small edits to the same gradient.
 
 **DAPO** (ByteDance, 2025, arXiv:2503.14476) stacks four fixes onto GRPO and reached 50 on AIME 2024 with a Qwen2.5-32B base, publishing every detail:
 
@@ -390,6 +502,8 @@ answer length 200 tokens -> per-token push = 0.0025
 Same advantage, a 10x weaker push on the long answer. Flip the sign for a wrong answer and the long one is penalized 10x less per token: the model learns to pad. Dr. GRPO drops the length division so a wrong answer is penalized the same regardless of length.
 
 ![Two bars showing the per-token gradient for a 20-token answer versus a 200-token answer at the same advantage, the long answer getting a 10x weaker push](./images/fig-length-bias.svg)
+
+The two bars make the bias concrete. At the same advantage, the 20-token answer gets a per-token push of 0.025 while the 200-token answer gets only 0.0025, a 10x weaker signal purely because it is longer. Dropping the length division levels the two bars, so a wrong answer is discouraged the same amount no matter how many tokens it spans.
 
 **Difficulty bias** comes from the ÷std: dividing by the group's spread over-weights low-variance (easy) prompts, where tiny reward differences get blown up. Dr. GRPO removes that too, leaving the plain mean-centered advantage:
 
@@ -419,7 +533,7 @@ The common thread: **every variant tweaks the advantage, the clip, or the sampli
 **Answer.** Both DAPO's overlong shaping (a soft penalty on runaway length) and Dr. GRPO's removal of the $1/|o_i|$ length division attack it. The un-fixed objective rewards length because dividing a wrong answer's loss by its many tokens makes each token's penalty tiny, so long mistakes are barely discouraged. Drop the length normalizer and you would expect average completion length to stop drifting upward, since a wrong answer is now penalized the same per token regardless of how long it is.
 </details>
 
-## 6. GRPO vs PPO: when to use which
+## 5. GRPO vs PPO: when to use which
 
 GRPO did not replace PPO; it found a better fit for one important shape of problem. Read the table top to bottom and watch the critic, and everything attached to it, disappear while the stability machinery (clip, KL) stays put.
 
@@ -447,7 +561,7 @@ The trade is about the shape of your reward and your episodes. **Reach for PPO**
 **Answer.** PPO. The reward is dense and per-step, so a learned critic can produce a low-variance per-step advantage that uses every timestep, where GRPO would collapse the whole episode to one outcome number. And the episodes are long and expensive, so you cannot cheaply draw a group of $G$ per starting state for a Monte-Carlo baseline. This is the classic-RL world the critic was built for.
 </details>
 
-## 7. GRPO in the wild
+## 6. GRPO in the wild
 
 In a real training stack the bottleneck is **generation**, because GRPO's whole added cost over single-sample methods is producing a group of $G$ answers per prompt, every step. So production GRPO leans on a fast rollout engine (SGLang, vLLM) to sample the group while a trainer applies the clipped update and ships fresh weights back. (The assignment uses Unsloth's vLLM-backed fast generation for exactly this reason.)
 
@@ -465,9 +579,9 @@ The failure modes are the ones the variants exist to fix: **entropy collapse** (
 **Answer.** The group mean is a Monte-Carlo estimate of the expected reward, so a larger G gives a lower-variance, more accurate baseline (and more contrast within the group), stabilizing the advantage, at the cost of more generation per prompt. Too-small G makes the baseline noisy; teams pick G to balance signal quality against rollout compute.
 </details>
 
-## 8. Putting it all together (capstone)
+## 7. Putting it all together
 
-Here is the whole post in one recap, mapping each concept to the math and the code already shown inline:
+Everything above is one machine. Here is the recap of what we built, mapping each concept to the math and the code already shown inline:
 
 | Concept | Math | In code |
 |---|---|---|
@@ -477,107 +591,9 @@ Here is the whole post in one recap, mapping each concept to the math and the co
 | Importance ratio | $\rho = \pi_\theta/\pi_{\text{old}}$ | `torch.exp(logp - old_logp)` |
 | Clipped surrogate | $\min(\rho \hat{A},\ \text{clip}(\rho)\hat{A})$ | `torch.min(ratio*ADV, clamp(ratio,1-eps,1+eps)*ADV)` |
 
-### 8.1 GRPO from scratch on a toy verifiable task (runs on a CPU)
+The complete, runnable program, the toy GRPO loop from Section 2.6 and the full GSM8K run from Section 2.7, is packaged as a notebook you can run and extend in the [assignment](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture6.ipynb).
 
-The real assignment needs a GPU and two hours, so first here is the *entire* GRPO algorithm in 30 lines, on a task small enough to run in a second. The "prompts" are integers $0\dots4$; the "answer" is a single token; the verifiable reward is +1 if the token equals the prompt. No critic, no reward model, just a group baseline and PPO's clip. Watch the policy learn purely from comparing each answer to its siblings:
-
-```python
-import torch
-
-torch.manual_seed(0)
-N_PROMPTS = VOCAB = 5          # the correct answer for prompt p is the token p
-G, EPS, LR, STEPS, INNER = 16, 0.2, 0.3, 80, 2
-
-logits = torch.zeros(N_PROMPTS, VOCAB, requires_grad=True)   # uniform policy at start
-opt = torch.optim.SGD([logits], lr=LR)
-
-def verify(prompt, token):                       # the verifiable reward: correct or not
-    return 1.0 if token == prompt else 0.0
-
-for step in range(STEPS):
-    old_logp = torch.log_softmax(logits, -1).detach()        # pi_old: frozen snapshot
-    P, S, ADV, R = [], [], [], []
-    for p in range(N_PROMPTS):
-        toks = torch.distributions.Categorical(logits=old_logp[p]).sample((G,))  # GROUP of G
-        r = torch.tensor([verify(p, int(t)) for t in toks])
-        A = (r - r.mean()) / (r.std() + 1e-8)                # group-relative advantage
-        P += [p] * G; S.append(toks); ADV.append(A); R.append(r)
-    P = torch.tensor(P); S = torch.cat(S); ADV = torch.cat(ADV); R = torch.cat(R)
-
-    for _ in range(INNER):                                    # reuse the batch a few times
-        logp = torch.log_softmax(logits, -1)[P, S]
-        ratio = torch.exp(logp - old_logp[P, S])             # rho = pi_theta / pi_old
-        surr = torch.min(ratio * ADV, torch.clamp(ratio, 1 - EPS, 1 + EPS) * ADV)
-        loss = -surr.mean()                                  # maximise clipped surrogate
-        opt.zero_grad(); loss.backward(); opt.step()
-
-    if step % 16 == 0 or step == STEPS - 1:
-        probs = torch.softmax(logits, -1).detach()
-        p_correct = probs[torch.arange(N_PROMPTS), torch.arange(N_PROMPTS)].mean()
-        print(f"step {step:2d}   group reward = {R.mean():.3f}   P(correct) = {p_correct:.3f}")
-```
-
-```text title="Output"
-step  0   group reward = 0.200   P(correct) = 0.209
-step 16   group reward = 0.425   P(correct) = 0.424
-step 32   group reward = 0.738   P(correct) = 0.688
-step 48   group reward = 0.788   P(correct) = 0.847
-step 64   group reward = 0.875   P(correct) = 0.912
-step 79   group reward = 0.962   P(correct) = 0.939
-```
-
-From a uniform policy (20% correct, pure chance) the model climbs to 96% group reward and a 94% probability on the right answer, with nothing but a verifiable check and a group baseline. Every line maps to a box in the objective: `old_logp` is $\pi_{\text{old}}$, the `Categorical.sample((G,))` is the group, `(r - r.mean())/r.std()` is $\hat{A}_i$, `torch.exp(logp - old_logp)` is $\rho_{i,t}$, and the `torch.min(... clamp ...)` is the clipped surrogate. (Answers here are a single token, so $|o_i| = 1$ and every token "sharing" the advantage is trivial; in the real thing an answer is hundreds of tokens, all sharing the one $\hat{A}_i$.)
-
-### 8.2 The real thing: GRPO on GSM8K with TRL
-
-The lab (adapted from [Unsloth's GRPO notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide#grpo-notebooks)) runs the same algorithm at scale, with the clip-and-advantage internals handled by TRL's `GRPOTrainer`. Your job is the part that is genuinely GRPO-specific: the verifiable rewards (Section 2.1), the group size $G$, and the wiring. The reward functions are passed as a *list*, summed per answer, then turned into group-relative advantages internally:
-
-```python
-training_args = GRPOConfig(
-    learning_rate = 5e-6,
-    num_generations = 6,        # <- this is G, the group size
-    max_prompt_length = 256,
-    max_completion_length = 768,
-    max_steps = 250,
-    max_grad_norm = 0.1,
-    # report_to = "wandb",      # log the reward/kl curves
-)
-
-trainer = GRPOTrainer(
-    model = model,              # Llama-3.2-3B + LoRA, no value head
-    processing_class = tokenizer,
-    reward_funcs = [            # summed, then group-normalised by TRL
-        xmlcount_reward_func,   # partial credit for clean XML tags
-        soft_format_reward_func,
-        strict_format_reward_func,
-        int_reward_func,        # answer is a number
-        correctness_reward_func,# +2 if the answer matches the gold (the real signal)
-    ],
-    args = training_args,
-    train_dataset = dataset,    # openai/gsm8k, 7,473 grade-school problems
-)
-trainer.train()
-```
-
-```text title="Output"
-==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
-   Num examples = 7,473 | Num Epochs = 1 | Total steps = 250
-   Batch size per device = 6 | Gradient accumulation steps = 1 | Total batch size = 6
-   Trainable parameters = 48,627,712 of 3,261,377,536 (1.49% trained)
-...
-TrainOutput(global_step=250, training_loss=0.0211,
-            metrics={'train_runtime': 8032.6, 'train_steps_per_second': 0.031})
-```
-
-Notice what is *not* there: no value head (the model is loaded without one), no reward model (the five `reward_funcs` are plain Python), and only LoRA adapters train (1.49% of the weights). The whole run fits on a single 14.5 GB T4, which is the entire point of dropping the critic.
-
-What do the logs show over 250 steps? Be patient, as the notebook warns: "you'll probably get 0 reward for the first 100 steps." The reward is noisy and stays low, and crucially it is **mostly driven by the format reward, not correctness**: on a 3B model in two hours, the group-mean correctness reward is non-zero in only 19 of 250 steps (peaking when 4 of 6 answers in a group are right). The KL to reference stays tiny throughout, around 0.01, so the policy never bolts.
-
-![Two panels from the real GSM8K run: left, a noisy reward curve that slowly rises with a wide in-group spread band and a best group at step 204; right, the KL to reference staying tiny on a log scale](./images/fig-grpo-training-curve.svg)
-
-That is honest, and instructive. This short demo run teaches the *machinery* (sample a group, verify, advantage, clipped step) and the *format shaping*, while real reasoning gains need bigger models, longer chains, and many more steps, exactly the regime DeepSeek-R1 ran. The `reward_std` column is the thing to watch: it is non-zero precisely on the prompts where the group disagrees, which (Section 3) is where every bit of the learning actually happens.
-
-## 9. It was the same gradient all along
+## 8. It was the same gradient all along
 
 Six lectures, one update rule. GRPO did not change the gradient; it changed where the baseline and the reward come from. Translate every RL term into its reasoning-RL meaning and only two rows differ from the [RLHF](../07-rlhf/README.md) post:
 
@@ -624,8 +640,8 @@ Read it as: "push up the log-probability of answers that beat the baseline (posi
 
 ## Practice: assignment
 
-> **[Assignment — GRPO](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture6.ipynb)**
+> **[Assignment: GRPO](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture6.ipynb)**
 
 ## Where this goes next
 
-GRPO gave us reasoning from a single verifiable outcome per prompt: sample a group, grade each answer with a rule, compare to the group's average, take a clipped step. But many real tasks are not one question and one boxed answer; they are *long, multi-step interactions* with tools, environments, and intermediate decisions, an **agent** taking actions over many turns. The next post points the same gradient at that setting, where an "answer" becomes a *trajectory of tool calls* and the reward arrives after a whole episode of acting in the world. Same $\nabla_\theta J = \mathbb{E}[\hat{A} \cdot \nabla_\theta \log \pi_\theta]$, a new shape of episode.
+GRPO gave us reasoning from a single verifiable outcome per prompt: sample a group, grade each answer with a rule, compare to the group's average, take a clipped step. The final post makes two moves. First it _simplifies_: Direct Preference Optimization reaches the same aligned model as RLHF while firing both the reward model and the RL loop. Then it _expands_: it points the same group-relative gradient at a _long, multi-step world_, where an "answer" becomes a _trajectory of tool calls_ and the model stops answering and starts acting as an **agent**, reading observations and earning a reward only after a whole episode. Same $\nabla_\theta J = \mathbb{E}[\hat{A} \cdot \nabla_\theta \log \pi_\theta]$, a new shape of episode, in the [DPO & Agentic RL](../09-dpo-and-agentic-rl/README.md) post.
