@@ -197,6 +197,8 @@ day). The other six days (Wed–Mon) run follow-ups on that same blog from its `
 | 04 | SARSA, Q-learning & DQN | ☐ Tue Jul 14 | ☐ Tue Jul 14 |
 | 05 | Policy Gradients | ☐ Tue Jul 21 | ☐ Tue Jul 21 |
 | 06 | TRPO & PPO | ☐ Tue Jul 28 | ☐ Tue Jul 28 |
+| 07 | RLHF | ☐ Tue Aug 4 | ☐ Tue Aug 4 |
+| 08 | GRPO | ☐ Tue Aug 11 | ☐ Tue Aug 11 |
 
 > Blog 01 was already live (it is the prerequisites post), so it launched on a Thursday and
 > gets a short follow-up run; from Blog 02 onward, every launch lands on a Tuesday.
