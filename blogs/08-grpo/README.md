@@ -3,7 +3,16 @@ title: "GRPO: Teaching a Model to Reason by Comparing It to Itself"
 shortName: "GRPO"
 date: "2026-06-23"
 summary: "RLHF aligned a model with two heavy passengers: a learned reward model and a value-head critic. This post throws both away. You will see why the critic was only ever a baseline and how a group of sampled answers replaces it for free, why a verifiable check beats a hackable reward model for math and code, how GRPO wraps that group-relative advantage in PPO's clip, and how this exact recipe produced DeepSeek-R1, all grounded in a hands-on run that trains Llama-3.2-3B to reason on grade-school math."
-tags: ["reinforcement-learning", "grpo", "verifiable-rewards", "rlvr", "deepseek-r1", "reasoning", "ppo"]
+tags:
+  [
+    "reinforcement-learning",
+    "grpo",
+    "verifiable-rewards",
+    "rlvr",
+    "deepseek-r1",
+    "reasoning",
+    "ppo",
+  ]
 order: 8
 ---
 
@@ -11,14 +20,14 @@ order: 8
 
 ![A calm robot below five thought-bubbles of different sizes, a dashed line across them at their average height, bubbles above the line in terracotta and the one below in gray, flat editorial style on warm paper, no text](./images/ai-hero.png)
 
-> **The throughline:** *The value of where I am is the reward I just got, plus a discounted value of where I'll land next.*
-> The [RLHF](../07-rlhf/README.md) post aligned a language model with PPO, carrying a *learned* reward model for the signal and a *value-head critic* for the baseline, all on a KL leash. It ended by promising the next idea drops the critic. This post keeps that promise, and then drops the reward model too. What is left is the same gradient we have written since [DP, MC & TD](../03-dp-mc-td/README.md), fed a rule-based reward and a baseline measured from a group of answers. That recipe is exactly what produced **DeepSeek-R1**.
+> **The throughline:** _The value of where I am is the reward I just got, plus a discounted value of where I'll land next._
+> The [RLHF](../07-rlhf/README.md) post aligned a language model with PPO, carrying a _learned_ reward model for the signal and a _value-head critic_ for the baseline, all on a KL leash. It ended by promising the next idea drops the critic. This post keeps that promise, and then drops the reward model too. What is left is the same gradient we have written since [DP, MC & TD](../03-dp-mc-td/README.md), fed a rule-based reward and a baseline measured from a group of answers. That recipe is exactly what produced **DeepSeek-R1**.
 
 ## 1. The intuition
 
 RLHF worked. But look at what it had to carry. To align a model with PPO you hold **four** large models in memory at once: the policy you are training, a frozen reference for the KL leash, a learned reward model that scores answers, and a value-head critic that predicts a per-token baseline. Two of those four are the expensive, fragile passengers this post is about.
 
-**Passenger #1, the reward model.** A whole transformer trained on human preference data, and (as the [RLHF](../07-rlhf/README.md) post showed in its reward-hacking lab) a *proxy* the optimizer learns to fool. It needs expensive labels to train and a KL leash to keep it honest.
+**Passenger #1, the reward model.** A whole transformer trained on human preference data, and (as the [RLHF](../07-rlhf/README.md) post showed in its reward-hacking lab) a _proxy_ the optimizer learns to fool. It needs expensive labels to train and a KL leash to keep it honest.
 
 **Passenger #2, the critic.** A second network about the size of the policy, whose only job is to estimate $V(s)$ so we can subtract it as a baseline. It doubles the trainable memory, and on a long reasoning chain (where the reward only arrives at the very last token) its per-token predictions hundreds of tokens early are mostly noise.
 
@@ -32,11 +41,11 @@ flowchart TB
     RLVR --> DS
 ```
 
-**Drop the critic.** The critic exists only to give a baseline, an estimate of "how well do I usually do here?" to subtract from the reward. What if, instead of *learning* that baseline with a network, we *measured* it: sample a **group** of $G$ answers to the same prompt and use their average reward? That is **GRPO**, Group Relative Policy Optimization.
+**Drop the critic.** The critic exists only to give a baseline, an estimate of "how well do I usually do here?" to subtract from the reward. What if, instead of _learning_ that baseline with a network, we _measured_ it: sample a **group** of $G$ answers to the same prompt and use their average reward? That is **GRPO**, Group Relative Policy Optimization.
 
-**Drop the reward model.** For a math problem there is a *right answer*. What if the reward were simply "is it correct?", checked by a few lines of code instead of a learned, hackable network? That is a **verifiable reward**.
+**Drop the reward model.** For a math problem there is a _right answer_. What if the reward were simply "is it correct?", checked by a few lines of code instead of a learned, hackable network? That is a **verifiable reward**.
 
-Put the two together and a base model can *learn to reason from RL alone*. That is the story of this post, and it is the algorithm behind this lecture's lab, adapted from [Unsloth's GRPO notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide#grpo-notebooks), where we train Llama-3.2-3B to solve grade-school math problems by sampling groups of solutions and grading them with rules.
+Put the two together and a base model can _learn to reason from RL alone_. That is the story of this post, and it is the algorithm behind this lecture's lab, adapted from [Unsloth's GRPO notebooks](https://unsloth.ai/docs/get-started/reinforcement-learning-rl-guide#grpo-notebooks), where we train Llama-3.2-3B to solve grade-school math problems by sampling groups of solutions and grading them with rules.
 
 **Here is the one equation everything today builds toward.** Read it loosely now; by the end every symbol is obvious:
 
@@ -52,19 +61,21 @@ That single deletion, the value critic, is most of the win. The other passenger,
 <summary><strong>Check:</strong> Why is a per-token value function especially unreliable for long chain-of-thought answers?</summary>
 
 **Answer.** The reward is sparse and terminal: it only arrives once the full answer is graded. Asking the critic to predict that eventual reward hundreds of tokens early, before the reasoning has resolved, is a high-variance guess. On long chains those early predictions are mostly noise, so the baseline they provide is shaky exactly where we lean on it most.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> What kind of task is verifiable-reward + GRPO best suited to, and what isn't?</summary>
 
 **Answer.** Best: tasks with a checkable outcome, math, code (run the tests), formal logic, anything with ground truth. Poorly suited: open-ended generation (essays, dialogue, "be helpful") where there is no automatic correctness check. Those still need a learned reward model or human preferences, that is, they stay in the [RLHF](../07-rlhf/README.md) world.
+
 </details>
 
 ## 2. The math you need
 
 ### 2.1 Verifiable rewards: replace the reward model with a rule
 
-In the [RLHF](../07-rlhf/README.md) post we could not *write* "a good answer," so we *learned* it from human comparisons. The catch was that the learned reward $r_\varphi$ is a proxy with blind spots, and a relentless optimizer sprints toward them: sycophancy, padding, fluent nonsense that scores high. That is reward hacking, and it is the reason RLHF needs a KL leash at all.
+In the [RLHF](../07-rlhf/README.md) post we could not _write_ "a good answer," so we _learned_ it from human comparisons. The catch was that the learned reward $r_\varphi$ is a proxy with blind spots, and a relentless optimizer sprints toward them: sycophancy, padding, fluent nonsense that scores high. That is reward hacking, and it is the reason RLHF needs a KL leash at all.
 
 Now change the task. Ask the model to compute $2 + 2 \times 3$, or solve an equation, or write a function that passes some tests. Something fundamental shifts: **"good answer" now has a definition a short program can check.** The reward stops being a network and becomes a rule:
 
@@ -101,7 +112,7 @@ correctness (bad):  0.0
 
 The wrong answer scores 0 no matter how fluent its reasoning. There is no "style" loophole because style was never on the scoresheet.
 
-On top of correctness, recipes add a small **format reward** that shapes *how* the model presents its work without judging *what* it concludes: did it wrap its reasoning in `<reasoning>` tags and give a clean `<answer>`? The assignment's `count_xml` hands out partial credit for each correct tag and gently penalizes trailing junk after the answer:
+On top of correctness, recipes add a small **format reward** that shapes _how_ the model presents its work without judging _what_ it concludes: did it wrap its reasoning in `<reasoning>` tags and give a clean `<answer>`? The assignment's `count_xml` hands out partial credit for each correct tag and gently penalizes trailing junk after the answer:
 
 ```python
 def count_xml(text) -> float:
@@ -138,25 +149,28 @@ Read it as: "reward equals the accuracy term plus a small multiple $\lambda$ of 
 <summary><strong>Check:</strong> Why split the reward into an accuracy part and a format part?</summary>
 
 **Answer.** They target different things. Accuracy drives the model toward correct answers; the format reward shapes presentation (show working in tags, give a parseable final answer) so the output can be graded and the chain-of-thought is encouraged. Keeping the format weight small means style can guide behavior without ever overriding correctness.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Even with a verifiable reward, what can still be gamed?</summary>
 
 **Answer.** Correctness itself cannot, but the surroundings can: gaming the answer-extractor so the parser misreads, exploiting a weak unit-test suite for code, getting the right answer by a fluke with nonsense working, or padding the chain-of-thought to chase a length-correlated signal. The reward is robust, not invincible, which is exactly what motivates the later variants (DAPO's overlong shaping, Dr. GRPO's length-bias fix).
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> If verifiable rewards are so clean, why didn't RLHF just use them?</summary>
 
 **Answer.** RLHF targets open-ended helpfulness, which has no automatic correctness check. You cannot write a rule for "is this a kind, well-pitched explanation," so human preference (a learned reward model) is the only option there. Verifiable rewards exist only where ground truth does.
+
 </details>
 
 ### 2.2 The group is the baseline: replace the critic
 
-Now the second deletion. Recall the one fact about advantages that has survived the whole series (from the [DP, MC & TD](../03-dp-mc-td/README.md) and [Policy Gradients](../05-policy-gradients/README.md) posts): the advantage is **reward minus a baseline**, and *any* estimate of expected reward that does not depend on the action you are scoring is a valid, unbiased baseline. The critic was just *one* choice of baseline, a learned network predicting $V(s)$.
+Now the second deletion. Recall the one fact about advantages that has survived the whole series (from the [DP, MC & TD](../03-dp-mc-td/README.md) and [Policy Gradients](../05-policy-gradients/README.md) posts): the advantage is **reward minus a baseline**, and _any_ estimate of expected reward that does not depend on the action you are scoring is a valid, unbiased baseline. The critic was just _one_ choice of baseline, a learned network predicting $V(s)$.
 
-GRPO picks the simplest baseline imaginable: **the group's own average.** For a single prompt $q$, sample a group of $G$ answers (in practice $G \in \{8, \dots, 64\}$; the assignment uses 6), score each with the verifier, and standardize:
+GRPO picks the simplest baseline imaginable: **the group's own average.** For a single prompt $q$, sample a group of $G$ answers (in practice $G \in \{8, \dots, 64\}$; score each with the verifier, and standardize:
 
 $$\hat{A}_i = \frac{r_i - \text{mean}(r_1, \dots, r_G)}{\text{std}(r_1, \dots, r_G)}.$$
 
@@ -164,12 +178,12 @@ Read it as: "answer $i$'s advantage is its reward minus the group's mean reward,
 
 **A first concrete group of four.** Take the prompt "Compute $2 + 2 \times 3$." The gold answer is 8 (multiplication binds first; the trap answer 12 comes from adding first). Sample $G = 4$ answers and run each through the exact-match verifier:
 
-| answer | verdict | $r_i$ | $\hat{A}_i = (r_i - \mu)/\sigma$ |
-|---|---|---|---|
-| "$\dots = 8$" | correct | 1 | $+1.0$ |
-| "$\dots = 12$" | wrong | 0 | $-1.0$ |
-| "$\dots = 8$" | correct | 1 | $+1.0$ |
-| "$\dots = 10$" | wrong | 0 | $-1.0$ |
+| answer         | verdict | $r_i$ | $\hat{A}_i = (r_i - \mu)/\sigma$ |
+| -------------- | ------- | ----- | -------------------------------- |
+| "$\dots = 8$"  | correct | 1     | $+1.0$                           |
+| "$\dots = 12$" | wrong   | 0     | $-1.0$                           |
+| "$\dots = 8$"  | correct | 1     | $+1.0$                           |
+| "$\dots = 10$" | wrong   | 0     | $-1.0$                           |
 
 The group supplies its own baseline and scale: $\mu = \text{mean}(1,0,1,0) = 0.5$ and $\sigma = 0.5$, so the two correct answers get $\hat{A} = (1 - 0.5)/0.5 = +1$ and the two wrong ones get $(0 - 0.5)/0.5 = -1$. No critic was queried; the four rewards graded each other. The code below runs the same idea on a group of six:
 
@@ -195,11 +209,11 @@ group {1,0,1,1,0,1}: mean=0.667 std=0.471
   centred? sum(r-mean) = 0.0
 ```
 
-The four correct answers each land above the mean and get a positive push; the two wrong ones get a negative push. Notice the deviations sum to zero by construction, yet not one of them is zero: the baseline being the average is exactly what makes the advantages *well-centered*, not what makes them vanish.
+The four correct answers each land above the mean and get a positive push; the two wrong ones get a negative push. Notice the deviations sum to zero by construction, yet not one of them is zero: the baseline being the average is exactly what makes the advantages _well-centered_, not what makes them vanish.
 
 ![Six reward bars at 0 or 1 with a dashed group-mean line at 0.667, arrows showing each answer's deviation above or below the baseline](./images/fig-group-baseline.svg)
 
-Why is this a legitimate baseline and not a trick? Because it is the same object the critic was approximating, computed more directly. The critic was trained so that $V(s) \to \mathbb{E}[r \mid q]$, the typical reward for this prompt. The group mean is the textbook Monte-Carlo estimate of that very expectation: draw $G$ samples and average them. As $G \to \infty$ the group mean converges to $\mathbb{E}[r \mid q]$. The critic *predicts* the average with a network; GRPO *measures* it from a group drawn fresh for this prompt. Crucially, $\hat{A}_i$ carries a single subscript $i$: **every token of answer $i$ shares the one advantage.** It is an outcome-level signal, not a per-token one. We pay for that simplicity in Section 5, but for a checkable end-of-answer reward it is exactly enough.
+Why is this a legitimate baseline and not a trick? Because it is the same object the critic was approximating, computed more directly. The critic was trained so that $V(s) \to \mathbb{E}[r \mid q]$, the typical reward for this prompt. The group mean is the textbook Monte-Carlo estimate of that very expectation: draw $G$ samples and average them. As $G \to \infty$ the group mean converges to $\mathbb{E}[r \mid q]$. The critic _predicts_ the average with a network; GRPO _measures_ it from a group drawn fresh for this prompt. Crucially, $\hat{A}_i$ carries a single subscript $i$: **every token of answer $i$ shares the one advantage.** It is an outcome-level signal, not a per-token one. We pay for that simplicity in Section 5, but for a checkable end-of-answer reward it is exactly enough.
 
 ![Two grouped bars per answer comparing the numerator-only advantage with the full z-score advantage; both share the same signs and centring](./images/fig-advantage-zscore.svg)
 
@@ -228,7 +242,8 @@ The three panels make it visual: the all-correct and all-wrong groups sit flat a
 <details>
 <summary><strong>Check:</strong> If a prompt's group of answers are all correct (every reward = 1), what is each answer's GRPO advantage, and what does that mean for the update?</summary>
 
-**Answer.** Every advantage is zero, so the prompt contributes no gradient. The mean is 1, so $r_i - \text{mean} = 0$ for all answers (the same happens if all are wrong). The group baseline only produces a learning signal when answers *disagree*. This "all-same, no signal" fact is wasteful, and it is exactly what DAPO's dynamic sampling fixes in Section 4.
+**Answer.** Every advantage is zero, so the prompt contributes no gradient. The mean is 1, so $r_i - \text{mean} = 0$ for all answers (the same happens if all are wrong). The group baseline only produces a learning signal when answers _disagree_. This "all-same, no signal" fact is wasteful, and it is exactly what DAPO's dynamic sampling fixes in Section 4.
+
 </details>
 
 ### 2.3 The clipped surrogate: borrowed wholesale from PPO
@@ -263,7 +278,7 @@ At $\rho = 1.1$ the update is inside the trust band and flows freely. At $\rho =
 
 ### 2.4 The KL leash, now a loss term
 
-GRPO keeps one more piece of PPO's stability machinery: a KL penalty pulling the policy toward a frozen reference $\pi_{\text{ref}}$. But it sits in a different place. In classic RLHF the KL-to-reference was folded *into the per-token reward*, subtracted token by token. GRPO instead adds it as a separate term in the loss, using an unbiased, always-positive estimator so the penalty behaves well:
+GRPO keeps one more piece of PPO's stability machinery: a KL penalty pulling the policy toward a frozen reference $\pi_{\text{ref}}$. But it sits in a different place. In classic RLHF the KL-to-reference was folded _into the per-token reward_, subtracted token by token. GRPO instead adds it as a separate term in the loss, using an unbiased, always-positive estimator so the penalty behaves well:
 
 $$-\,\beta\,D_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}}), \qquad D_{\text{KL}} \approx \frac{\pi_{\text{ref}}}{\pi_\theta} - \log\frac{\pi_{\text{ref}}}{\pi_\theta} - 1.$$
 
@@ -294,20 +309,24 @@ Stack the four pieces: the group-relative advantage, the per-token ratio, the cl
 
 $$J(\theta) = \frac{1}{G}\sum_{i=1}^{G} \frac{1}{|o_i|}\sum_{t=1}^{|o_i|} \min\big(\rho_{i,t}\,\hat{A}_i,\ \text{clip}(\rho_{i,t},\, 1-\varepsilon,\, 1+\varepsilon)\,\hat{A}_i\big) \;-\; \beta\,D_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}}).$$
 
+Read it left to right. On the far left, $J(\theta)$ is the score we push uphill by tuning the policy's weights $\theta$. The first block is a **double average**. The outer $\frac{1}{G}\sum_{i=1}^{G}$ walks over the $G$ answers in the group and averages across them; the inner $\frac{1}{|o_i|}\sum_{t=1}^{|o_i|}$ walks over the $\lvert o_i\rvert$ tokens of answer $i$ and averages across those. So we are taking the mean of one per-token number over every token of every answer. That per-token number is the clipped surrogate $\min\big(\rho_{i,t}\hat{A}_i,\ \text{clip}(\rho_{i,t}, 1-\varepsilon, 1+\varepsilon)\hat{A}_i\big)$: the token's importance ratio $\rho_{i,t}$ times its answer's advantage $\hat{A}_i$, with the ratio held inside the band $[1-\varepsilon, 1+\varepsilon]$ so no single step can move too far. Finally the term $-\,\beta\,D_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})$ subtracts a penalty for drifting from the frozen reference, and $\beta$ sets how stiff that penalty is.
+
+In plain English: **reward each token in proportion to how good its whole answer was, take a capped step so training stays stable, and pay a fee for wandering too far from where you started.** Every token of a better-than-average answer (advantage above zero) is pushed up, and every token of a worse-than-average one (advantage below zero) is pushed down. The clip stops any one update from overshooting, and turning $\beta$ up pulls the policy harder back toward the reference. Notice the answer length $\lvert o_i\rvert$ sitting in that inner average: it means a long answer spreads its one advantage thinly across many tokens, which is the exact length bias Section 4 comes back to fix.
+
 Maximize it and you have the actor update, with no critic loss term because there is no critic. Every symbol, in one legend:
 
-| Symbol | Meaning |
-|---|---|
-| $q$ | the prompt |
-| $G$ | group size, number of answers sampled per prompt (e.g. 8–64; the assignment uses 6) |
-| $o_i,\ \lvert o_i\rvert$ | the $i$-th answer and its length in tokens |
-| $o_{i,t},\ o_{i,<t}$ | the $t$-th token of answer $i$, and the tokens before it |
-| $r_i$ | verifier reward for answer $i$ |
-| $\hat{A}_i$ | group-relative advantage, shared by all tokens of $o_i$ |
-| $\rho_{i,t}$ | per-token importance ratio $\pi_\theta/\pi_{\text{old}}$ |
-| $\varepsilon$ | clip width, typically $\approx 0.2$ |
-| $\beta$ | KL-penalty strength (sometimes 0) |
-| $\pi_{\text{ref}}$ | frozen reference policy the leash anchors to |
+| Symbol                   | Meaning                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| $q$                      | the prompt                                                                          |
+| $G$                      | group size, number of answers sampled per prompt (e.g. 8–64; the assignment uses 6) |
+| $o_i,\ \lvert o_i\rvert$ | the $i$-th answer and its length in tokens                                          |
+| $o_{i,t},\ o_{i,<t}$     | the $t$-th token of answer $i$, and the tokens before it                            |
+| $r_i$                    | verifier reward for answer $i$                                                      |
+| $\hat{A}_i$              | group-relative advantage, shared by all tokens of $o_i$                             |
+| $\rho_{i,t}$             | per-token importance ratio $\pi_\theta/\pi_{\text{old}}$                            |
+| $\varepsilon$            | clip width, typically $\approx 0.2$                                                 |
+| $\beta$                  | KL-penalty strength (sometimes 0)                                                   |
+| $\pi_{\text{ref}}$       | frozen reference policy the leash anchors to                                        |
 
 **This is PPO with the critic swapped for the group.** If you understood why PPO clips, you already understand most of GRPO. Only two things changed: the advantage now comes from a group instead of a value network, and the KL moved out of the reward and into the loss.
 
@@ -315,12 +334,14 @@ Maximize it and you have the actor update, with no critic loss term because ther
 <summary><strong>Check:</strong> Where did the clip and the ratio in the GRPO objective come from?</summary>
 
 **Answer.** Straight from PPO (the [TRPO & PPO](../06-trpo-ppo/README.md) post). GRPO changes only the advantage (group-relative instead of return-minus-critic) and where the KL lives. The "take a safe step by clipping the ratio" machinery is untouched, which is why GRPO is still a policy-gradient method.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> In GRPO every token of an answer shares the same advantage. Contrast that with PPO's per-token advantage. What is gained and lost?</summary>
 
 **Answer.** Gained: simplicity and no critic, one outcome reward, one group baseline, one advantage per answer. Lost: fine-grained credit assignment, GRPO cannot say "this particular token was the good move," only "this whole answer beat its siblings." For outcome-checkable tasks that coarse signal is enough; for dense per-step rewards PPO's per-token value is more informative.
+
 </details>
 
 ### 2.6 The GRPO loop in code
@@ -445,32 +466,35 @@ The two panels show that story. On the left the reward curve is noisy and only d
 
 GRPO began life as a quiet efficiency trick. It first appeared in the **DeepSeekMath** paper (2024, arXiv:2402.03300) described undramatically as "a variant of PPO that enhances mathematical reasoning while concurrently optimizing the memory usage of PPO." The motivation was exactly Section 1: the value network is expensive, so drop it and use the group. No one called it a revolution.
 
-The revolution came when DeepSeek pointed it at a *base* model with verifiable rewards and let it run. **DeepSeek-R1-Zero** (Jan 2025, arXiv:2501.12948) took a base LLM with *no supervised fine-tuning on reasoning traces at all* and applied pure GRPO with a verifiable reward: +1 for the correct final answer, a little for clean formatting, 0 otherwise. Nothing in the loop ever judged the *reasoning*.
+The revolution came when DeepSeek pointed it at a _base_ model with verifiable rewards and let it run. **DeepSeek-R1-Zero** (Jan 2025, arXiv:2501.12948) took a base LLM with _no supervised fine-tuning on reasoning traces at all_ and applied pure GRPO with a verifiable reward: +1 for the correct final answer, a little for clean formatting, 0 otherwise. Nothing in the loop ever judged the _reasoning_.
 
-And it worked. The model spontaneously developed long chains of thought, self-reflection, answer verification, and the habit of re-trying strategies, behaviors nobody hand-coded. The paper highlights an **"aha moment"**: mid-solution, the model writes something like *"wait, let me re-evaluate that step,"* backtracks, and fixes its own error.
+And it worked. The model spontaneously developed long chains of thought, self-reflection, answer verification, and the habit of re-trying strategies, behaviors nobody hand-coded. The paper highlights an **"aha moment"**: mid-solution, the model writes something like _"wait, let me re-evaluate that step,"_ backtracks, and fixes its own error.
 
 ![A small robot mid-thought on a path of stepping stones, with a large curved terracotta arrow looping backward to an earlier stone, depicting a self-correction backtrack, and a lightbulb above its head](./images/ai-aha-moment.png)
 
-Nothing told it to do this. The only pressure was the verifiable reward for getting the final answer right, and re-checking your work *raises the probability of a correct answer*, which raises the reward, which GRPO reinforces. **Reasoning emerged as a strategy the model discovered for earning reward**, not a behavior taught by example.
+Nothing told it to do this. The only pressure was the verifiable reward for getting the final answer right, and re-checking your work _raises the probability of a correct answer_, which raises the reward, which GRPO reinforces. **Reasoning emerged as a strategy the model discovered for earning reward**, not a behavior taught by example.
 
 R1-Zero reasoned well but wrote messily (mixed languages, hard to read), so **DeepSeek-R1** added a small "cold-start" SFT for readability, then the same GRPO RL, then a final cleanup pass. The result rivaled OpenAI's o1 on reasoning, and DeepSeek released the weights and the recipe. That openness is why every lab now runs GRPO-style training: it needed no human-preference dataset and no closed reward model, so anyone could reproduce it cheaply.
 
 <details>
 <summary><strong>Check:</strong> R1-Zero used no supervised reasoning data, yet learned long, self-correcting chains of thought. Where did that behavior come from?</summary>
 
-**Answer.** It was reinforced because it raised the verifiable reward. The only signal was "is the final answer correct?" Longer deliberation, checking intermediate steps, and re-trying after a mistake all increase the chance of a correct answer, so GRPO made them more likely. The deep lesson: with a clean reward and enough RL, capability can be *incentivized* rather than demonstrated.
+**Answer.** It was reinforced because it raised the verifiable reward. The only signal was "is the final answer correct?" Longer deliberation, checking intermediate steps, and re-trying after a mistake all increase the chance of a correct answer, so GRPO made them more likely. The deep lesson: with a clean reward and enough RL, capability can be _incentivized_ rather than demonstrated.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why was using a base model (not an instruction-tuned one) for R1-Zero such a striking choice?</summary>
 
-**Answer.** It showed reasoning did not need to be bootstrapped from human demonstrations at all: pure RL on raw next-token weights was enough to grow it. That challenged the assumption that you must first SFT on curated reasoning traces, and suggested RL can *discover* capabilities, not only sharpen demonstrated ones.
+**Answer.** It showed reasoning did not need to be bootstrapped from human demonstrations at all: pure RL on raw next-token weights was enough to grow it. That challenged the assumption that you must first SFT on curated reasoning traces, and suggested RL can _discover_ capabilities, not only sharpen demonstrated ones.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why did R1 add a small cold-start SFT that R1-Zero skipped?</summary>
 
 **Answer.** R1-Zero reasoned well but produced unreadable output (language mixing, poor formatting) because nothing rewarded readability. A little curated SFT before RL gave it a clean, human-friendly starting style, which the subsequent GRPO preserved while improving reasoning, trading a touch of purity for a much more usable model.
+
 </details>
 
 ## 4. Fixing GRPO's rough edges: DAPO and Dr. GRPO
@@ -479,14 +503,14 @@ Once everyone ran vanilla GRPO, three weak spots showed up. **Entropy collapse:*
 
 **DAPO** (ByteDance, 2025, arXiv:2503.14476) stacks four fixes onto GRPO and reached 50 on AIME 2024 with a Qwen2.5-32B base, publishing every detail:
 
-- **Clip-Higher.** Split the single $\varepsilon$ into a lower and an upper bound and raise the upper one ($\varepsilon_{\text{high}} > \varepsilon_{\text{low}}$, e.g. 0.28 vs 0.2). A symmetric clip caps how fast *any* token's probability can rise, so rare exploratory tokens with positive advantage hit the ceiling and never grow, and entropy collapses. Raising only the upper bound gives good-but-rare tokens room to climb, keeping exploration alive.
+- **Clip-Higher.** Split the single $\varepsilon$ into a lower and an upper bound and raise the upper one ($\varepsilon_{\text{high}} > \varepsilon_{\text{low}}$, e.g. 0.28 vs 0.2). A symmetric clip caps how fast _any_ token's probability can rise, so rare exploratory tokens with positive advantage hit the ceiling and never grow, and entropy collapses. Raising only the upper bound gives good-but-rare tokens room to climb, keeping exploration alive.
 - **Dynamic Sampling.** Over-sample and filter: discard all-correct and all-wrong groups (zero gradient) and keep only ones that disagree. This is not throwing away data, those groups carry no signal, so every prompt in the batch now moves the policy.
 - **Token-level loss.** Average over all tokens in the batch at once instead of per-answer-then-per-group, so long correct answers are not under-counted.
 - **Overlong shaping.** Apply a soft, growing penalty to runaway-length completions instead of a hard cutoff, reducing reward noise without abruptly punishing borderline answers.
 
-**Dr. GRPO** (Sea AI Lab, 2025, arXiv:2503.20783) makes a sharper claim: vanilla GRPO contains two *biases* hiding in its normalizers, and removing them gives an unbiased estimator.
+**Dr. GRPO** (Sea AI Lab, 2025, arXiv:2503.20783) makes a sharper claim: vanilla GRPO contains two _biases_ hiding in its normalizers, and removing them gives an unbiased estimator.
 
-**Length bias** comes from dividing each answer's loss by its token count ($1/|o_i|$). A long answer's many tokens each get a small share of the gradient, so a long *wrong* answer is barely discouraged per token, and over training the model drifts toward ever-longer outputs:
+**Length bias** comes from dividing each answer's loss by its token count ($1/|o_i|$). A long answer's many tokens each get a small share of the gradient, so a long _wrong_ answer is barely discouraged per token, and over training the model drifts toward ever-longer outputs:
 
 ```python
 A = 0.5
@@ -511,41 +535,43 @@ $$\hat{A}_i = \frac{r_i - \text{mean}(r)}{\text{std}(r)} \ \longrightarrow\ \hat
 
 Read it as: "keep the group mean as the baseline, but stop dividing by the spread and by the answer length." The baseline idea is untouched; only the two distorting normalizers are gone.
 
-The common thread: **every variant tweaks the advantage, the clip, or the sampling, and nothing else.** DAPO changes the clip and the sampling; Dr. GRPO changes the advantage. Two more worth knowing do the same elsewhere: **GSPO** (Qwen) clips at the *sequence* level instead of per token, steadier for very long answers and MoE models, and **CISPO** (MiniMax) clips the importance weights so reflective low-probability tokens survive.
+The common thread: **every variant tweaks the advantage, the clip, or the sampling, and nothing else.** DAPO changes the clip and the sampling; Dr. GRPO changes the advantage. Two more worth knowing do the same elsewhere: **GSPO** (Qwen) clips at the _sequence_ level instead of per token, steadier for very long answers and MoE models, and **CISPO** (MiniMax) clips the importance weights so reflective low-probability tokens survive.
 
-| | GRPO | DAPO | Dr. GRPO |
-|---|---|---|---|
-| **Clip** | symmetric $[1-\varepsilon, 1+\varepsilon]$ | decoupled, raised upper | same as GRPO |
-| **Sampling** | fixed group per prompt | dynamic: drop all-same, resample | same as GRPO |
-| **Loss aggregation** | per-answer then mean | token-level over the batch | no length division |
-| **Normalization** | ÷std and ÷length | keeps ÷std; overlong shaping | removes both |
-| **KL term** | optional $\beta$ | often dropped | dropped |
+|                      | GRPO                                       | DAPO                             | Dr. GRPO           |
+| -------------------- | ------------------------------------------ | -------------------------------- | ------------------ |
+| **Clip**             | symmetric $[1-\varepsilon, 1+\varepsilon]$ | decoupled, raised upper          | same as GRPO       |
+| **Sampling**         | fixed group per prompt                     | dynamic: drop all-same, resample | same as GRPO       |
+| **Loss aggregation** | per-answer then mean                       | token-level over the batch       | no length division |
+| **Normalization**    | ÷std and ÷length                           | keeps ÷std; overlong shaping     | removes both       |
+| **KL term**          | optional $\beta$                           | often dropped                    | dropped            |
 
 <details>
 <summary><strong>Check:</strong> How does clip-higher combat entropy collapse, mechanically?</summary>
 
 **Answer.** A symmetric clip caps how much any token's probability can rise in one step (factor $1+\varepsilon$). Rare exploratory tokens with positive advantage hit that cap and stop growing, so mass piles onto a few high-probability tokens and entropy falls toward zero. Raising the upper bound lets those good-but-rare tokens keep gaining probability, preserving spread, that is, exploration.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Your GRPO run's outputs keep getting longer epoch after epoch with no gain in accuracy. Which fix addresses this, and why?</summary>
 
 **Answer.** Both DAPO's overlong shaping (a soft penalty on runaway length) and Dr. GRPO's removal of the $1/|o_i|$ length division attack it. The un-fixed objective rewards length because dividing a wrong answer's loss by its many tokens makes each token's penalty tiny, so long mistakes are barely discouraged. Drop the length normalizer and you would expect average completion length to stop drifting upward, since a wrong answer is now penalized the same per token regardless of how long it is.
+
 </details>
 
 ## 5. GRPO vs PPO: when to use which
 
 GRPO did not replace PPO; it found a better fit for one important shape of problem. Read the table top to bottom and watch the critic, and everything attached to it, disappear while the stability machinery (clip, KL) stays put.
 
-| | PPO / RLHF | GRPO |
-|---|---|---|
-| **Baseline** | learned value critic $V(s)$ | group mean reward (no network) |
-| **Advantage** | GAE over a trajectory | group-normalized $(r_i - \text{mean})/\text{std}$ |
-| **Models in memory** | policy + ref + reward + value $\approx 4$ | policy + ref + verifier $\approx 2$–3 |
-| **Reward source** | typically a learned reward model | typically a verifiable function |
-| **Clip + KL** | keeps both | keeps both |
-| **Rollouts per update** | 1 sample per prompt | $G$ samples per prompt |
-| **Best fit** | dense/shaped rewards, long continuous control | one checkable answer (math, code, logic) |
+|                         | PPO / RLHF                                    | GRPO                                              |
+| ----------------------- | --------------------------------------------- | ------------------------------------------------- |
+| **Baseline**            | learned value critic $V(s)$                   | group mean reward (no network)                    |
+| **Advantage**           | GAE over a trajectory                         | group-normalized $(r_i - \text{mean})/\text{std}$ |
+| **Models in memory**    | policy + ref + reward + value $\approx 4$     | policy + ref + verifier $\approx 2$–3             |
+| **Reward source**       | typically a learned reward model              | typically a verifiable function                   |
+| **Clip + KL**           | keeps both                                    | keeps both                                        |
+| **Rollouts per update** | 1 sample per prompt                           | $G$ samples per prompt                            |
+| **Best fit**            | dense/shaped rewards, long continuous control | one checkable answer (math, code, logic)          |
 
 The trade is about the shape of your reward and your episodes. **Reach for PPO** when rewards are dense and arrive throughout long, expensive episodes (robotics, games, continuous control): there a learned critic earns its memory by producing low-variance per-step advantages from a single trajectory. **Reach for GRPO** when there is one checkable outcome at the end and sampling a group is cheap and parallel: there the group mean is a free Monte-Carlo baseline and the critic is pure overhead. Classic RL lives in the first world; LLM reasoning lives in the second.
 
@@ -553,12 +579,14 @@ The trade is about the shape of your reward and your episodes. **Reach for PPO**
 <summary><strong>Check:</strong> Why is sampling a group of G answers an acceptable cost, when training a critic was not?</summary>
 
 **Answer.** Generation is forward-only, embarrassingly parallel, and runs on fast inference engines, so sampling G answers mostly costs time, not a second set of trainable weights and optimizer state. A critic doubles the trained-model memory, must itself be learned, and is unreliable on long chains. You trade a hard training problem for cheap parallel sampling.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> You are training a controller with a dense per-step reward and long, expensive episodes. GRPO or PPO?</summary>
 
 **Answer.** PPO. The reward is dense and per-step, so a learned critic can produce a low-variance per-step advantage that uses every timestep, where GRPO would collapse the whole episode to one outcome number. And the episodes are long and expensive, so you cannot cheaply draw a group of $G$ per starting state for a Monte-Carlo baseline. This is the classic-RL world the critic was built for.
+
 </details>
 
 ## 6. GRPO in the wild
@@ -571,24 +599,26 @@ The failure modes are the ones the variants exist to fix: **entropy collapse** (
 <summary><strong>Check:</strong> Many reasoning runs set the KL weight β to 0. When is that safe, and when is it risky?</summary>
 
 **Answer.** Safe when the reward is genuinely verifiable, so correctness cannot be hacked and there is little benefit to anchoring near the reference, while removing the leash lets the model move further toward correct reasoning. Risky when the reward is exploitable or you care about preserving general abilities and safety, where dropping the KL invites drift and reward-gaming and you keep $\beta > 0$, RLHF-style.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> How does group size G trade off against the quality of the baseline?</summary>
 
 **Answer.** The group mean is a Monte-Carlo estimate of the expected reward, so a larger G gives a lower-variance, more accurate baseline (and more contrast within the group), stabilizing the advantage, at the cost of more generation per prompt. Too-small G makes the baseline noisy; teams pick G to balance signal quality against rollout compute.
+
 </details>
 
 ## 7. Putting it all together
 
 Everything above is one machine. Here is the recap of what we built, mapping each concept to the math and the code already shown inline:
 
-| Concept | Math | In code |
-|---|---|---|
-| Verifiable reward | $r = \mathbb{1}[\text{answer} = \text{gold}]$ | `2.0 if extract_xml_answer(r) == gold else 0.0` |
-| Group baseline | $\mu = \frac{1}{G}\sum_j r_j$ | `r.mean()` over the group |
-| Group advantage | $\hat{A}_i = (r_i - \mu)/\sigma$ | `(r - r.mean()) / (r.std() + 1e-8)` |
-| Importance ratio | $\rho = \pi_\theta/\pi_{\text{old}}$ | `torch.exp(logp - old_logp)` |
+| Concept           | Math                                            | In code                                              |
+| ----------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| Verifiable reward | $r = \mathbb{1}[\text{answer} = \text{gold}]$   | `2.0 if extract_xml_answer(r) == gold else 0.0`      |
+| Group baseline    | $\mu = \frac{1}{G}\sum_j r_j$                   | `r.mean()` over the group                            |
+| Group advantage   | $\hat{A}_i = (r_i - \mu)/\sigma$                | `(r - r.mean()) / (r.std() + 1e-8)`                  |
+| Importance ratio  | $\rho = \pi_\theta/\pi_{\text{old}}$            | `torch.exp(logp - old_logp)`                         |
 | Clipped surrogate | $\min(\rho \hat{A},\ \text{clip}(\rho)\hat{A})$ | `torch.min(ratio*ADV, clamp(ratio,1-eps,1+eps)*ADV)` |
 
 The complete, runnable program, the toy GRPO loop from Section 2.6 and the full GSM8K run from Section 2.7, is packaged as a notebook you can run and extend in the [assignment](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture6.ipynb).
@@ -597,14 +627,14 @@ The complete, runnable program, the toy GRPO loop from Section 2.6 and the full 
 
 Six lectures, one update rule. GRPO did not change the gradient; it changed where the baseline and the reward come from. Translate every RL term into its reasoning-RL meaning and only two rows differ from the [RLHF](../07-rlhf/README.md) post:
 
-| RL | GRPO reasoning |
-|---|---|
-| state | prompt + tokens so far |
-| action | the next token |
-| policy | the reasoning model |
-| reward | **verifiable: is the answer correct?** |
-| baseline | **the group's mean (no critic)** |
-| episode | one full solution attempt |
+| RL       | GRPO reasoning                         |
+| -------- | -------------------------------------- |
+| state    | prompt + tokens so far                 |
+| action   | the next token                         |
+| policy   | the reasoning model                    |
+| reward   | **verifiable: is the answer correct?** |
+| baseline | **the group's mean (no critic)**       |
+| episode  | one full solution attempt              |
 
 $$\nabla_\theta J = \mathbb{E}\big[\, \hat{A} \cdot \nabla_\theta \log \pi_\theta \,\big]$$
 
@@ -615,25 +645,29 @@ Read it as: "push up the log-probability of answers that beat the baseline (posi
 <details>
 <summary><strong>Check:</strong> Why does a verifiable reward resist the reward-hacking you saw in RLHF?</summary>
 
-**Answer.** A learned reward model is an approximation with blind spots the optimizer can exploit (verbosity, sycophancy). A rule that checks "is the final answer correct?" has no such soft spots: a wrong answer scores 0 no matter how fluent or flattering. You can still game the *format* or the parser, but not the correctness, which is why a verifiable-reward run can optimize hard without collapsing into reward-hacked nonsense.
+**Answer.** A learned reward model is an approximation with blind spots the optimizer can exploit (verbosity, sycophancy). A rule that checks "is the final answer correct?" has no such soft spots: a wrong answer scores 0 no matter how fluent or flattering. You can still game the _format_ or the parser, but not the correctness, which is why a verifiable-reward run can optimize hard without collapsing into reward-hacked nonsense.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Dynamic sampling discards all-correct and all-wrong groups. Why is that not throwing away data?</summary>
 
 **Answer.** Those groups have zero advantage for every member (every reward equals the group mean), so they contribute exactly zero gradient. Keeping them just burns the forward and backward compute. Filtering them and resampling means every group in the batch actually moves the policy, so you get more learning per unit compute, not less.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> A bug makes a reward format-only (it pays out for a well-formed answer regardless of correctness). What does the policy converge to, and why doesn't the group baseline save you?</summary>
 
 **Answer.** The policy converges to producing perfectly-formatted answers of any content, because that is all the reward measures. The group baseline does not help: if every answer is equally well-formatted, every reward is the same, the mean equals that value, and every advantage is 0, so there is no signal pulling toward correctness. The gradient only ever points where the reward actually varies, and here it varies with format, not truth.
+
 </details>
 
 <details>
 <summary><strong>Check:</strong> Why does open-sourcing R1 matter so much for the field?</summary>
 
 **Answer.** It published both the weights and a simple, reproducible recipe (GRPO + verifiable rewards) that needed no massive human-preference dataset and no closed reward model. Suddenly any lab could train strong reasoners cheaply, which is why GRPO and its variants exploded across 2025.
+
 </details>
 
 ---
