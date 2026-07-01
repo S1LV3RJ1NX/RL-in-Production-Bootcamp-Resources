@@ -8,13 +8,14 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 - **LinkedIn:** paste the text (it ends with "Link in comments."), then put the blog link in the first comment, and add the hashtags at the bottom.
 - **X:** delete the "Link in comments." line, paste the text, and drop the blog link in a self-reply. No hashtags.
 - The closing question doubles as your first self-reply. Reply to every comment in the first hour.
+- **This run is 6 days** (Wed-Mon): Follow-up 1 = Wed Jul 15, then one per day through Follow-up 6 = Mon Jul 20. On Tuesday Jul 21 the series moves to blog 5.
 
 Blog link: https://prathameshsaraf.com/blogs/04-sarsa-qlearning-dqn/
 Hashtags (LinkedIn): #ReinforcementLearning #MachineLearning #DeepLearning #LLMs #LearningInPublic
 
 ---
 
-## Follow-up 1 — control is prediction plus a max
+## Follow-up 1 (Wed Jul 15) — control is prediction plus a max
 
 Prediction asks how good a policy is. Control asks the harder question: what is the best policy, when nobody hands you one?
 
@@ -26,7 +27,7 @@ Link in comments.
 
 ---
 
-## Follow-up 2 — max versus argmax
+## Follow-up 2 (Thu Jul 16) — max versus argmax
 
 Two words that quietly run all of value-based RL, and they are easy to mix up.
 
@@ -39,7 +40,7 @@ Link in comments.
 
 ---
 
-## Follow-up 3 — one symbol separates SARSA and Q-learning
+## Follow-up 3 (Fri Jul 17) — one symbol separates SARSA and Q-learning
 
 SARSA and Q-learning differ by a single symbol in their target.
 
@@ -52,7 +53,7 @@ Link in comments.
 
 ---
 
-## Follow-up 4 — the cliff paradox (attach fig-sarsa-vs-q-curves)
+## Follow-up 4 (Sat Jul 18) — the cliff paradox (attach fig-sarsa-vs-q-curves)
 
 Same grid, same hyperparameters, one symbol of difference, two different personalities.
 
@@ -66,7 +67,7 @@ Link in comments.
 
 ---
 
-## Follow-up 5 — from a table to a network
+## Follow-up 5 (Sun Jul 19) — from a table to a network
 
 CliffWalking has 48 states, so the values fit in a table. Pong has more pixel screens than atoms in the universe, so the table has to go.
 
@@ -78,22 +79,11 @@ Link in comments.
 
 ---
 
-## Follow-up 6 — the two tricks that make DQN work
+## Follow-up 6 (Mon Jul 20) — the two tricks that make DQN work, and the week in recap
 
-Naive deep Q-learning diverges. DQN adds two fixes, each aimed at one failure.
+Naive deep Q-learning diverges. DQN adds two fixes, each aimed at one failure. Experience replay stores transitions in a buffer and samples random batches, so consecutive frames stop being correlated. A target network builds the label with a frozen copy of the weights, so the agent stops chasing a target that moves every step. Neither changes the objective; they just let gradient descent cope. That is the jump to the network that learned 49 Atari games.
 
-- Experience replay: store transitions in a buffer and sample random batches, so consecutive frames stop being correlated.
-- Target network: build the label with a frozen copy of the weights, so the agent stops chasing a target that moves every step.
-
-Neither changes the objective. They just let gradient descent cope. That is the jump to the network that learned 49 Atari games.
-
-Link in comments.
-
----
-
-## Follow-up 7 — recap and the bridge
-
-Blog 4 in five lines:
+So here is blog 4 in five lines:
 
 - Control is prediction plus a max.
 - max is a value, argmax is an action.
@@ -101,7 +91,7 @@ Blog 4 in five lines:
 - On a cliff, that symbol changes the route the agent learns.
 - Swap the table for a network and the same loop plays Pong from pixels.
 
-Next up is blog 5: policy gradients, where we skip values and optimize the policy directly, the branch that leads to PPO and RLHF. Have you hit the cliff paradox in your own training runs?
+Tomorrow the series moves to blog 5: policy gradients, where we skip values and optimize the policy directly, the branch that leads to PPO and RLHF. Have you hit the cliff paradox in your own training runs?
 
 Link in comments.
 

@@ -8,13 +8,14 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 - **LinkedIn:** paste the text (it ends with "Link in comments."), then put the blog link in the first comment, and add the hashtags at the bottom.
 - **X:** delete the "Link in comments." line, paste the text, and drop the blog link in a self-reply. No hashtags.
 - The closing question doubles as your first self-reply. Reply to every comment in the first hour.
+- **This run is 6 days** (Wed-Mon): Follow-up 1 = Wed Jul 22, then one per day through Follow-up 6 = Mon Jul 27. On Tuesday Jul 28 the series moves to blog 6.
 
 Blog link: https://prathameshsaraf.com/blogs/05-policy-gradients/
 Hashtags (LinkedIn): #ReinforcementLearning #MachineLearning #RLHF #LLMs #LearningInPublic
 
 ---
 
-## Follow-up 1 — delete the middleman
+## Follow-up 1 (Wed Jul 22) — delete the middleman
 
 Value methods learn a number for every action, then pick moves with an argmax. There is a quieter cost to that: to act, you need either the argmax or the environment model.
 
@@ -26,7 +27,7 @@ Link in comments.
 
 ---
 
-## Follow-up 2 — the score-function trick
+## Follow-up 2 (Thu Jul 23) — the score-function trick
 
 Policy gradients hang on one identity from calculus.
 
@@ -40,7 +41,7 @@ Link in comments.
 
 ---
 
-## Follow-up 3 — one reward, every logit moves
+## Follow-up 3 (Fri Jul 24) — one reward, every logit moves
 
 A softmax policy over nine aiming angles. You sample one angle, see one reward, and update once.
 
@@ -52,7 +53,7 @@ Link in comments.
 
 ---
 
-## Follow-up 4 — why subtract a baseline
+## Follow-up 4 (Sat Jul 25) — why subtract a baseline
 
 Plain REINFORCE works, but it is loud. A single sampled trajectory gives a wildly swinging gradient, so learning crawls.
 
@@ -66,7 +67,7 @@ Link in comments.
 
 ---
 
-## Follow-up 5 — credit assignment
+## Follow-up 5 (Sun Jul 26) — credit assignment
 
 In a bandit there is no future, so the weight on an action is just its reward. Add states and that breaks.
 
@@ -78,7 +79,7 @@ Link in comments.
 
 ---
 
-## Follow-up 6 — the variance ladder (attach fig-variance-ladder)
+## Follow-up 6 (Mon Jul 27) — the variance ladder, and the week in recap (attach fig-variance-ladder)
 
 Every trick in policy gradients aims at one enemy: the variance of the gradient estimate. Here is the payoff in numbers, from the Archer MDP.
 
@@ -88,15 +89,7 @@ Every trick in policy gradients aims at one enemy: the variance of the gradient 
 
 The baseline cuts variance by orders of magnitude, and only the low-variance methods actually solve the task. Lower variance is not cosmetic, it is the line between learning and not.
 
-(Attach: fig-variance-ladder.png)
-
-Link in comments.
-
----
-
-## Follow-up 7 — recap and the bridge
-
-Blog 5 in five lines:
+So here is blog 5 in five lines:
 
 - Skip values, optimize the policy directly by gradient ascent.
 - The score-function trick turns a gradient you cannot sample into an average you can.
@@ -104,7 +97,9 @@ Blog 5 in five lines:
 - A baseline centers the signal and kills the variance.
 - Actor-Critic learns the baseline as a critic, the template every modern method reuses.
 
-Next up is blog 6: TRPO and PPO, where we stop each update from taking too big a step and collapsing the policy. That is the last piece before the RLHF stack. Have you hit unstable policy updates in your own runs?
+Tomorrow the series moves to blog 6: TRPO and PPO, where we stop each update from taking too big a step and collapsing the policy. That is the last piece before the RLHF stack. Have you hit unstable policy updates in your own runs?
+
+(Attach: fig-variance-ladder.png)
 
 Link in comments.
 

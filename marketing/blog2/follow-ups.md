@@ -8,13 +8,14 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 - **LinkedIn:** paste the text (it ends with "Link in comments."), then put the blog link in the first comment, and add the hashtags at the bottom.
 - **X:** delete the "Link in comments." line, paste the text, and drop the blog link in a self-reply. No hashtags.
 - The closing question doubles as your first self-reply. Reply to every comment in the first hour.
+- **This run is 6 days** (Wed-Mon): Follow-up 1 = Wed Jul 1, then one per day through Follow-up 6 = Mon Jul 6. On Tuesday Jul 7 the series moves to blog 3.
 
 Blog link: https://prathameshsaraf.com/blogs/02-mdps-and-bellman/
 Hashtags (LinkedIn): #ReinforcementLearning #BellmanEquation #MachineLearning #RLHF #LearningInPublic
 
 ---
 
-## Follow-up 1 — the equation in plain English
+## Follow-up 1 (Wed Jul 1) — the equation in plain English
 
 The whole field spends its time solving one recursion. Here it is in plain English:
 
@@ -28,7 +29,7 @@ Link in comments.
 
 ---
 
-## Follow-up 2 — what an MDP actually is
+## Follow-up 2 (Thu Jul 2) — what an MDP actually is
 
 An MDP sounds intimidating and is really just four things:
 
@@ -45,7 +46,7 @@ Link in comments.
 
 ---
 
-## Follow-up 3 — V versus Q
+## Follow-up 3 (Fri Jul 3) — V versus Q
 
 There are two ways to measure "how good," and mixing them up causes half of all RL confusion.
 
@@ -60,7 +61,7 @@ Link in comments.
 
 ---
 
-## Follow-up 4 — the backup diagram (attach fig-backup-diagram)
+## Follow-up 4 (Sat Jul 4) — the backup diagram (attach fig-backup-diagram)
 
 This little tree is the most useful picture in all of RL.
 
@@ -74,7 +75,7 @@ Link in comments.
 
 ---
 
-## Follow-up 5 — expectation versus optimality
+## Follow-up 5 (Sun Jul 5) — expectation versus optimality
 
 The Bellman equation comes in two flavors, and the difference is a single operator.
 
@@ -87,21 +88,11 @@ Link in comments.
 
 ---
 
-## Follow-up 6 — the code is the equation
+## Follow-up 6 (Mon Jul 6) — the code is the equation, and the week in recap
 
-The thing that finally made Bellman click for me was seeing every symbol become a line of code.
+The thing that finally made Bellman click for me was seeing every symbol become a line of code. The sum over actions is a loop, the transition probability is a weight, the reward plus discounted next value is the body. No magic, just the equation typed out.
 
-The sum over actions is a loop. The transition probability is a weight. The reward plus discounted next value is the body. No magic, just the equation typed out.
-
-If you learn better with the math and the Python side by side, this post was written for you.
-
-Link in comments.
-
----
-
-## Follow-up 7 — recap and the bridge
-
-Blog 2 in five lines:
+So here is blog 2 in five lines:
 
 - An MDP is states, actions, transitions, rewards.
 - V scores states, Q scores actions.
@@ -109,7 +100,7 @@ Blog 2 in five lines:
 - The Bellman expectation equation scores a policy.
 - Swap average for max and you get Bellman optimality.
 
-Next up is blog 3: three different ways to actually solve this equation (DP, Monte Carlo, and TD) and proof they all land on the same answer. Which flavor of Bellman trips you up more, expectation or optimality?
+Tomorrow the series moves to blog 3: three different ways to actually solve this equation (DP, Monte Carlo, and TD), and proof they all land on the same answer. Which flavor of Bellman trips you up more, expectation or optimality?
 
 Link in comments.
 

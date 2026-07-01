@@ -45,7 +45,7 @@ Link in comments.
 
 ---
 
-## Follow-up 3 (Mon Jun 29) — the running average
+## Follow-up 3 (Mon Jun 29) — the running average - DONE
 
 You do not need to store every reward you have ever seen to learn from it.
 

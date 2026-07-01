@@ -8,13 +8,14 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 - **LinkedIn:** paste the text (it ends with "Link in comments."), then put the blog link in the first comment, and add the hashtags at the bottom.
 - **X:** delete the "Link in comments." line, paste the text, and drop the blog link in a self-reply. No hashtags.
 - The closing question doubles as your first self-reply. Reply to every comment in the first hour.
+- **This run is 6 days** (Wed-Mon): Follow-up 1 = Wed Jul 8, then one per day through Follow-up 6 = Mon Jul 13. On Tuesday Jul 14 the series moves to blog 4.
 
 Blog link: https://prathameshsaraf.com/blogs/03-dp-mc-td/
 Hashtags (LinkedIn): #ReinforcementLearning #MachineLearning #TemporalDifference #DeepLearning #LearningInPublic
 
 ---
 
-## Follow-up 1 — three ways, one answer
+## Follow-up 1 (Wed Jul 8) — three ways, one answer
 
 DP, Monte Carlo, and TD get taught as three separate chapters, so they feel like rival methods. They are not.
 
@@ -28,7 +29,7 @@ Link in comments.
 
 ---
 
-## Follow-up 2 — DP needs the map
+## Follow-up 2 (Thu Jul 9) — DP needs the map
 
 Dynamic Programming is the exact one. It sweeps every state and computes the true values.
 
@@ -40,7 +41,7 @@ Link in comments.
 
 ---
 
-## Follow-up 3 — Monte Carlo waits
+## Follow-up 3 (Fri Jul 10) — Monte Carlo waits
 
 Monte Carlo needs nothing but finished episodes. It plays the game to the end, then averages the returns that actually happened.
 
@@ -52,7 +53,7 @@ Link in comments.
 
 ---
 
-## Follow-up 4 — TD updates after one step
+## Follow-up 4 (Sat Jul 11) — TD updates after one step
 
 Temporal Difference is the idea that powers modern RL.
 
@@ -64,7 +65,7 @@ Link in comments.
 
 ---
 
-## Follow-up 5 — the proof (attach fig-convergence)
+## Follow-up 5 (Sun Jul 12) — the proof (attach fig-convergence)
 
 This is the whole post in one picture.
 
@@ -78,28 +79,18 @@ Link in comments.
 
 ---
 
-## Follow-up 6 — why TD usually wins on speed
+## Follow-up 6 (Mon Jul 13) — why TD wins on speed, and the week in recap
 
-If MC and TD reach the same values, why does TD often get there in far fewer episodes?
+If MC and TD reach the same values, why does TD often get there in far fewer episodes? Because TD bootstraps: a reward's information spreads after one transition instead of being buried inside one noisy whole-episode return. MC throws that structure away and pays for it in variance, though it still earns its keep when episodes are short and you want zero bootstrap bias.
 
-Because TD bootstraps. A reward's information spreads after one transition instead of being buried inside one noisy whole-episode return. MC throws that structure away and pays for it in variance.
-
-MC still earns its keep when episodes are short and you want zero bootstrap bias. The trade-off is real.
-
-Link in comments.
-
----
-
-## Follow-up 7 — recap and the bridge
-
-Blog 3 in four lines:
+So here is blog 3 in four lines:
 
 - DP needs the model and is exact.
 - Monte Carlo needs only finished episodes.
 - TD needs one transition and bootstraps.
 - All three solve the same Bellman equation and converge to the same values.
 
-Everything so far is prediction: scoring a policy someone handed you. Next up is blog 4, where one extra symbol turns this into control, finding the best policy yourself. Which did you reach for first, MC or TD?
+Everything so far is prediction: scoring a policy someone handed you. Tomorrow the series moves to blog 4, where one extra symbol turns this into control, finding the best policy yourself. Which did you reach for first, MC or TD?
 
 Link in comments.
 
