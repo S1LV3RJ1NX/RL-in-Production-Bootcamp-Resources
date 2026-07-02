@@ -75,7 +75,20 @@ $$\mathcal{L}_{\text{DPO}} = -\log \sigma\!\left( \beta \log \frac{\pi_\theta(y_
 
 Read it as: "each bracketed term is an answer's implicit reward (§2.2); their difference is the **margin** between chosen ($y_w$) and rejected ($y_l$); $\sigma$ turns that margin into 'how confidently did we rank them right?'; the negative log makes a confident-correct ranking cheap and a wrong one expensive." This is exactly the Bradley-Terry loss you would use to train a reward-model classifier (the [RLHF](../07-rlhf/README.md) post), with the reward replaced by the implicit reward. The reward model and the policy optimization have fused into one supervised step.
 
-Here is the whole loss in code, with the four log-probabilities it needs:
+Make it concrete with one real preference. Fix $\beta = 0.1$ and take:
+
+- **Prompt $x$:** "Should I put all my savings into one stock?"
+- **Chosen $y_w$:** "No, putting everything in one stock is risky; spread it across a low-cost index fund."
+- **Rejected $y_l$:** "Yes, go all in."
+
+Run both answers through $\pi_\theta$ and $\pi_{\text{ref}}$ and sum the per-token log-probs, and you get the four numbers the loss needs (one policy log-prob and one reference log-prob per answer):
+
+| | $\log \pi_\theta$ | $\log \pi_{\text{ref}}$ | $\Delta(y) = \log \pi_\theta - \log \pi_{\text{ref}}$ |
+|---|---|---|---|
+| chosen $y_w$ | $-1.4$ | $-2.2$ | $+0.80$ |
+| rejected $y_l$ | $-2.2$ | $-1.8$ | $-0.40$ |
+
+Two paragraphs of text have collapsed to two scalars: $\Delta(y_w) = +0.80$ (the policy likes the prudent answer *more* than the reference did) and $\Delta(y_l) = -0.40$ (it already disprefers the reckless one). Feed those four log-probs straight into the loss:
 
 ```python
 import math
@@ -84,10 +97,14 @@ def sigmoid(z):
     return 1.0 / (1.0 + math.exp(-z))
 
 def dpo_loss(logp_w, logp_l, ref_w, ref_l, beta=0.1):
-    r_w = beta * (logp_w - ref_w)              # implicit reward of the chosen answer
-    r_l = beta * (logp_l - ref_l)              # implicit reward of the rejected answer
-    margin = r_w - r_l                         # m = r_hat(y_w) - r_hat(y_l)
-    loss = -math.log(sigmoid(margin))          # -log sigma(m)
+    # implicit reward of the chosen answer
+    r_w = beta * (logp_w - ref_w)
+    # implicit reward of the rejected answer
+    r_l = beta * (logp_l - ref_l)
+    # the margin m = r_hat(y_w) - r_hat(y_l)
+    margin = r_w - r_l
+    # -log sigma(m)
+    loss = -math.log(sigmoid(margin))
     return loss, r_w, r_l, margin
 
 loss, r_w, r_l, m = dpo_loss(logp_w=-1.4, logp_l=-2.2, ref_w=-2.2, ref_l=-1.8)
@@ -104,7 +121,13 @@ margin                     m = +0.120
 DPO loss                     = 0.635
 ```
 
-Four log-probs in, one loss out: no reward model, no sampling, no rollouts. The positive margin says the policy already ranks this pair correctly, so the loss is modest (just under the coin-flip value $-\ln 0.5 \approx 0.69$).
+Four log-probs in, one loss out: no reward model, no sampling, no rollouts. Scaling the two $\Delta$ values by $\beta$ gives the implicit rewards $\hat{r}_w = 0.1 \times 0.80 = +0.08$ and $\hat{r}_l = 0.1 \times (-0.40) = -0.04$, so the margin is $m = +0.12$ and the loss is $-\log \sigma(0.12) \approx 0.635$. The positive margin says the policy already ranks this pair correctly, so the loss is modest, just under the coin-flip value $-\ln 0.5 \approx 0.69$. There is plenty of room to sharpen the separation.
+
+<details>
+<summary><strong>Check:</strong> In the worked pair the margin is already positive (+0.12). Why is the loss still nonzero, and why is that fine?</summary>
+
+**Answer.** $\sigma(0.12) \approx 0.53$, so $-\log \sigma(0.12) \approx 0.635$, just below the coin-flip loss of 0.69. The model ranks the pair correctly but not *confidently*, so a small loss (and a small-weight update) keeps nudging it toward a clearer separation. A perfectly confident pair would drive the loss toward 0.
+</details>
 
 ### 2.4 The gradient: push hardest on the pairs you get wrong
 
@@ -116,7 +139,8 @@ Read it as: "the update is a scalar weight, the sigmoid of the *reversed* margin
 
 ```python
 def grad_weight(margin, beta=0.1):
-    return beta * sigmoid(-margin)             # beta * sigma(r_l - r_w) = beta * sigma(-m)
+    # beta * sigma(r_l - r_w) = beta * sigma(-m)
+    return beta * sigmoid(-margin)
 
 for mm in (-0.5, 0.0, 0.12, 1.0):
     print(f"margin {mm:+.2f}  ->  weight {grad_weight(mm):.4f}")
@@ -130,6 +154,27 @@ margin +1.00  ->  weight 0.0269
 ```
 
 A mis-ranked pair (negative margin) gets the strongest push; a comfortably-correct pair (margin +1.0) gets barely a nudge. **This data-dependent weight is exactly what makes DPO stable.** Delete it and you are back to "raise the winner, lower the loser" forever, with no signal to stop, which is the runaway degeneration from §2.1.
+
+For the worked pair from §2.3, the margin was $m = +0.12$, so the update weight is $\beta \cdot \sigma(-m) = 0.1 \times \sigma(-0.12) \approx 0.047$. That single small number scales the whole contrastive step: nudge $y_w$ up and $y_l$ down, gently, because the pair is already (just) correct.
+
+![Two panels sharing a margin axis: left, the DPO loss minus-log-sigmoid curve falling as the margin grows with the worked point marked at margin 0.12; right, the gradient weight beta-times-sigmoid of minus-margin, high for mis-ranked pairs and fading toward zero as the margin grows](./images/fig-dpo-margin.svg)
+
+The two panels share a margin axis and tie §2.3 and §2.4 together. On the left, the DPO loss $-\log \sigma(m)$ falls as the margin grows, with the worked point marked at $m = 0.12$ (loss $0.635$, just under the coin-flip line). On the right, the gradient weight $\beta\,\sigma(-m)$ is high for mis-ranked pairs (negative margin) and fades toward zero as the margin grows. They are the same story from two sides: a pair the model already ranks correctly costs little loss and earns only a small update, so DPO spends its effort where the ranking is still wrong.
+
+**Turn the temperature up.** Re-run the same scored pair at $\beta = 0.5$ instead of $0.1$:
+
+```python
+loss5, r_w5, r_l5, m5 = dpo_loss(-1.4, -2.2, -2.2, -1.8, beta=0.5)
+print(f"r_w = {r_w5:+.2f}   r_l = {r_l5:+.2f}   margin = {m5:+.2f}")
+print(f"loss = {loss5:.3f}   weight = {grad_weight(m5, beta=0.5):.3f}")
+```
+
+```text title="Output"
+r_w = +0.40   r_l = -0.20   margin = +0.60
+loss = 0.437   weight = 0.177
+```
+
+A larger $\beta$ does two things at once: it *sharpens* the reward (the same log-ratio now maps to a five-times-larger reward, so the margin grows from 0.12 to 0.60 and the loss falls) and it *enlarges* the step (the weight grows from 0.047 to 0.177). Temperature is not only a leash on drift; it directly scales both the reward you read off the policy and the size of every update.
 
 <details>
 <summary><strong>Check:</strong> People say DPO is "secretly reward modelling," yet we never trained a reward model. In what sense is that true?</summary>
@@ -151,38 +196,36 @@ A mis-ranked pair (negative margin) gets the strongest push; a comfortably-corre
 
 ### 2.5 Why this is RLHF in disguise (one clean derivation)
 
-The implicit reward looks too convenient. Why is $\beta \log(\pi_\theta / \pi_{\text{ref}})$ the *right* reward, and not an ad-hoc trick? Because it falls straight out of the RLHF objective. Here is the whole argument in four steps; the only tool is rewriting an expression until the answer is obvious.
+The implicit reward $\beta \log(\pi_\theta / \pi_{\text{ref}})$ looks too convenient. Is it a lucky guess, or the real reward? It is the real one: it drops straight out of the RLHF objective in three short moves. If the algebra is not your thing, trust the boxed takeaway at the end; but the three moves are worth seeing once.
 
-**Step 1, the optimal policy.** RLHF maximizes expected reward minus a KL penalty to the reference (the [RLHF](../07-rlhf/README.md) objective, with temperature $\beta$):
+**Move 1: what RLHF is really solving.** RLHF looks for the policy that earns high reward without wandering far from the reference (the [RLHF](../07-rlhf/README.md) objective, with temperature $\beta$):
 
-$$\max_{\pi}\ \mathbb{E}_{y\sim\pi}\big[r(x, y)\big] - \beta\, \text{KL}\big(\pi(\cdot \mid x)\,\|\,\pi_{\text{ref}}(\cdot \mid x)\big).$$
+$$\max_{\pi}\ \mathbb{E}_{y\sim\pi}\big[r(x, y)\big] \;-\; \beta\, \text{KL}\big(\pi \,\|\, \pi_{\text{ref}}\big).$$
 
-For *any* reward $r$, the policy that maximizes this has a closed form:
+Read it as: "pick the policy with the highest average reward, minus a penalty $\beta$ times how far it strays from the reference." This exact problem has a known answer: the best policy is just the reference, tilted toward higher-reward answers.
 
-$$\pi^*(y \mid x) = \frac{1}{Z(x)}\, \pi_{\text{ref}}(y \mid x)\, \exp\!\Big(\tfrac{1}{\beta} r(x, y)\Big),$$
+$$\pi^*(y \mid x) \;\propto\; \pi_{\text{ref}}(y \mid x)\, \exp\!\Big(\tfrac{1}{\beta}\, r(x, y)\Big).$$
 
-where $Z(x) = \sum_y \pi_{\text{ref}}(y\mid x)\exp(\tfrac1\beta r(x,y))$ is a normalizer (the partition function) that depends on the prompt but not on any one response. Read it as: "the best policy is the reference *reshaped* by the reward, multiplying up responses with high reward by $\exp(r/\beta)$ and renormalizing." (You get this by rewriting the objective as $-\beta\,\text{KL}(\pi \,\|\, \pi^*)$ plus a constant; KL is minimized at zero when $\pi = \pi^*$.)
+Read it as: "start from the reference, then scale each answer up by an amount that grows with its reward." A high reward lifts an answer's probability, a low one leaves it near where the reference had it, and $\beta$ sets how hard the reward pushes. (The $\propto$ hides a divide by a number $Z(x)$ that makes the probabilities sum to one. It depends only on the prompt $x$, and that single fact is what makes the rest work.)
 
-**Step 2, read it backwards.** Take logs of that optimum and solve for the reward:
+**Move 2: read that backwards to get the reward.** We wanted the reward and Move 1 handed us the policy, so flip it: take logs and solve for $r$.
 
-$$r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x).$$
+$$r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \;+\; \underbrace{\beta \log Z(x)}_{\text{same for every answer to } x}.$$
 
-Read it as: "the reward is the implicit reward (the log-ratio) plus a prompt-only term $\beta \log Z(x)$." The reward is no longer a mysterious network; it is written entirely in terms of policies, plus one annoying intractable term $Z(x)$.
+Read it as: "the reward equals the implicit reward (the log-ratio we already use) plus a leftover term that depends only on the prompt." The reward is no longer a separate network; it is written entirely from the policy and the reference, plus that one prompt-only piece.
 
-**Step 3, the partition function cancels.** Human data comes as comparisons, and the Bradley-Terry model says the probability a human prefers $y_w$ over $y_l$ is $\sigma$ of the reward *difference*. Substitute the reward from Step 2 for both responses:
+**Move 3: the leftover cancels.** Here is the trick. Preferences never use a reward on its own; they always compare two answers to the *same* prompt. And a term that depends only on the prompt is the same number for both answers, so it subtracts away:
 
 $$r(x, y_w) - r(x, y_l) = \beta \log \frac{\pi^*(y_w)}{\pi_{\text{ref}}(y_w)} - \beta \log \frac{\pi^*(y_l)}{\pi_{\text{ref}}(y_l)}.$$
 
-Both responses share the same prompt, hence the same $Z(x)$, so the two $\beta \log Z(x)$ terms are identical and **cancel exactly**. The intractable normalizer is gone. Anything that depended only on the prompt washed out the moment we compared two responses to it.
-
-**Step 4, the loss.** Replace the unknown optimum $\pi^*$ with our trainable $\pi_\theta$ and ask which parameters make the observed preferences most likely. That maximum-likelihood objective is exactly $\mathcal{L}_{\text{DPO}}$ from §2.3. So:
+The two prompt-only terms are identical, so they **cancel** and the awkward $Z(x)$ is gone. What remains is exactly the margin of implicit rewards from §2.3. Feed that difference into the preference model (the Bradley-Terry $\sigma$) and ask which $\pi_\theta$ makes the observed choices most likely, and you get back $\mathcal{L}_{\text{DPO}}$ unchanged.
 
 > **One line to remember.** DPO optimizes the *exact* RLHF objective with a single classification loss, no reward model and no RL.
 
-The information you lose by skipping the explicit reward model, that prompt-only $\beta \log Z(x)$ shift, is exactly the information that never affected the policy in the first place. (Rafailov et al., 2023, [*Your Language Model is Secretly a Reward Model*](https://arxiv.org/abs/2305.18290).)
+The only thing you give up by skipping the reward model is that prompt-only term, and it never affected which answer the policy prefers in the first place. (Rafailov et al., 2023, [*Your Language Model is Secretly a Reward Model*](https://arxiv.org/abs/2305.18290).)
 
 <details>
-<summary><strong>Check:</strong> Why does the intractable partition function Z(x) not stop us, when computing it directly is hopeless?</summary>
+<summary><strong>Check:</strong> The leftover term Z(x) is impossible to compute directly. Why does it not stop us?</summary>
 
 **Answer.** Because preferences only ever use the *difference* of two rewards for the same prompt, and $Z(x)$ depends only on the prompt. It appears identically in both rewards and cancels in the subtraction, so we never have to evaluate it.
 </details>
@@ -193,57 +236,13 @@ The information you lose by skipping the explicit reward model, that prompt-only
 **Answer.** Upside: it trains like supervised learning on a fixed dataset, stable, cheap, no rollouts. Limitation: it is *offline*. It can only judge the fixed pairs, never fresh answers the model invents. The moment a reward must be *earned by acting*, you need online RL again, which is exactly the agentic setting in the second half.
 </details>
 
-## 3. DPO worked end to end, every number
+**The recipe, in three steps.** With the loss, its gradient, and the derivation in hand, running DPO is short. (1) **SFT first** on good demonstrations; the result *is* your frozen reference $\pi_{\text{ref}}$. (2) **Collect preference triples** $(x, y_w, y_l)$, once, ahead of time. (3) **Run the single DPO loss** over them, supervised-style. In practice this is a few lines with TRL's `DPOTrainer`: hand it the SFT model and the preference dataset, set $\beta$, and train as if it were ordinary fine-tuning.
 
-Take one real preference and walk it to a gradient step. Fix $\beta = 0.1$.
-
-- **Prompt $x$:** "Should I put all my savings into one stock?"
-- **Chosen $y_w$:** "No, putting everything in one stock is risky; spread it across a low-cost index fund."
-- **Rejected $y_l$:** "Yes, go all in."
-
-**Score each answer.** Run both through $\pi_\theta$ and $\pi_{\text{ref}}$, sum the per-token log-probs, and subtract to get each response's log-ratio $\Delta(y) = \log \pi_\theta(y) - \log \pi_{\text{ref}}(y)$:
-
-| | $\log \pi_\theta$ | $\log \pi_{\text{ref}}$ | $\Delta(y)$ |
-|---|---|---|---|
-| chosen $y_w$ | $-1.4$ | $-2.2$ | $+0.80$ |
-| rejected $y_l$ | $-2.2$ | $-1.8$ | $-0.40$ |
-
-Two paragraphs of text have collapsed to two scalars: $\Delta(y_w) = +0.80$ (the policy likes the prudent answer *more* than the reference did) and $\Delta(y_l) = -0.40$ (it already disprefers the reckless one). Everything downstream touches only these two numbers.
-
-**Reward, margin, loss.** Scale by $\beta$ to get implicit rewards, subtract for the margin, push through the loss. These are the §2.3 outputs: $\hat{r}_w = 0.1 \times 0.80 = +0.08$, $\hat{r}_l = 0.1 \times (-0.40) = -0.04$, margin $m = +0.12$, and $\mathcal{L} = -\log \sigma(0.12) \approx 0.635$. The pair is ranked correctly but only barely, so there is plenty of room to improve.
-
-**The gradient.** From §2.4, the weight is $\beta \cdot \sigma(-m) = 0.1 \times \sigma(-0.12) = 0.047$. That single small number scales the whole contrastive step: nudge $y_w$ up and $y_l$ down, gently, because the pair is already (just) correct.
-
-![Two panels sharing a margin axis: left, the DPO loss minus-log-sigmoid curve falling as the margin grows with the worked point marked at margin 0.12; right, the gradient weight beta-times-sigmoid of minus-margin, high for mis-ranked pairs and fading toward zero as the margin grows](./images/fig-dpo-margin.svg)
-
-**Turn the temperature up.** Re-run the same scored pair at $\beta = 0.5$ instead of $0.1$:
-
-```python
-loss5, r_w5, r_l5, m5 = dpo_loss(-1.4, -2.2, -2.2, -1.8, beta=0.5)
-print(f"r_w = {r_w5:+.2f}   r_l = {r_l5:+.2f}   margin = {m5:+.2f}")
-print(f"loss = {loss5:.3f}   weight = {grad_weight(m5, beta=0.5):.3f}")
-```
-
-```text title="Output"
-r_w = +0.40   r_l = -0.20   margin = +0.60
-loss = 0.437   weight = 0.177
-```
-
-A larger $\beta$ does two things at once: it *sharpens* the reward (the same log-ratio now maps to a five-times-larger reward, so the margin grows from 0.12 to 0.60 and the loss falls) and it *enlarges* the step (the weight grows from 0.047 to 0.177). Temperature is not only a leash on drift; it directly scales both the reward you read off the policy and the size of every update.
-
-**The recipe, in three steps.** (1) **SFT first** on good demonstrations; the result *is* your frozen reference $\pi_{\text{ref}}$. (2) **Collect preference triples** $(x, y_w, y_l)$, once, ahead of time. (3) **Run the single DPO loss** over them, supervised-style. In practice this is a few lines with TRL's `DPOTrainer`: hand it the SFT model and the preference dataset, set $\beta$, and train as if it were ordinary fine-tuning.
-
-<details>
-<summary><strong>Check:</strong> In the worked pair the margin is already positive (+0.12). Why is the loss still nonzero, and why is that fine?</summary>
-
-**Answer.** $\sigma(0.12) \approx 0.53$, so $-\log \sigma(0.12) \approx 0.635$, just below the coin-flip loss of 0.69. The model ranks the pair correctly but not *confidently*, so a small loss (and a small-weight update) keeps nudging it toward a clearer separation. A perfectly confident pair would drive the loss toward 0.
-</details>
-
-## 4. Two variations worth knowing: SimPO and KTO
+## 3. Two variations worth knowing: SimPO and KTO
 
 DPO turned alignment into one loss, but it still asks for two things: a frozen reference model kept in memory the whole run, and *paired* data (a chosen and a rejected answer for every prompt). Two popular variations relax exactly those constraints. The core never changes: raise the relative likelihood of the preferred output with a single offline loss.
 
-### 4.1 SimPO: drop the reference, fix the length bias
+### 3.1 SimPO: drop the reference, fix the length bias
 
 DPO leaves three things on the table, and spotting them is the whole motivation for SimPO. First, the **reference model** sits in memory the entire run, so you pay for two models to train one. Second, a **length bias**: DPO scores a response by the *sum* of its token log-probs, and more tokens means more terms, so the score drifts with length and the model learns it can move the loss just by rambling. Third, a **train/generate mismatch**: at decoding time we rank candidates by their *average* log-probability per token, but DPO trains on a reference-relative *sum*. The quantity you optimize is not the quantity you later select on.
 
@@ -255,16 +254,21 @@ Read it as: "same logistic ranking loss as DPO, but each answer's score is now i
 
 ```python
 def avg_logprob(token_logps):
-    return sum(token_logps) / len(token_logps)        # (1/|y|) * sum log pi
+    # (1/|y|) * sum log pi
+    return sum(token_logps) / len(token_logps)
 
 def simpo_loss(logps_w, logps_l, beta=2.0, gamma=1.0):
-    s_w = beta * avg_logprob(logps_w)                 # reference-free, length-normalised
+    # reference-free, length-normalised score
+    s_w = beta * avg_logprob(logps_w)
     s_l = beta * avg_logprob(logps_l)
-    margin = s_w - s_l - gamma                         # demand a clear gap gamma
+    # demand a clear gap gamma
+    margin = s_w - s_l - gamma
     return -math.log(sigmoid(margin)), s_w, s_l
 
-chosen = [-0.20, -0.30, -0.10]                         # short, confident answer
-rejected = [-0.50, -0.60, -0.70, -0.60, -0.80, -0.70]  # long, mediocre answer
+# short, confident answer
+chosen = [-0.20, -0.30, -0.10]
+# long, mediocre answer
+rejected = [-0.50, -0.60, -0.70, -0.60, -0.80, -0.70]
 print(f"sum  log-prob:  chosen {sum(chosen):+.2f}   rejected {sum(rejected):+.2f}  (length-biased)")
 print(f"avg  log-prob:  chosen {avg_logprob(chosen):+.3f}   rejected {avg_logprob(rejected):+.3f}")
 sl, s_w, s_l = simpo_loss(chosen, rejected)
@@ -281,6 +285,8 @@ Look at the two scoring rules side by side. By **sum**, the longer rejected answ
 
 ![Two grouped bars per answer: a short confident answer and a long mediocre one, scored by total summed log-prob versus average per-token log-prob, with the sum favoring length and the average favoring per-token quality](./images/fig-simpo-length.svg)
 
+The figure stacks the two scoring rules for both answers. Under the summed score (the left bars) the long mediocre answer looks stronger, but only because it has more tokens to add up. Under the average score (the right bars) the short confident answer wins on per-token quality. Length-normalizing is what flips the comparison back to the answer we actually prefer, and it is the single change SimPO makes to DPO's reward.
+
 In practice SimPO's $\beta$ is much larger than DPO's (around 2.0 to 2.5 versus DPO's 0.1) because the length-normalized reward lives on a smaller numeric scale and needs more amplification. The cost of going reference-free: removing $\pi_{\text{ref}}$ also removes the implicit KL anchor, so SimPO can drift further and is more hyperparameter-sensitive; $\gamma$ and the normalization now do the stabilizing the reference used to. (Meng et al., 2024.)
 
 <details>
@@ -289,7 +295,7 @@ In practice SimPO's $\beta$ is much larger than DPO's (around 2.0 to 2.5 versus 
 **Answer.** Plain DPO scores an answer by the *sum* of its token log-probs, which grows in magnitude simply because there are more tokens, so longer answers get a mechanical edge and the model drifts wordier. SimPO scores by the *average* per token, so length no longer tips the scales (and it matches the metric decoding actually ranks by).
 </details>
 
-### 4.2 KTO: learn from a lone thumbs-up
+### 3.2 KTO: learn from a lone thumbs-up
 
 SimPO kept DPO's paired data. KTO attacks that assumption. Real feedback is rarely a matched A-vs-B pair: a user clicks a thumbs-up or thumbs-down, a reviewer accepts or rejects, a reply gets a like or a dislike. Each is a verdict on *one* response in isolation, and DPO's loss is a comparison, so a lone thumb has nothing to subtract against. Curated pairs are expensive; unpaired thumbs are everywhere and nearly free.
 
@@ -302,8 +308,10 @@ Read it as: "the implicit reward $r_\theta$ is the *same* one DPO uses (the poli
 ```python
 def kto_value(r_theta, z0, desirable, lam_D=1.0, lam_U=1.5):
     if desirable:
-        return lam_D * sigmoid(r_theta - z0)          # thumbs-up wants reward ABOVE baseline
-    return lam_U * sigmoid(z0 - r_theta)              # thumbs-down wants reward BELOW baseline
+        # thumbs-up wants reward ABOVE baseline
+        return lam_D * sigmoid(r_theta - z0)
+    # thumbs-down wants reward BELOW baseline
+    return lam_U * sigmoid(z0 - r_theta)
 
 z0 = 0.0
 for label, r, des in [("thumbs-up, above z0", +0.5, True),
@@ -324,13 +332,15 @@ Two things to read off. A thumbs-up scores higher when its reward is above the b
 
 ![The Kahneman-Tversky prospect-theory value curve: an S-shape through a reference point at the origin, gently bending and flattening for gains above it and dropping more steeply for losses below it, showing loss aversion](./images/fig-kto-value-curve.svg)
 
+The curve is the prospect-theory value function KTO borrows. It passes through the reference point at the origin, bends gently and flattens for gains above it (diminishing sensitivity), and drops more steeply for losses below it (loss aversion). That asymmetric shape is what lets a lone thumbs-up or thumbs-down become a training signal: each verdict is scored by how far it sits on the right side of the reference point, with no partner to compare against.
+
 <details>
 <summary><strong>Check:</strong> KTO learns from single thumbs-up/down instead of A-vs-B pairs. Why is that a big practical deal?</summary>
 
 **Answer.** Unpaired thumbs are everywhere and cheap (every product has like/dislike buttons), often around 10x cheaper to collect than curated pairs with a clean winner and loser for the same prompt. KTO lets you align on the abundant signal you already have.
 </details>
 
-### 4.3 The three, side by side, and when to leave them
+### 3.3 The three, side by side, and when to leave them
 
 Each variation changes one thing about DPO and keeps the core.
 
@@ -366,7 +376,7 @@ That right-hand column is the bridge to the rest of this post.
 **Answer.** DPO is offline: it needs a fixed dataset of (prompt, chosen, rejected) triples and never samples the model. An agent's reward is *interactive*, it exists only once the agent acts and you see the outcome, so there is no pre-collected set of good-vs-bad trajectories to hand a preference loss. You must generate trajectories with the current policy and score them live, which is on-policy RL.
 </details>
 
-## 5. From alignment to agents
+## 4. From alignment to agents
 
 Everything so far, RLHF, DPO, SimPO, KTO, aligns a model that answers *once*: a prompt goes in, a response comes out, it is scored a single time. As a decision problem that is one step, with full information and immediate feedback. In RL language it is a **degenerate one-step MDP**.
 
@@ -383,6 +393,8 @@ flowchart LR
     E -.->|"reward, usually only at the end"| R["0 / 1: did the task succeed?"]
 ```
 
+Read the loop left to right: the agent emits an action (a token or a tool call), the environment returns a partial observation, and the two cycle turn after turn. The dashed arrow is the difference from alignment. The reward is not attached to each response; it arrives once, usually as a single 0/1 at the very end. The table below makes those differences explicit.
+
 | | RLHF / DPO (alignment) | Agentic RL |
 |---|---|---|
 | **Horizon** | one turn | many turns |
@@ -392,7 +404,7 @@ flowchart LR
 
 The intuition: alignment is answering an exam question. Agentic RL is doing a research project. You take an action (look something up), the world answers (you find a paper), you take another action conditioned on that answer, and only at the very end is the project judged good or bad.
 
-### 5.1 The agentic MDP, made precise
+### 4.1 The agentic MDP, made precise
 
 It helps to write the MDP components down, because the differences from single-turn RL are exactly the sources of difficulty. In single-turn LLM RL the state is just the token context, the action is the next token, the transition deterministically appends that token, and the reward lands once on the finished rollout. The agentic version generalizes every row (this framing follows Cameron Wolfe's [*Agentic RL*](https://cameronrwolfe.substack.com/p/agentic-rl) overview):
 
@@ -415,17 +427,19 @@ Two features drive everything that follows. Only the model's own tokens (the thi
 
 ![A horizontal chain of six trajectory steps ending in a single terminal reward star, with curved arrows arcing back from the reward over the earlier steps, labeled with the question of which steps earned the credit](./images/fig-credit-assignment.svg)
 
+The figure draws that problem. Six steps run left to right into one terminal reward star, and the curved arrows fan back from that single reward over every earlier step. Only the model's own turns (think, act, answer) can be credited, and the picture poses the question RL has to answer: which of those decisions actually earned the reward? Spreading one end-of-episode number back over the steps that mattered is the whole job of the training in the next section.
+
 <details>
 <summary><strong>Check:</strong> In single-turn RLHF the "MDP" was called degenerate. Name the two things the agentic setting adds that make it a real sequential-decision problem.</summary>
 
 **Answer.** (1) **Multiple steps** before any reward: the agent takes a whole sequence of actions (tool calls, observations) that affect each other, so there is real temporal credit assignment. (2) **Partial observability**: it acts on what the environment chooses to reveal, not the full state. Single-turn RLHF had exactly one step and full information, which is why it was degenerate.
 </details>
 
-## 6. Agentic RL in the wild
+## 5. Agentic RL in the wild
 
 Five real systems, each trained with RL, each unlocking a different capability. The most instructive is DeepEyes, so work it in full, then the others fall into the same pattern.
 
-### 6.1 DeepEyes: learning to "think with images"
+### 5.1 DeepEyes: learning to "think with images"
 
 A vision-language model encodes a picture into a *fixed, limited* number of visual tokens. On a high-resolution photo, a small or distant detail (a far-off road sign, a tiny label) is blurred away in that compression: the model does not overlook it, it literally cannot resolve it. Humans zoom in on the relevant region, look closer, then reason. Can a model learn to do that on its own?
 
@@ -434,7 +448,7 @@ DeepEyes (arXiv [2505.14362](https://arxiv.org/abs/2505.14362)) gives the model 
 > **Worked episode.** "What does the small sign in the distance say?"
 > - **t1, think:** "That sign is tiny in the full frame; I cannot read it. I should look closer."
 > - **t2, act:** emit a bounding box around the sign, a zoom tool call.
-> - **t3, observe:** the environment returns the cropped, zoomed patch, now legible. *(masked, see §7.1)*
+> - **t3, observe:** the environment returns the cropped, zoomed patch, now legible. *(masked, see §6.1)*
 > - **t4, think:** "Now I can read it. It says No Parking."
 > - **t5, answer:** "No Parking." Reward 1 if correct.
 
@@ -446,11 +460,11 @@ DeepEyes is trained **purely with RL**, no SFT cold-start and no separate ground
 | **Tool-use** | A model can ignore the zoom and guess. A reward for *actually using* the tool when it helps **bootstraps** the behaviour, until accuracy alone can sustain it. |
 | **Format** | Well-formed tool calls and answer structure, so the environment can parse the box and act. |
 
-The tool-use term is the key trick. Early in training the model is not yet good enough for zooming to pay off in accuracy, so a pure accuracy reward would give it no reason to ever zoom, and the behaviour would never appear. The small tool-use reward gets zooming off the ground; once the model is competent, accuracy takes over and the scaffold can be annealed away. (We will reproduce exactly this bootstrap in the §10 capstone.)
+The tool-use term is the key trick. Early in training the model is not yet good enough for zooming to pay off in accuracy, so a pure accuracy reward would give it no reason to ever zoom, and the behaviour would never appear. The small tool-use reward gets zooming off the ground; once the model is competent, accuracy takes over and the scaffold can be annealed away. (We reproduce exactly this bootstrap in the §6.5 loop.)
 
 **Nobody told the model to zoom.** It was never shown a "first zoom, then answer" demonstration; RL discovered the strategy because zooming led to correct answers, which earned reward. And the behaviour sharpens in three stages: **explore** (zooms almost at random, limited benefit), **exploit** (zooms aggressively, and it starts working), **refine** (zooms *selectively*, only when it helps). Human-like behaviours appear on their own: visual search, region comparison, confirmation before committing, and hallucination mitigation (look first, then answer, so it invents fewer details).
 
-### 6.2 The same recipe, four more worlds
+### 5.2 The same recipe, four more worlds
 
 The point of DeepEyes is that it is *not* a special case. The identical recipe recurs across the literature, each instance just swapping the tool and the verifier:
 
@@ -467,11 +481,11 @@ The point of DeepEyes is that it is *not* a special case. The identical recipe r
 **Explanation.** Early on the model is bad at grounding, so a zoom rarely improves the answer; with only an accuracy reward, zooming and guessing look equally (un)rewarding, and there is nothing to single out the zoom, so it never gets reinforced. The tool-use reward pays the model just for zooming, getting the behaviour off the ground. Once the model zooms competently, correct zooms reliably earn the accuracy reward on their own, so the tool-use scaffold is redundant and can be removed without the behaviour collapsing.
 </details>
 
-## 7. How agents are trained
+## 6. How agents are trained
 
 The objective does not change: it is still GRPO/PPO, still "make good behaviour more likely." What changes is the *rollout*, and two details of the rollout are where almost all agentic-RL bugs live.
 
-### 7.1 Masking: train on the agent's actions, not the world's replies
+### 6.1 Masking: train on the agent's actions, not the world's replies
 
 A rollout interleaves two kinds of tokens: the ones the model **generated** (its thoughts, actions, tool calls, answer) and the ones the environment **inserted** (search results, stack traces, a returned image patch). They sit side by side in one context, but one is an action the policy is responsible for and the other is an observation it merely received.
 
@@ -484,11 +498,14 @@ import torch
 
 tokens = ["Q:", "<think>", "search(", "GRPO", ")", "[RESULT:DeepSeek]", "answer", "=", "2024"]
 #          prompt  -------------- agent action tokens --------------   env obs   --- agent ---
-action_mask = torch.tensor([0, 1, 1, 1, 1, 0, 1, 1, 1], dtype=torch.float32)   # 1 = agent, 0 = world
+# 1 = agent-generated token, 0 = environment token
+action_mask = torch.tensor([0, 1, 1, 1, 1, 0, 1, 1, 1], dtype=torch.float32)
 per_token_logp = torch.tensor([-0.1, -0.7, -1.2, -0.3, -0.4, -2.5, -0.6, -0.5, -0.9])
-advantage = 0.8                                        # one group-relative advantage, whole answer
+# one group-relative advantage for the whole answer
+advantage = 0.8
 
-contrib = -advantage * per_token_logp * action_mask    # masked policy-gradient surrogate
+# masked policy-gradient surrogate
+contrib = -advantage * per_token_logp * action_mask
 print("trained on", int(action_mask.sum().item()), "of", len(tokens), "tokens")
 print("masked term:", [round(x, 3) for x in contrib.tolist()])
 print("env tokens (idx 0, 5) zeroed ->", contrib[0].item(), contrib[5].item())
@@ -502,11 +519,11 @@ env tokens (idx 0, 5) zeroed -> 0.0 0.0
 
 The prompt token and the `[RESULT:...]` observation contribute exactly zero; only the agent's own decisions feed the gradient. A clean way to remember it: **you only reinforce decisions, and the agent's only decisions are the tokens it wrote.**
 
-### 7.2 Where the reward lives
+### 6.2 Where the reward lives
 
 The second choice is how much reward signal you give, and when. An **outcome reward** is a single signal at the end (did the answer verify, did the tests pass): the cleanest, most honest signal, but maximally sparse. A **process reward** adds intermediate signals (a useful search, an edit that compiles, a partial test pass): denser and easier to learn from, but a proxy that can be gamed. The tension is real: too sparse and credit assignment is brutal (which of six turns earned the single +1?); too shaped and the model farms the intermediate bonuses without solving the task. Masking and reward placement are the two knobs with no analogue in DPO; everything else is the GRPO loop you already built.
 
-### 7.3 Why it is hard, and the toolkit
+### 6.3 Why it is hard, and the toolkit
 
 Long horizons make every part harder at once: **credit assignment** (one reward after twenty steps, which action mattered?), **sparse reward** (most trajectories fail and score 0, and a group of all-failures carries no gradient, the [GRPO](../08-grpo/README.md) dynamic-sampling problem amplified), **tool and environment noise** (real tools time out and return junk), and **long context and cost** (many turns blow up the context window, and each rollout is many model calls). The standard fixes do not change the objective; they squeeze a usable signal out of long, sparse, expensive trajectories:
 
@@ -516,21 +533,23 @@ Long horizons make every part harder at once: **credit assignment** (one reward 
 - **Dynamic sampling**: drop all-success and all-fail groups that carry no gradient, spending compute where there is signal.
 - **Group-relative methods (GRPO)**: a learned critic asked to predict returns over a twenty-turn, mostly-failing trajectory is exactly the kind of model that becomes brittle. GRPO never asks "how good is this state in absolute terms," only "which of these sampled attempts did relatively better," a comparison that stays meaningful even when every individual estimate would be noise.
 
-### 7.4 Stability at scale: normalization, async rollouts, and collapse
+### 6.4 Stability at scale: normalization, async rollouts, and collapse
 
 Pushing agentic RL to many tasks and long horizons surfaces failure modes that single-turn RL rarely sees. Three are worth knowing, all distilled from recent frameworks in Wolfe's [*Agentic RL*](https://cameronrwolfe.substack.com/p/agentic-rl) survey.
 
 **Advantage normalization across a task.** Vanilla GRPO normalizes a completion's reward relative to other completions for the *same prompt*. In multi-task training, different domains live on different reward scales, and one domain can dominate the update. The fix (AgentRL's task-level normalization, AutoForge's ERPO) is to standardize advantages across an entire task or domain so no single one takes over:
 
 ```python
-# terminal rewards from two domains that live on very different scales
-rewards = torch.tensor([10.0, 6.0, 8.0,     # domain A: large-magnitude rewards
-                        0.9, 0.1, 0.5])      # domain B: small-magnitude rewards
+# terminal rewards from two domains on very different scales
+# (rows 0-2 are domain A, large magnitude; rows 3-5 are domain B, small magnitude)
+rewards = torch.tensor([10.0, 6.0, 8.0,
+                        0.9, 0.1, 0.5])
 domain = torch.tensor([0, 0, 0, 1, 1, 1])
 
 norm = torch.zeros_like(rewards)
 for d in domain.unique():
-    g = domain == d                                          # all trajectories in this domain
+    # all trajectories in this domain
+    g = domain == d
     norm[g] = (rewards[g] - rewards[g].mean()) / (rewards[g].std(unbiased=False) + 1e-8)
 
 print("raw rewards:        ", [round(x, 1) for x in rewards.tolist()])
@@ -566,7 +585,95 @@ Domain A's rewards (6 to 10) and domain B's (0.1 to 0.9) both map to the same $\
 **Answer.** The reward is *interactive*: it exists only once the agent acts in the environment and you see the outcome. There is no fixed dataset of good-vs-bad trajectories to run DPO on; you must generate trajectories with the current policy and score them live. No rollouts, no signal.
 </details>
 
-## 8. Where agents actually practise: RL environments
+### 6.5 An agentic RL loop in code
+
+Time to put the whole training story into one runnable program. It is a tiny **agentic RL loop**: a multi-turn text environment with a `reset`/`step` feel, an agent that may call a tool or answer, a **sparse terminal reward**, and the [GRPO](../08-grpo/README.md) update (group baseline plus clipped surrogate) doing the learning. There is no labelled "you should search" anywhere; we watch tool use *emerge from reward alone*, the DeepEyes story in miniature.
+
+**The world.** A hidden digit $t \in \{0,1,2,3,4\}$ is drawn each episode. From the `start` context the agent picks one action: call `SEARCH`, or guess a digit. If it searches, the environment reveals the digit as an observation (context `saw:t`, the masked tool output it did not choose) and the agent guesses on the next turn. The terminal reward is 1 for a correct guess, 0 otherwise, plus a small +0.15 tool-use bonus for having searched (DeepEyes' bootstrap, §5.1). The optimal policy is obvious to us and unknown to the agent: **search, read the revealed digit, guess it.** It must discover that from reward.
+
+The policy is a tiny table of logits over 6 actions for each of 6 contexts, trained with the exact GRPO loop from the [GRPO](../08-grpo/README.md) post: snapshot $\pi_{\text{old}}$, sample a **group** of trajectories on the *same* task, turn terminal rewards into group-relative advantages, and apply the clipped surrogate over the agent's action tokens.
+
+```python
+import torch
+torch.manual_seed(0)
+
+# contexts: 0 = start, 1..5 = "saw:digit"; actions: 0 = SEARCH, 1..5 = guess digit a-1
+N_CTX, N_ACT = 6, 6
+SEARCH = 0
+G, EPS, LR, STEPS, TASKS = 12, 0.2, 0.5, 400, 8
+
+logits = torch.zeros(N_CTX, N_ACT, requires_grad=True)
+opt = torch.optim.SGD([logits], lr=LR)
+
+def rollout(target, logp):
+    # start in context "start"
+    steps, ctx = [], 0
+    # at most two turns
+    for _ in range(2):
+        a = int(torch.distributions.Categorical(logits=logp[ctx]).sample())
+        steps.append((ctx, a))
+        # tool call: env returns a masked observation
+        if a == SEARCH and ctx == 0:
+            # move to context "saw:target"
+            ctx = target + 1
+            continue
+        guess = a - 1
+        # verifiable terminal reward
+        reward = 1.0 if guess == target else 0.0
+        if ctx != 0:
+            # small tool-use bonus (bootstraps search, as in DeepEyes)
+            reward += 0.15
+        return steps, reward
+    # searched twice, never answered
+    return steps, 0.0
+
+for step in range(STEPS):
+    # pi_old snapshot
+    old = torch.log_softmax(logits, -1).detach()
+    CTX, ACT, ADV, rlog = [], [], [], []
+    for _ in range(TASKS):
+        target = int(torch.randint(0, 5, (1,)))
+        # a GROUP of G rollouts on the SAME task
+        group = [rollout(target, old) for _ in range(G)]
+        r = torch.tensor([g[1] for g in group])
+        # group-relative advantage
+        A = (r - r.mean()) / (r.std() + 1e-8)
+        rlog.append(r.mean().item())
+        for (st, _), adv in zip(group, A):
+            # only the agent's own actions feed the gradient
+            for (ctx, a) in st:
+                CTX.append(ctx); ACT.append(a); ADV.append(adv)
+    CTX = torch.tensor(CTX); ACT = torch.tensor(ACT); ADV = torch.stack(ADV)
+
+    # reuse the batch (the PPO/GRPO inner loop)
+    for _ in range(2):
+        logp = torch.log_softmax(logits, -1)[CTX, ACT]
+        ratio = torch.exp(logp - old[CTX, ACT])
+        surr = torch.min(ratio * ADV, torch.clamp(ratio, 1 - EPS, 1 + EPS) * ADV)
+        # clipped surrogate, maximise advantage
+        loss = -surr.mean()
+        opt.zero_grad(); loss.backward(); opt.step()
+
+    if step % 80 == 0 or step == STEPS - 1:
+        p = torch.softmax(logits, -1).detach()
+        p_search = p[0, SEARCH].item()
+        acc = sum(p[t + 1, t + 1].item() for t in range(5)) / 5
+        print(f"step {step:3d}  group reward={sum(rlog) / len(rlog):.3f}  "
+              f"P(search@start)={p_search:.3f}  P(correct|saw)={acc:.3f}")
+```
+
+```text title="Output"
+step   0  group reward=0.254  P(search@start)=0.172  P(correct|saw)=0.167
+step  80  group reward=0.824  P(search@start)=0.959  P(correct|saw)=0.789
+step 160  group reward=1.117  P(search@start)=0.994  P(correct|saw)=0.956
+step 240  group reward=1.129  P(search@start)=0.997  P(correct|saw)=0.980
+step 320  group reward=1.140  P(search@start)=0.998  P(correct|saw)=0.988
+step 399  group reward=1.140  P(search@start)=0.998  P(correct|saw)=0.991
+```
+
+Read the three columns as the whole second half of this post, happening live. At step 0 the agent is random: it searches about 1 time in 6 and, even after seeing the digit, guesses right about 1 time in 5 (`P(correct|saw)=0.167`). By the end it searches almost always (`0.998`) and, once it has seen the digit, names it almost perfectly (`0.991`). Group reward climbs past 1.0 because the converged agent reliably both searches (collecting the +0.15 bonus) and answers correctly. Nobody wrote "search first"; the only inputs were a verifiable reward and a group baseline, and the **two-step strategy emerged** exactly as it does for DeepEyes, Search-R1, and the rest. That is agentic RL, on a laptop, in forty lines.
+
+## 7. Where agents actually practise: RL environments
 
 An agentic RL run is only as good as the world the model trains in. That world is an **RL environment**, the LLM-era analogue of CartPole's physics-sim-plus-reward-rule. The loop is the same one from the [MDPs & Bellman](../02-mdps-and-bellman/README.md) post; what changed is the world.
 
@@ -603,7 +710,7 @@ How they scale splits into two models. **In-process** (Verifiers, SkyRL Gym, GEM
 **Answer.** Most of Qwen3.5's post-training gain was attributed to environment *scale and diversity*, not a larger model or a new loss. Once RL is the main driver of capability, the limiting factor becomes how many diverse, gradeable worlds you can run, so building and scaling environments becomes its own engineering discipline.
 </details>
 
-## 9. The whole bootcamp, one idea
+## 8. The whole bootcamp, one idea
 
 Nine posts, and a single sentence carried all of them: *the value of where I am is the reward I just got, plus a discounted value of where I'll land next.* Everything was a different way to estimate that value or to act on it.
 
@@ -633,86 +740,16 @@ Read it as: "nudge the policy to make actions with positive advantage more likel
 | Observation masking | loss on agent tokens only | `loss * action_mask` |
 | Group-relative advantage | $(r - \bar r)/\sigma_r$ | `(r - r.mean()) / r.std()` |
 
-## 10. Capstone: an agent that learns to use a tool
+Every row is a snippet already shown inline. The complete, runnable programs live in the assignment: the DPO loss and its SimPO and KTO variants, plus the multi-turn agentic RL loop from §6.5, packaged as a notebook you can run and extend.
 
-One runnable program ties the second half together. It is a tiny **agentic RL loop**: a multi-turn text environment with a `reset`/`step` interface, an agent that may call a tool or answer, a **sparse terminal reward**, and the [GRPO](../08-grpo/README.md) update (group baseline + clipped surrogate) doing the learning. There is no labelled "you should search" anywhere; we will watch tool use *emerge from reward alone*, the DeepEyes story in miniature.
-
-**The world.** A hidden digit $t \in \{0,1,2,3,4\}$ is drawn each episode. From the `start` context the agent picks one action: call `SEARCH`, or guess a digit. If it searches, the environment reveals the digit as an observation (context `saw:t`, the masked tool output it did not choose) and the agent guesses on the next turn. The terminal reward is 1 for a correct guess, 0 otherwise, plus a small +0.15 tool-use bonus for having searched (DeepEyes' bootstrap, §6.1). The optimal policy is obvious to us and unknown to the agent: **search, read the revealed digit, guess it.** It must discover that from reward.
-
-The policy is a tiny table of logits over 6 actions for each of 6 contexts, trained with the exact GRPO loop from the [GRPO](../08-grpo/README.md) post: snapshot $\pi_{\text{old}}$, sample a **group** of trajectories on the *same* task, turn terminal rewards into group-relative advantages, and apply the clipped surrogate over the agent's action tokens.
-
-```python
-import torch
-torch.manual_seed(0)
-
-N_CTX, N_ACT = 6, 6          # contexts: 0=start, 1..5 = "saw:digit" ; actions: 0=SEARCH, 1..5 = guess digit a-1
-SEARCH = 0
-G, EPS, LR, STEPS, TASKS = 12, 0.2, 0.5, 400, 8
-
-logits = torch.zeros(N_CTX, N_ACT, requires_grad=True)
-opt = torch.optim.SGD([logits], lr=LR)
-
-def rollout(target, logp):
-    steps, ctx = [], 0                                  # start in context "start"
-    for _ in range(2):                                  # at most two turns
-        a = int(torch.distributions.Categorical(logits=logp[ctx]).sample())
-        steps.append((ctx, a))
-        if a == SEARCH and ctx == 0:                    # tool call: env returns a masked observation
-            ctx = target + 1                            # "saw:target"
-            continue
-        guess = a - 1
-        reward = 1.0 if guess == target else 0.0        # verifiable terminal reward
-        if ctx != 0:
-            reward += 0.15                              # small tool-use bonus (bootstraps search, as in DeepEyes)
-        return steps, reward
-    return steps, 0.0                                   # searched twice, never answered
-
-for step in range(STEPS):
-    old = torch.log_softmax(logits, -1).detach()        # pi_old snapshot
-    CTX, ACT, ADV, rlog = [], [], [], []
-    for _ in range(TASKS):
-        target = int(torch.randint(0, 5, (1,)))
-        group = [rollout(target, old) for _ in range(G)]        # GROUP of G on the SAME task
-        r = torch.tensor([g[1] for g in group])
-        A = (r - r.mean()) / (r.std() + 1e-8)                   # group-relative advantage
-        rlog.append(r.mean().item())
-        for (st, _), adv in zip(group, A):
-            for (ctx, a) in st:                                 # only the agent's own actions
-                CTX.append(ctx); ACT.append(a); ADV.append(adv)
-    CTX = torch.tensor(CTX); ACT = torch.tensor(ACT); ADV = torch.stack(ADV)
-
-    for _ in range(2):                                  # reuse the batch (PPO/GRPO inner loop)
-        logp = torch.log_softmax(logits, -1)[CTX, ACT]
-        ratio = torch.exp(logp - old[CTX, ACT])
-        surr = torch.min(ratio * ADV, torch.clamp(ratio, 1 - EPS, 1 + EPS) * ADV)
-        loss = -surr.mean()                             # clipped surrogate, maximise advantage
-        opt.zero_grad(); loss.backward(); opt.step()
-
-    if step % 80 == 0 or step == STEPS - 1:
-        p = torch.softmax(logits, -1).detach()
-        p_search = p[0, SEARCH].item()
-        acc = sum(p[t + 1, t + 1].item() for t in range(5)) / 5
-        print(f"step {step:3d}  group reward={sum(rlog) / len(rlog):.3f}  "
-              f"P(search@start)={p_search:.3f}  P(correct|saw)={acc:.3f}")
-```
-
-```text title="Output"
-step   0  group reward=0.254  P(search@start)=0.172  P(correct|saw)=0.167
-step  80  group reward=0.824  P(search@start)=0.959  P(correct|saw)=0.789
-step 160  group reward=1.117  P(search@start)=0.994  P(correct|saw)=0.956
-step 240  group reward=1.129  P(search@start)=0.997  P(correct|saw)=0.980
-step 320  group reward=1.140  P(search@start)=0.998  P(correct|saw)=0.988
-step 399  group reward=1.140  P(search@start)=0.998  P(correct|saw)=0.991
-```
-
-Read the three columns as the whole second half of this post, happening live. At step 0 the agent is random: it searches about 1 time in 6 and, even after seeing the digit, guesses right about 1 time in 5 (`P(correct|saw)=0.167`). By the end it searches almost always (`0.998`) and, once it has seen the digit, names it almost perfectly (`0.991`). Group reward climbs past 1.0 because the converged agent reliably both searches (collecting the +0.15 bonus) and answers correctly. Nobody wrote "search first"; the only inputs were a verifiable reward and a group baseline, and the **two-step strategy emerged** exactly as it does for DeepEyes, Search-R1, and the rest. That is agentic RL, on a laptop, in forty lines.
+> **[Assignment: DPO and Agentic RL](https://github.com/S1LV3RJ1NX/RL-in-Production-Bootcamp-Resources/blob/main/assignments/lecture6.ipynb)**
 
 ## Where this goes next
 
 This is the last post in the series, so end by looking outward. The toy above learns in seconds because its world has six states; the open problems are all about what happens when the world does not.
 
-- **Real environments at scale.** §8's frameworks are a year old. The bet is consolidation around a few protocols (MCP, ORS) and a shared catalog of thousands of gradeable worlds, the "environments are the scarce resource" thesis taken to its conclusion.
-- **Long horizons.** Toy episodes are two turns; a real software agent runs hundreds. Credit assignment, context cost, and stability all get harder roughly linearly in horizon, and §7.4's failure modes (echo trap, template collapse) get easier to trigger. Better per-step credit and cheaper long-context training are open.
+- **Real environments at scale.** §7's frameworks are a year old. The bet is consolidation around a few protocols (MCP, ORS) and a shared catalog of thousands of gradeable worlds, the "environments are the scarce resource" thesis taken to its conclusion.
+- **Long horizons.** Toy episodes are two turns; a real software agent runs hundreds. Credit assignment, context cost, and stability all get harder roughly linearly in horizon, and §6.4's failure modes (echo trap, template collapse) get easier to trigger. Better per-step credit and cheaper long-context training are open.
 - **Reward design and verification.** Everything here leaned on a *verifiable* reward (right answer, passing tests). The frontier is tasks with no clean verifier, where reward modelling, rubric grading, and process supervision return, now wrapped around an agent instead of a single response.
 - **Safety.** An agent that *acts* (runs code, edits files, clicks) can cause real side effects, and reward hacking stops being a curiosity when the optimizer has a shell. Sandboxing, guardrails, and alignment of *behaviour* (not just answers) become first-class.
 
