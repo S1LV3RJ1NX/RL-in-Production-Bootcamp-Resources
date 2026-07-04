@@ -46,22 +46,44 @@ def token_logprobs(model, input_ids, attn_mask, prompt_len):
 # --------------------------------------------------------------------------- #
 # ✅ PROVIDED — rollout: for each puzzle, sample a GROUP of completions + reward
 # --------------------------------------------------------------------------- #
-@torch.no_grad()
+@torch.no_grad()  # just sampling answers here, so no gradients
 def rollout(model, tok, puzzles, group, max_new_tokens, device):
+    # For each puzzle, ask the model for `group` answers. Total = bsz * group.
+
+    # Repeat each puzzle's prompt `group` times, back to back. Keeping them
+    # grouped like [P0,P0,P0,P0, P1,P1,P1,P1] is what lets us later do reshape(-1, group).
     prompts, metas = [], []
     for p in puzzles:
         text = tok.apply_chat_template(chat_messages(p), tokenize=False, add_generation_prompt=True)
         for _ in range(group):
-            prompts.append(text)
-            metas.append(p)
+            prompts.append(text)   # same question, asked `group` times
+            metas.append(p)        # remember which puzzle this row is for (needed to score it)
+
+    # Turn the prompts into padded token ids. Shapes: [bsz*group, prompt_len].
     enc = tok(prompts, return_tensors="pt", padding=True).to(device)
+
+    # Sampling (not greedy), so the `group` identical prompts give DIFFERENT answers.
+    # That variety is what creates a learning signal. Shape: [bsz*group, prompt_len + new].
+    # Generate in eval mode with the KV cache on for speed, then restore train mode.
+    was_training = model.training
+    model.eval()
     gen = model.generate(**enc, max_new_tokens=max_new_tokens, do_sample=True,
-                         temperature=1.0, top_p=1.0, pad_token_id=tok.pad_token_id)
+                         temperature=1.0, top_p=1.0, pad_token_id=tok.pad_token_id,
+                         use_cache=True)
+    model.train(was_training)
     prompt_len = enc["input_ids"].shape[1]
+
+    # Keep only the newly generated part and turn it back into text.
     completions = tok.batch_decode(gen[:, prompt_len:], skip_special_tokens=True)
+
+    # Score every answer with the shaped reward -> {0.0, 0.05, 0.10, 1.0}.
+    # Same grouped order as above, so rewards is [bsz*group] -> exactly what TODO 1 wants.
     rewards = torch.tensor([countdown_reward(c, p) for c, p in zip(completions, metas)],
                            dtype=torch.float32)
+
+    # Fraction actually correct (exact verifier). For logging only, not training.
     solved = sum(is_correct(c, p) for c, p in zip(completions, metas)) / len(metas)
+
     return gen, enc["attention_mask"], prompt_len, rewards, solved, metas
 
 
@@ -79,8 +101,20 @@ def group_advantages(rewards: torch.Tensor, group: int) -> torch.Tensor:
     Hint: this is the single idea that distinguishes GRPO from PPO (no critic needed).
     Review the L6 slides before implementing.
     """
-    raise NotImplementedError("📝 TODO 1: group-relative advantage")
+    # "How much better than my group's average was I?" That deviation is the advantage.
 
+    # Put each puzzle's answers on their own row: [bsz*group] -> [bsz, group].
+    rewards_reshaped_by_group = rewards.reshape(-1, group)
+
+    # Average + spread of each puzzle's own answers (the group is its own baseline).
+    group_mean, std = rewards_reshaped_by_group.mean(dim=1), rewards_reshaped_by_group.std(dim=1)
+
+    # Above the group average -> positive (push up); below -> negative (push down).
+    # +1e-8 so an all-equal group gives 0 (no signal) instead of dividing by zero.
+    advantages = (rewards_reshaped_by_group - group_mean.unsqueeze(1)) / (std.unsqueeze(1) + 1e-8)
+
+    # Back to a flat list, one advantage per answer, same order as the completions.
+    return advantages.reshape(-1)
 
 # --------------------------------------------------------------------------- #
 # 📝 TODO 2 — the GRPO loss (clipped surrogate + KL to reference)
@@ -102,7 +136,27 @@ def grpo_loss(logp, logp_old, logp_ref, comp_mask, advantages, clip_eps=0.2, kl_
     KL estimator: the k3 form  exp(log_ref − log_policy) − (log_ref − log_policy) − 1
     is standard and numerically stable — you'll find it in the GRPO paper.
     """
-    raise NotImplementedError("📝 TODO 2: GRPO clipped surrogate + KL loss")
+    # How much more likely is each token now vs. when we sampled it? (PPO ratio)
+    policy_ratio = torch.exp(logp - logp_old)
+    # Don't trust a huge jump: cap the ratio to a small trust band around 1.
+    policy_ratio_clipped = torch.clamp(policy_ratio, 1 - clip_eps, 1 + clip_eps)
+
+    # One advantage per answer -> give it a token axis so it applies to every token.
+    A = advantages.unsqueeze(-1)
+    # Take the more pessimistic of clipped/unclipped: rewards good moves, but the
+    # clip stops any single step from pushing a token too hard.
+    surrogate = torch.min(policy_ratio_clipped * A, policy_ratio * A)
+
+    # Leash: how far each token drifted from the frozen reference model (k3 KL, always >= 0).
+    KL = torch.exp(logp_ref - logp) - (logp_ref - logp) - 1
+
+    # Reward beating the group, minus a small fee for drifting from the reference.
+    per_token_objective = surrogate - kl_beta * KL
+
+    # Average over REAL completion tokens only (mask hides prompt/padding), then
+    # flip sign because the optimizer minimizes but we want to maximize the objective.
+    loss = -(per_token_objective * comp_mask).sum() / comp_mask.sum().clamp(min=1)
+    return loss
 
 
 # --------------------------------------------------------------------------- #
@@ -119,6 +173,8 @@ def main() -> None:
     ap.add_argument("--max-new-tokens", type=int, default=384)
     ap.add_argument("--lr", type=float, default=1e-6)
     ap.add_argument("--smoke", action="store_true", help="tiny run to test plumbing")
+    ap.add_argument("--save-every", type=int, default=200,
+                    help="checkpoint every N steps (0 disables intermediate saves)")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -126,6 +182,13 @@ def main() -> None:
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     tok.padding_side = "left"
+    # Fallback for base models (e.g. tiny-gpt2 smoke test) that ship NO chat template.
+    # Real instruct models like Qwen2.5-Instruct already have one, so this is inert for them.
+    if tok.chat_template is None:
+        tok.chat_template = (
+            "{% for m in messages %}{{ m['role'] + ': ' + m['content'] + '\n' }}{% endfor %}"
+            "{% if add_generation_prompt %}assistant: {% endif %}"
+        )
 
     policy = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype="auto").to(device)
     ref = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype="auto").to(device)
@@ -160,6 +223,13 @@ def main() -> None:
 
         print(f"step {step:4d} | loss {loss.item():+.4f} | "
               f"reward {rewards.mean().item():.3f} | solved {solved*100:5.1f}%")
+
+        # Periodic checkpoint so a crash/OOM late in a long run doesn't lose everything,
+        # and so we have intermediate checkpoints to evaluate/compare.
+        if args.save_every and (step + 1) % args.save_every == 0:
+            policy.save_pretrained(args.out)
+            tok.save_pretrained(args.out)
+            print(f"  checkpoint saved -> {args.out} (step {step + 1})")
 
     policy.save_pretrained(args.out)
     tok.save_pretrained(args.out)

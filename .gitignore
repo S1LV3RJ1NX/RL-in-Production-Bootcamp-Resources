@@ -9,3 +9,6 @@ self-notes/
 
 # Trained reward-model artifacts (large; model.safetensors ~475MB)
 assignments/rm/
+
+# Capstone trained checkpoints (large; upload to HF Hub instead of git)
+lectures/capstone/model*/

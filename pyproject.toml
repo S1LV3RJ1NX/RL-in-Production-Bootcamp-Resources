@@ -24,4 +24,13 @@ dependencies = [
 ]
 
 [tool.uv]
-environments = ["sys_platform == 'darwin'"]
+environments = ["sys_platform == 'linux'", "sys_platform == 'darwin'"]
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu129", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cu129", marker = "sys_platform == 'linux'" }]

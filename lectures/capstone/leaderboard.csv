@@ -1,0 +1,3 @@
+name,accuracy,accuracy_hard,format_rate,avg_tokens_correct,n
+base-floor,0.0033,0.0000,0.0000,20.0,300
+grpo-run1-lr1e6,0.0100,0.0000,0.0000,16.7,300
