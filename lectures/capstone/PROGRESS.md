@@ -235,6 +235,41 @@ Remaining for a complete Run 1 set:
 
 >>> RUN 1 COMPLETE SET LOCKED. Next: IMPROVE via ablation.
 
+## ABLATION RESULT — lr 3e-6, 1500 steps (BIG WIN)
+leaderboard.csv:
+    base-floor       accuracy 0.33%   hard 0.00%   format 0.00%
+    grpo-run1-lr1e6  accuracy 1.00%   hard 0.00%   format 0.00%
+    grpo-lr3e6       accuracy 12.00%  hard 1.67%   format 0.00%   <-- 12x floor, 12x run1
+- Reward: final smoothed ~0.191 (vs run1 ~0.101); batch-solved up to ~44% near step 1500.
+- Overlaid curve shows lr3e6 > run1 at EVERY shared step -> gain is from LR, not the extra 500 steps.
+- Still rising at 1500 -> more steps should help.
+- KEY INSIGHT: completions are only ~17 tokens even when correct -> max_new_tokens is NOT the
+  bottleneck. Do NOT bother raising it to 256 / gradient checkpointing. Levers that matter: LR + steps.
+- format_rate still 0 (no <think>) - the reasoning-collapse failure mode persists (reward doesn't pay
+  for <think>); accuracy still climbs because bare correct answers score 1.0.
+- REPORT.md ablation section filled. Added plot_leaderboard.py (bar chart of leaderboard.csv).
+- Artifacts: model_lr3e6/, train_log_lr3e6.txt, dev_preds_lr3e6.jsonl.
+
+## STEP ABLATION — lr 3e-6, 3000 steps (PLATEAU, no gain)
+    grpo-lr3e6      (1500 steps) accuracy 12.00%  hard 1.67%
+    grpo-lr3e6-3k   (3000 steps) accuracy 10.67%  hard 1.67%   <-- flat-to-down (within ~1.8% noise)
+- Reward plateaus right after step 1500: brief spike to ~0.24 then flat ~0.13-0.16 to step 3000.
+  Final smoothed 0.159 (LOWER than the 1500 run's 0.191).
+- CONCLUSION: recipe saturates ~step 1500. More steps = wasted compute. Best = grpo-lr3e6 (1500).
+- To break the plateau, change a DIFFERENT lever: larger --group (lower-variance advantage) or
+  higher lr (5e-6). NOT more steps, NOT more tokens.
+- Report ablation table updated (Run1 / A=best / B=plateau). Leaderboard.png regenerated (4 runs).
+
+## GROUP ABLATION — group 16 (NO GAIN) + tuning DONE
+    grpo-g16-1200  (group 16, 1200 steps)  accuracy 10.33%  hard 0.00%  <- no advantage, same plateau
+- group-16 run OOM'd at step 1379 (allocator fragmentation on ref forward). Fix for future:
+  PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True. But result didn't justify a rerun.
+- FINAL VERDICT (3 ablations): only LR moved the needle (1%->12%). Steps & group = no gain.
+  Recipe saturates ~12%; binding constraint is reward design (reasoning collapse, format_rate=0),
+  NOT hyperparameters. Tuning phase CLOSED.
+- SUBMISSION PICK: grpo-lr3e6  (model_lr3e6/ + dev_preds_lr3e6.jsonl)  = 12.00% dev accuracy.
+- Report headline results table + synthesis paragraph updated. Next: package submission.
+
 ---
 
 ## CURRENT STEP → Ablation run (lr 3e-6, 1500 steps) to beat Run 1

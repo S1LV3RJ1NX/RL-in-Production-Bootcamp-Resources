@@ -1,0 +1,300 @@
+{"id": "dev-00000", "completion": "<answer>(5 + (5 + 10))</answer>", "num_tokens": 16}
+{"id": "dev-00001", "completion": "<answer>(3 + (18 + 18))</answer>", "num_tokens": 17}
+{"id": "dev-00002", "completion": "<answer>(3 + (2 + 3))</answer>", "num_tokens": 15}
+{"id": "dev-00003", "completion": "<answer>(17 + (11 - 2))</answer>", "num_tokens": 17}
+{"id": "dev-00004", "completion": "<answer>(13 + (4 * 11))</answer>", "num_tokens": 17}
+{"id": "dev-00005", "completion": "<answer>(13 + (7 - 10))</answer>", "num_tokens": 17}
+{"id": "dev-00006", "completion": "<answer>(4 + (20 / 16))</answer>", "num_tokens": 17}
+{"id": "dev-00007", "completion": "<answer>(14 + (12 + 3))</answer>", "num_tokens": 17}
+{"id": "dev-00008", "completion": "<answer>(16 + (15 + 4))</answer>", "num_tokens": 17}
+{"id": "dev-00009", "completion": "<answer>(17 + (6 * 14))</answer>", "num_tokens": 17}
+{"id": "dev-00010", "completion": "<answer>(10 + (9 + 14))</answer>", "num_tokens": 17}
+{"id": "dev-00011", "completion": "<answer>(7 * (7 + 5))</answer>", "num_tokens": 15}
+{"id": "dev-00012", "completion": "<answer>(17 + (4 - 3))</answer>", "num_tokens": 16}
+{"id": "dev-00013", "completion": "<answer>(19 + (7 - 14))</answer>", "num_tokens": 17}
+{"id": "dev-00014", "completion": "<answer>(12 + (6 + 16))</answer>", "num_tokens": 17}
+{"id": "dev-00015", "completion": "<answer>(18 + (11 - 12))</answer>", "num_tokens": 18}
+{"id": "dev-00016", "completion": "<answer>(16 + (6 * 15))</answer>", "num_tokens": 17}
+{"id": "dev-00017", "completion": "<answer>(19 + (14 + 3))</answer>", "num_tokens": 17}
+{"id": "dev-00018", "completion": "<answer>(8 + (15 + 5))</answer>", "num_tokens": 16}
+{"id": "dev-00019", "completion": "<answer>(5 + (13 - 6))</answer>", "num_tokens": 16}
+{"id": "dev-00020", "completion": "<answer>(10 + (9 - 3))</answer>", "num_tokens": 16}
+{"id": "dev-00021", "completion": "<answer>(2 + (9 - 8))</answer>", "num_tokens": 15}
+{"id": "dev-00022", "completion": "<answer>(7 + (20 - 17))</answer>", "num_tokens": 17}
+{"id": "dev-00023", "completion": "<answer>(8 + (12 * 6))</answer>", "num_tokens": 16}
+{"id": "dev-00024", "completion": "<answer>(20 + (2 * 10))</answer>", "num_tokens": 17}
+{"id": "dev-00025", "completion": "<answer>(16 + (9 - 12))</answer>", "num_tokens": 17}
+{"id": "dev-00026", "completion": "<answer>(19 + (6 * 11))</answer>", "num_tokens": 17}
+{"id": "dev-00027", "completion": "<answer>(10 + (2 * 6))</answer>", "num_tokens": 16}
+{"id": "dev-00028", "completion": "<answer>(10 + (18 - 17))</answer>", "num_tokens": 18}
+{"id": "dev-00029", "completion": "<answer>(18 + (16 - 7))</answer>", "num_tokens": 17}
+{"id": "dev-00030", "completion": "<answer>(13 + (8 - 5))</answer>", "num_tokens": 16}
+{"id": "dev-00031", "completion": "<answer>(15 + (4 * 15))</answer>", "num_tokens": 17}
+{"id": "dev-00032", "completion": "<answer>(20 + (17 + 3))</answer>", "num_tokens": 17}
+{"id": "dev-00033", "completion": "<answer>(19 + (14 + 6))</answer>", "num_tokens": 17}
+{"id": "dev-00034", "completion": "<answer>(17 + (9 - 18))</answer>", "num_tokens": 17}
+{"id": "dev-00035", "completion": "<answer>(2 + (13 + 2))</answer>", "num_tokens": 16}
+{"id": "dev-00036", "completion": "<answer>(15 + (6 - 18))</answer>", "num_tokens": 17}
+{"id": "dev-00037", "completion": "<answer>(9 + (20 + 9))</answer>", "num_tokens": 16}
+{"id": "dev-00038", "completion": "<answer>(16 + (8 + 20))</answer>", "num_tokens": 17}
+{"id": "dev-00039", "completion": "<answer>(10 + (6 + 13))</answer>", "num_tokens": 17}
+{"id": "dev-00040", "completion": "<answer>(8 + (8 + 12))</answer>", "num_tokens": 16}
+{"id": "dev-00041", "completion": "<answer>(8 + (20 - 16))</answer>", "num_tokens": 17}
+{"id": "dev-00042", "completion": "<answer>(9 + (5 - 17))</answer>", "num_tokens": 16}
+{"id": "dev-00043", "completion": "<answer>(1 + (10 + 12))</answer>", "num_tokens": 17}
+{"id": "dev-00044", "completion": "<answer>(16 + (20 - 10))</answer>", "num_tokens": 18}
+{"id": "dev-00045", "completion": "<answer>(8 + (4 + 13))</answer>", "num_tokens": 16}
+{"id": "dev-00046", "completion": "<answer>(20 + (8 - 10))</answer>", "num_tokens": 17}
+{"id": "dev-00047", "completion": "<answer>(10 + (14 + 9))</answer>", "num_tokens": 17}
+{"id": "dev-00048", "completion": "<answer>(13 + (7 - 10))</answer>", "num_tokens": 17}
+{"id": "dev-00049", "completion": "<answer>(1 + (12 / 4))</answer>", "num_tokens": 16}
+{"id": "dev-00050", "completion": "<answer>(18 + (4 - 1))</answer>", "num_tokens": 16}
+{"id": "dev-00051", "completion": "<answer>(14 + (2 + 13))</answer>", "num_tokens": 17}
+{"id": "dev-00052", "completion": "<answer>(4 + (20 / 3))</answer>", "num_tokens": 16}
+{"id": "dev-00053", "completion": "<answer>(9 + (4 - 19))</answer>", "num_tokens": 16}
+{"id": "dev-00054", "completion": "<answer>(11 + (20 - 6))</answer>", "num_tokens": 17}
+{"id": "dev-00055", "completion": "<answer>(10 + (18 - 1))</answer>", "num_tokens": 17}
+{"id": "dev-00056", "completion": "<answer>(18 + (5 + 14))</answer>", "num_tokens": 17}
+{"id": "dev-00057", "completion": "<answer>(16 + (13 - 2))</answer>", "num_tokens": 17}
+{"id": "dev-00058", "completion": "<answer>(16 + (6 * 10))</answer>", "num_tokens": 17}
+{"id": "dev-00059", "completion": "<answer>(12 + (14 - 1))</answer>", "num_tokens": 17}
+{"id": "dev-00060", "completion": "<answer>(19 + (8 - 15))</answer>", "num_tokens": 17}
+{"id": "dev-00061", "completion": "<answer>(17 + (13 - 6))</answer>", "num_tokens": 17}
+{"id": "dev-00062", "completion": "<answer>(6 + (6 + 5))</answer>", "num_tokens": 15}
+{"id": "dev-00063", "completion": "<answer>(20 + (1 + 3))</answer>", "num_tokens": 16}
+{"id": "dev-00064", "completion": "<answer>(19 + (3 - 13))</answer>", "num_tokens": 17}
+{"id": "dev-00065", "completion": "<answer>(15 + (17 - 18))</answer>", "num_tokens": 18}
+{"id": "dev-00066", "completion": "<answer>(8 + (18 - 15))</answer>", "num_tokens": 17}
+{"id": "dev-00067", "completion": "<answer>(8 + (11 + 8))</answer>", "num_tokens": 16}
+{"id": "dev-00068", "completion": "<answer>(14 + (10 + 11))</answer>", "num_tokens": 18}
+{"id": "dev-00069", "completion": "<answer>(16 + (13 + 6))</answer>", "num_tokens": 17}
+{"id": "dev-00070", "completion": "<answer>(15 + (4 * 4))</answer>", "num_tokens": 16}
+{"id": "dev-00071", "completion": "<answer>(20 + (17 + 13))</answer>", "num_tokens": 18}
+{"id": "dev-00072", "completion": "<answer>(20 + (8 - 5))</answer>", "num_tokens": 16}
+{"id": "dev-00073", "completion": "<answer>(11 + (7 + 18))</answer>", "num_tokens": 17}
+{"id": "dev-00074", "completion": "<answer>(1 + (14 + 17))</answer>", "num_tokens": 17}
+{"id": "dev-00075", "completion": "<answer>(2 + (18 - 3))</answer>", "num_tokens": 16}
+{"id": "dev-00076", "completion": "<answer>(17 + (11 + 14))</answer>", "num_tokens": 18}
+{"id": "dev-00077", "completion": "<answer>(14 + (5 + 13))</answer>", "num_tokens": 17}
+{"id": "dev-00078", "completion": "<answer>(20 + (17 + 20))</answer>", "num_tokens": 18}
+{"id": "dev-00079", "completion": "<answer>(13 + (12 + 5))</answer>", "num_tokens": 17}
+{"id": "dev-00080", "completion": "<answer>(18 + (5 + 11))</answer>", "num_tokens": 17}
+{"id": "dev-00081", "completion": "<answer>(17 + (8 - 12))</answer>", "num_tokens": 17}
+{"id": "dev-00082", "completion": "<answer>(9 + (11 + 6))</answer>", "num_tokens": 16}
+{"id": "dev-00083", "completion": "<answer>(7 + (4 + 9))</answer>", "num_tokens": 15}
+{"id": "dev-00084", "completion": "<answer>(5 + (5 + 12))</answer>", "num_tokens": 16}
+{"id": "dev-00085", "completion": "<answer>(8 + (6 - 2))</answer>", "num_tokens": 15}
+{"id": "dev-00086", "completion": "<answer>(8 + (7 + 5))</answer>", "num_tokens": 15}
+{"id": "dev-00087", "completion": "<answer>(16 + (3 * 18))</answer>", "num_tokens": 17}
+{"id": "dev-00088", "completion": "<answer>(1 + (8 - 10))</answer>", "num_tokens": 16}
+{"id": "dev-00089", "completion": "<answer>(12 + (12 + 5))</answer>", "num_tokens": 17}
+{"id": "dev-00090", "completion": "<answer>(19 + (3 * 10))</answer>", "num_tokens": 17}
+{"id": "dev-00091", "completion": "<answer>(6 + (3 * 10))</answer>", "num_tokens": 16}
+{"id": "dev-00092", "completion": "<answer>(14 + (12 + 2))</answer>", "num_tokens": 17}
+{"id": "dev-00093", "completion": "<answer>(5 + (7 - 18))</answer>", "num_tokens": 16}
+{"id": "dev-00094", "completion": "<answer>(18 + (18 + 5))</answer>", "num_tokens": 17}
+{"id": "dev-00095", "completion": "<answer>(6 + (13 + 5))</answer>", "num_tokens": 16}
+{"id": "dev-00096", "completion": "<answer>(4 + (8 + 16))</answer>", "num_tokens": 16}
+{"id": "dev-00097", "completion": "<answer>(19 + (10 - 2))</answer>", "num_tokens": 17}
+{"id": "dev-00098", "completion": "<answer>(12 + (6 - 9))</answer>", "num_tokens": 16}
+{"id": "dev-00099", "completion": "<answer>(17 + (13 - 14))</answer>", "num_tokens": 18}
+{"id": "dev-00100", "completion": "<answer>(6 + (4 + 11))</answer>", "num_tokens": 16}
+{"id": "dev-00101", "completion": "<answer>(16 + (5 * 5))</answer>", "num_tokens": 16}
+{"id": "dev-00102", "completion": "<answer>(1 + (13 + 8))</answer>", "num_tokens": 16}
+{"id": "dev-00103", "completion": "<answer>(8 + (4 * 2))</answer>", "num_tokens": 15}
+{"id": "dev-00104", "completion": "<answer>(17 + (13 + 19))</answer>", "num_tokens": 18}
+{"id": "dev-00105", "completion": "<answer>(5 + (14 + 7))</answer>", "num_tokens": 16}
+{"id": "dev-00106", "completion": "<answer>(1 + (3 + 20))</answer>", "num_tokens": 16}
+{"id": "dev-00107", "completion": "<answer>(6 + (7 + 6))</answer>", "num_tokens": 15}
+{"id": "dev-00108", "completion": "<answer>(18 + (9 - 12))</answer>", "num_tokens": 17}
+{"id": "dev-00109", "completion": "<answer>(5 + (5 + 7))</answer>", "num_tokens": 15}
+{"id": "dev-00110", "completion": "<answer>(15 + (8 * 12))</answer>", "num_tokens": 17}
+{"id": "dev-00111", "completion": "<answer>(17 + (14 - 10))</answer>", "num_tokens": 18}
+{"id": "dev-00112", "completion": "<answer>(1 + (4 + 11))</answer>", "num_tokens": 16}
+{"id": "dev-00113", "completion": "<answer>(16 + (2 + 7))</answer>", "num_tokens": 16}
+{"id": "dev-00114", "completion": "<answer>(8 + (8 + 2))</answer>", "num_tokens": 15}
+{"id": "dev-00115", "completion": "<answer>(19 + (20 - 19))</answer>", "num_tokens": 18}
+{"id": "dev-00116", "completion": "<answer>(9 + (13 + 6))</answer>", "num_tokens": 16}
+{"id": "dev-00117", "completion": "<answer>(9 + (4 + 20))</answer>", "num_tokens": 16}
+{"id": "dev-00118", "completion": "<answer>(16 + (10 - 1))</answer>", "num_tokens": 17}
+{"id": "dev-00119", "completion": "<answer>(20 + (1 + 3))</answer>", "num_tokens": 16}
+{"id": "dev-00120", "completion": "<answer>(9 + (8 + 5)) * 7</answer>", "num_tokens": 18}
+{"id": "dev-00121", "completion": "<answer>(11 + (12 + 11)) * 12</answer>", "num_tokens": 22}
+{"id": "dev-00122", "completion": "<answer>(8 * (3 + 5)) + 3</answer>", "num_tokens": 18}
+{"id": "dev-00123", "completion": "<answer>(4 * (10 + 1)) + 4</answer>", "num_tokens": 19}
+{"id": "dev-00124", "completion": "<answer>(8 + (3 + 7)) * 12</answer>", "num_tokens": 19}
+{"id": "dev-00125", "completion": "<answer>(9 + (7 + 6)) * 1</answer>", "num_tokens": 18}
+{"id": "dev-00126", "completion": "<answer>(9 + (8 + 7)) * 12</answer>", "num_tokens": 19}
+{"id": "dev-00127", "completion": "<answer>(5 * (2 + 4)) + 8</answer>", "num_tokens": 18}
+{"id": "dev-00128", "completion": "<answer>(8 * (8 + 8)) / 6</answer>", "num_tokens": 18}
+{"id": "dev-00129", "completion": "<answer>(5 + (5 + 4)) * 10</answer>", "num_tokens": 19}
+{"id": "dev-00130", "completion": "<answer>(7 + (6 + 8)) * 1</answer>", "num_tokens": 18}
+{"id": "dev-00131", "completion": "<answer>(9 * (3 + 3)) / 3</answer>", "num_tokens": 18}
+{"id": "dev-00132", "completion": "<answer>(10 + (2 + 7)) * 7</answer>", "num_tokens": 19}
+{"id": "dev-00133", "completion": "<answer>(11 * (1 + 11)) / 1</answer>", "num_tokens": 20}
+{"id": "dev-00134", "completion": "<answer>(5 + (6 + 8)) * 2</answer>", "num_tokens": 18}
+{"id": "dev-00135", "completion": "<answer>(10 + (8 - 11)) * 3</answer>", "num_tokens": 20}
+{"id": "dev-00136", "completion": "<answer>(9 * (12 + 9)) / 12</answer>", "num_tokens": 20}
+{"id": "dev-00137", "completion": "<answer>(10 + (4 - 7)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00138", "completion": "<answer>(7 + (4 + 10)) * 4</answer>", "num_tokens": 19}
+{"id": "dev-00139", "completion": "<answer>(10 + (8 + 10)) * 9</answer>", "num_tokens": 20}
+{"id": "dev-00140", "completion": "<answer>(5 * (3 + 5)) / 1</answer>", "num_tokens": 18}
+{"id": "dev-00141", "completion": "<answer>(10 + (8 + 7)) * 4</answer>", "num_tokens": 19}
+{"id": "dev-00142", "completion": "<answer>(11 + (11 + 7)) * 8</answer>", "num_tokens": 20}
+{"id": "dev-00143", "completion": "<answer>(9 + (6 - 7)) * 3</answer>", "num_tokens": 18}
+{"id": "dev-00144", "completion": "<answer>(8 + (4 * 3)) / 4</answer>", "num_tokens": 18}
+{"id": "dev-00145", "completion": "<answer>(4 * (1 + 1)) + 9</answer>", "num_tokens": 18}
+{"id": "dev-00146", "completion": "<answer>(1 + (6 + 12)) * 7</answer>", "num_tokens": 19}
+{"id": "dev-00147", "completion": "<answer>(8 + (10 + 2)) * 8</answer>", "num_tokens": 19}
+{"id": "dev-00148", "completion": "<answer>(10 * (10 + 1)) / 10</answer>", "num_tokens": 21}
+{"id": "dev-00149", "completion": "<answer>(9 + (4 - 2)) * 6</answer>", "num_tokens": 18}
+{"id": "dev-00150", "completion": "<answer>(8 + (3 * 3)) / 2</answer>", "num_tokens": 18}
+{"id": "dev-00151", "completion": "<answer>(7 + (2 + 5)) * 7</answer>", "num_tokens": 18}
+{"id": "dev-00152", "completion": "<answer>(8 + (8 + 6)) * 4</answer>", "num_tokens": 18}
+{"id": "dev-00153", "completion": "<answer>(10 * (2 + 5)) / 5</answer>", "num_tokens": 19}
+{"id": "dev-00154", "completion": "<answer>(9 * (8 + 9)) / 2</answer>", "num_tokens": 18}
+{"id": "dev-00155", "completion": "<answer>(12 + (11 + 9)) * 3</answer>", "num_tokens": 20}
+{"id": "dev-00156", "completion": "<answer>(5 + (3 + 9)) * 12</answer>", "num_tokens": 19}
+{"id": "dev-00157", "completion": "<answer>(3 + (11 - 2)) * 9</answer>", "num_tokens": 19}
+{"id": "dev-00158", "completion": "<answer>(5 + (9 - 2)) * 6</answer>", "num_tokens": 18}
+{"id": "dev-00159", "completion": "<answer>(3 * (5 + 3)) / 6</answer>", "num_tokens": 18}
+{"id": "dev-00160", "completion": "<answer>(7 + (4 + 6)) * 3</answer>", "num_tokens": 18}
+{"id": "dev-00161", "completion": "<answer>(12 + (4 - 9)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00162", "completion": "<answer>(10 + (4 + 11)) * 9</answer>", "num_tokens": 20}
+{"id": "dev-00163", "completion": "<answer>(9 + (4 + 9)) * 11</answer>", "num_tokens": 19}
+{"id": "dev-00164", "completion": "<answer>(11 + (6 - 9)) * 10</answer>", "num_tokens": 20}
+{"id": "dev-00165", "completion": "<answer>(5 + (12 + 2)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00166", "completion": "<answer>(8 + (9 - 2)) * 8</answer>", "num_tokens": 18}
+{"id": "dev-00167", "completion": "<answer>(12 + (9 - 10)) * 5</answer>", "num_tokens": 20}
+{"id": "dev-00168", "completion": "<answer>(9 + (5 + 1)) * 6</answer>", "num_tokens": 18}
+{"id": "dev-00169", "completion": "<answer>(6 + (12 + 6)) * 8</answer>", "num_tokens": 19}
+{"id": "dev-00170", "completion": "<answer>(9 * (4 + 9)) / 3</answer>", "num_tokens": 18}
+{"id": "dev-00171", "completion": "<answer>(11 + (1 + 1)) * 2</answer>", "num_tokens": 19}
+{"id": "dev-00172", "completion": "<answer>(10 + (4 * 5)) / 12</answer>", "num_tokens": 20}
+{"id": "dev-00173", "completion": "<answer>(6 * (4 + 4)) + 3</answer>", "num_tokens": 18}
+{"id": "dev-00174", "completion": "<answer>(9 + (6 - 8)) * 7</answer>", "num_tokens": 18}
+{"id": "dev-00175", "completion": "<answer>(12 + (4 + 9)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00176", "completion": "<answer>(9 + (5 + 7)) * 1</answer>", "num_tokens": 18}
+{"id": "dev-00177", "completion": "<answer>(7 + (10 + 3)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00178", "completion": "<answer>(4 + (10 - 6)) * 3</answer>", "num_tokens": 19}
+{"id": "dev-00179", "completion": "<answer>(6 + (2 + 10)) * 6</answer>", "num_tokens": 19}
+{"id": "dev-00180", "completion": "<answer>(12 + (9 + 11)) * 3</answer>", "num_tokens": 20}
+{"id": "dev-00181", "completion": "<answer>(12 + (4 * 1)) + 8</answer>", "num_tokens": 19}
+{"id": "dev-00182", "completion": "<answer>(11 + (5 + 7)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00183", "completion": "<answer>(11 + (2 + 12)) * 6</answer>", "num_tokens": 20}
+{"id": "dev-00184", "completion": "<answer>(12 + (8 + 5)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00185", "completion": "<answer>(1 + (6 + 4)) * 1</answer>", "num_tokens": 18}
+{"id": "dev-00186", "completion": "<answer>(4 * (10 + 7)) + 4</answer>", "num_tokens": 19}
+{"id": "dev-00187", "completion": "<answer>(8 + (4 + 2)) * 7</answer>", "num_tokens": 18}
+{"id": "dev-00188", "completion": "<answer>(12 + (5 + 9)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00189", "completion": "<answer>(5 + (2 * 9)) / 4</answer>", "num_tokens": 18}
+{"id": "dev-00190", "completion": "<answer>(12 + (6 + 5)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00191", "completion": "<answer>(8 + (6 + 7)) * 7</answer>", "num_tokens": 18}
+{"id": "dev-00192", "completion": "<answer>(3 + (4 + 5)) * 12</answer>", "num_tokens": 19}
+{"id": "dev-00193", "completion": "<answer>(11 + (6 * 5)) - 10</answer>", "num_tokens": 20}
+{"id": "dev-00194", "completion": "<answer>(7 + (10 + 6)) * 7</answer>", "num_tokens": 19}
+{"id": "dev-00195", "completion": "<answer>(9 + (9 + 7)) * 3</answer>", "num_tokens": 18}
+{"id": "dev-00196", "completion": "<answer>(8 + (12 + 9)) * 9</answer>", "num_tokens": 19}
+{"id": "dev-00197", "completion": "<answer>(9 + (7 + 3)) * 10</answer>", "num_tokens": 19}
+{"id": "dev-00198", "completion": "<answer>(11 + (11 + 5)) * 11</answer>", "num_tokens": 21}
+{"id": "dev-00199", "completion": "<answer>(3 + (1 + 8)) * 9</answer>", "num_tokens": 18}
+{"id": "dev-00200", "completion": "<answer>(5 * (3 + 7)) / 2</answer>", "num_tokens": 18}
+{"id": "dev-00201", "completion": "<answer>(6 + (12 + 5)) * 6</answer>", "num_tokens": 19}
+{"id": "dev-00202", "completion": "<answer>(3 * (12 + 6)) + 5</answer>", "num_tokens": 19}
+{"id": "dev-00203", "completion": "<answer>(12 + (5 + 8)) * 10</answer>", "num_tokens": 20}
+{"id": "dev-00204", "completion": "<answer>(9 + (10 - 2)) * 11</answer>", "num_tokens": 20}
+{"id": "dev-00205", "completion": "<answer>(8 + (5 * 5)) + 2</answer>", "num_tokens": 18}
+{"id": "dev-00206", "completion": "<answer>(4 + (12 + 7)) * 8</answer>", "num_tokens": 19}
+{"id": "dev-00207", "completion": "<answer>(8 * (5 + 3)) / 1</answer>", "num_tokens": 18}
+{"id": "dev-00208", "completion": "<answer>(7 * (7 + 6)) / 6</answer>", "num_tokens": 18}
+{"id": "dev-00209", "completion": "<answer>(11 * (11 + 1)) + 12</answer>", "num_tokens": 21}
+{"id": "dev-00210", "completion": "<answer>(1 + (1 + 10)) * 8</answer>", "num_tokens": 19}
+{"id": "dev-00211", "completion": "<answer>(9 + (2 + 7)) * 10</answer>", "num_tokens": 19}
+{"id": "dev-00212", "completion": "<answer>(12 + (12 + 11)) * 5</answer>", "num_tokens": 21}
+{"id": "dev-00213", "completion": "<answer>(10 + (3 + 6)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00214", "completion": "<answer>(5 + (12 - 4)) * 2</answer>", "num_tokens": 19}
+{"id": "dev-00215", "completion": "<answer>(11 + (10 - 6)) * 7</answer>", "num_tokens": 20}
+{"id": "dev-00216", "completion": "<answer>(1 + (5 + 8)) * 11</answer>", "num_tokens": 19}
+{"id": "dev-00217", "completion": "<answer>(11 + (6 + 11)) * 2</answer>", "num_tokens": 20}
+{"id": "dev-00218", "completion": "<answer>(9 * (3 + 9)) / 2</answer>", "num_tokens": 18}
+{"id": "dev-00219", "completion": "<answer>(5 * (12 + 6)) / 5</answer>", "num_tokens": 19}
+{"id": "dev-00220", "completion": "<answer>(1 + (2 + 3)) * 4</answer>", "num_tokens": 18}
+{"id": "dev-00221", "completion": "<answer>(11 + (11 + 4)) * 3</answer>", "num_tokens": 20}
+{"id": "dev-00222", "completion": "<answer>(12 + (10 - 7)) * 5</answer>", "num_tokens": 20}
+{"id": "dev-00223", "completion": "<answer>(11 + (3 + 9)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00224", "completion": "<answer>(4 + (7 + 6)) * 11</answer>", "num_tokens": 19}
+{"id": "dev-00225", "completion": "<answer>(4 * (3 + 3)) + 10</answer>", "num_tokens": 19}
+{"id": "dev-00226", "completion": "<answer>(10 + (2 + 1)) * 12</answer>", "num_tokens": 20}
+{"id": "dev-00227", "completion": "<answer>(11 + (2 + 1)) * 3</answer>", "num_tokens": 19}
+{"id": "dev-00228", "completion": "<answer>(10 + (5 + 5)) * 4</answer>", "num_tokens": 19}
+{"id": "dev-00229", "completion": "<answer>(7 + (10 + 5)) * 5</answer>", "num_tokens": 19}
+{"id": "dev-00230", "completion": "<answer>(8 * (5 + 8)) / 9</answer>", "num_tokens": 18}
+{"id": "dev-00231", "completion": "<answer>(3 + (7 + 6)) * 8</answer>", "num_tokens": 18}
+{"id": "dev-00232", "completion": "<answer>(12 + (10 + 5)) * 8</answer>", "num_tokens": 20}
+{"id": "dev-00233", "completion": "<answer>(7 + (12 - 9)) * 4</answer>", "num_tokens": 19}
+{"id": "dev-00234", "completion": "<answer>(12 + (7 + 4)) * 11</answer>", "num_tokens": 20}
+{"id": "dev-00235", "completion": "<answer>(9 + (4 + 2)) * 6</answer>", "num_tokens": 18}
+{"id": "dev-00236", "completion": "<answer>(5 + (11 - 2)) * 11</answer>", "num_tokens": 20}
+{"id": "dev-00237", "completion": "<answer>(1 + (8 + 9)) * 11</answer>", "num_tokens": 19}
+{"id": "dev-00238", "completion": "<answer>(3 * (4 + 3)) / 6</answer>", "num_tokens": 18}
+{"id": "dev-00239", "completion": "<answer>(11 + (7 + 10)) * 11</answer>", "num_tokens": 21}
+{"id": "dev-00240", "completion": "<answer>(1 + (5 + 14)) * 7 - 6</answer>", "num_tokens": 22}
+{"id": "dev-00241", "completion": "<answer>(13 + (2 + 14)) * 10 - 9</answer>", "num_tokens": 24}
+{"id": "dev-00242", "completion": "<answer>(9 + (15 + 12)) * 8 - 5</answer>", "num_tokens": 23}
+{"id": "dev-00243", "completion": "<answer>(12 * (11 + 7)) + 5 - 12</answer>", "num_tokens": 24}
+{"id": "dev-00244", "completion": "<answer>(11 + (10 - 8)) * 13 / 1</answer>", "num_tokens": 24}
+{"id": "dev-00245", "completion": "<answer>(2 * (5 + 15)) * 9 - 11</answer>", "num_tokens": 23}
+{"id": "dev-00246", "completion": "<answer>(5 * (6 + 10)) / 1 - 5</answer>", "num_tokens": 22}
+{"id": "dev-00247", "completion": "<answer>(10 + (7 + 5)) * 8 - 14</answer>", "num_tokens": 23}
+{"id": "dev-00248", "completion": "<answer>(12 + (15 + 6)) * 12 / 7</answer>", "num_tokens": 24}
+{"id": "dev-00249", "completion": "<answer>(10 + (9 + 13)) * 2 - 15</answer>", "num_tokens": 24}
+{"id": "dev-00250", "completion": "<answer>(14 * (5 + 7)) + 3 - 1</answer>", "num_tokens": 22}
+{"id": "dev-00251", "completion": "<answer>(15 + (11 + 11)) * 2 - 3</answer>", "num_tokens": 24}
+{"id": "dev-00252", "completion": "<answer>(1 + (6 - 7) * 12) / 3</answer>", "num_tokens": 23}
+{"id": "dev-00253", "completion": "<answer>(14 * (14 + 3)) + 3 - 11</answer>", "num_tokens": 24}
+{"id": "dev-00254", "completion": "<answer>(12 + (15 + 8)) * 1 + 3</answer>", "num_tokens": 23}
+{"id": "dev-00255", "completion": "<answer>(11 + (15 + 3)) * 8 - 10</answer>", "num_tokens": 24}
+{"id": "dev-00256", "completion": "<answer>(10 + (2 + 3)) * 11 / 1</answer>", "num_tokens": 23}
+{"id": "dev-00257", "completion": "<answer>(4 * (15 + 15)) + 5</answer>", "num_tokens": 20}
+{"id": "dev-00258", "completion": "<answer>(11 + (10 + 1)) * 13 / 12</answer>", "num_tokens": 25}
+{"id": "dev-00259", "completion": "<answer>(1 * (7 + 14)) + 9</answer>", "num_tokens": 19}
+{"id": "dev-00260", "completion": "<answer>(14 + (3 + 15)) * 2 - 12</answer>", "num_tokens": 24}
+{"id": "dev-00261", "completion": "<answer>(13 + (10 - 9) * 2) / 2</answer>", "num_tokens": 24}
+{"id": "dev-00262", "completion": "<answer>(8 + (2 + 5)) * 10 - 9</answer>", "num_tokens": 22}
+{"id": "dev-00263", "completion": "<answer>(4 * (2 + 8)) + 10 - 3</answer>", "num_tokens": 22}
+{"id": "dev-00264", "completion": "<answer>(14 + (1 + 5)) * 3 - 10</answer>", "num_tokens": 23}
+{"id": "dev-00265", "completion": "<answer>(9 + (13 + 3)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00266", "completion": "<answer>(11 + (12 - 3)) * 13 / 9</answer>", "num_tokens": 24}
+{"id": "dev-00267", "completion": "<answer>(11 * (11 + 7)) + 12 - 10</answer>", "num_tokens": 25}
+{"id": "dev-00268", "completion": "<answer>(3 * (13 + 9)) + 5 - 5</answer>", "num_tokens": 22}
+{"id": "dev-00269", "completion": "<answer>(4 * (12 + 3)) + 1</answer>", "num_tokens": 19}
+{"id": "dev-00270", "completion": "<answer>(10 + (4 + 1)) * 11 - 2</answer>", "num_tokens": 23}
+{"id": "dev-00271", "completion": "<answer>(5 + (4 + 15)) * 8 - 15</answer>", "num_tokens": 23}
+{"id": "dev-00272", "completion": "<answer>(15 + (13 - 6)) * 5 / 12</answer>", "num_tokens": 24}
+{"id": "dev-00273", "completion": "<answer>(15 + (7 + 11)) * 3 - 5</answer>", "num_tokens": 23}
+{"id": "dev-00274", "completion": "<answer>(3 * (12 + 11)) + 2</answer>", "num_tokens": 20}
+{"id": "dev-00275", "completion": "<answer>(12 + (6 + 1)) * 6 - 5</answer>", "num_tokens": 22}
+{"id": "dev-00276", "completion": "<answer>(11 + (12 - 6)) * 4 - 2</answer>", "num_tokens": 23}
+{"id": "dev-00277", "completion": "<answer>(15 + (8 + 3)) * 14 - 5</answer>", "num_tokens": 23}
+{"id": "dev-00278", "completion": "<answer>(11 + (2 + 9)) * 3 - 8</answer>", "num_tokens": 22}
+{"id": "dev-00279", "completion": "<answer>(6 + (14 + 2)) * 13 / 2</answer>", "num_tokens": 23}
+{"id": "dev-00280", "completion": "<answer>(10 + (4 + 12)) * 7 - 1</answer>", "num_tokens": 23}
+{"id": "dev-00281", "completion": "<answer>(13 * (13 + 7)) + 8 - 1</answer>", "num_tokens": 23}
+{"id": "dev-00282", "completion": "<answer>(11 + (11 + 3)) * 8</answer>", "num_tokens": 20}
+{"id": "dev-00283", "completion": "<answer>(12 + (15 - 7) * 1) / 10</answer>", "num_tokens": 25}
+{"id": "dev-00284", "completion": "<answer>(15 + (15 + 14)) * 6 - 4</answer>", "num_tokens": 24}
+{"id": "dev-00285", "completion": "<answer>(13 + (10 - 8)) * 8 / 4</answer>", "num_tokens": 23}
+{"id": "dev-00286", "completion": "<answer>(13 + (4 + 15)) * 2</answer>", "num_tokens": 20}
+{"id": "dev-00287", "completion": "<answer>(14 + (10 + 9)) * 15 / 4</answer>", "num_tokens": 24}
+{"id": "dev-00288", "completion": "<answer>(13 * (3 + 3) - 7) / 3</answer>", "num_tokens": 23}
+{"id": "dev-00289", "completion": "<answer>(7 + (3 + 10)) * 9 - 6</answer>", "num_tokens": 22}
+{"id": "dev-00290", "completion": "<answer>(3 * (5 + 7)) * 9 - 11</answer>", "num_tokens": 22}
+{"id": "dev-00291", "completion": "<answer>(2 * (6 + 2)) * 5 + 14</answer>", "num_tokens": 22}
+{"id": "dev-00292", "completion": "<answer>(6 + (6 + 1)) * 12 / 14</answer>", "num_tokens": 23}
+{"id": "dev-00293", "completion": "<answer>(11 + (3 + 5)) * 13 / 6</answer>", "num_tokens": 23}
+{"id": "dev-00294", "completion": "<answer>(8 + (12 + 3)) * 7 - 1</answer>", "num_tokens": 22}
+{"id": "dev-00295", "completion": "<answer>(10 + (14 + 6)) * 9 - 8</answer>", "num_tokens": 23}
+{"id": "dev-00296", "completion": "<answer>(13 + (11 + 7)) * 13 - 2</answer>", "num_tokens": 24}
+{"id": "dev-00297", "completion": "<answer>(11 + (6 + 7)) * 1</answer>", "num_tokens": 19}
+{"id": "dev-00298", "completion": "<answer>(5 + (11 + 3)) * 9 - 4</answer>", "num_tokens": 22}
+{"id": "dev-00299", "completion": "<answer>(9 + (7 - 2) * 3)</answer>", "num_tokens": 18}
