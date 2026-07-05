@@ -24,6 +24,7 @@ from __future__ import annotations
 import ast
 import random
 import re
+import math
 from collections import Counter
 from dataclasses import dataclass
 from fractions import Fraction
@@ -193,6 +194,45 @@ def reward(completion: str, puzzle: Puzzle) -> float:
     if res.parsable:
         return 0.05
     return 0.0
+
+def dense_reward(completion: str, puzzle: Puzzle) -> float:
+    """
+    DENSER variant of reward() for GRPO TRAINING. Same ladder, but the top rung is a
+    smooth SLOPE toward the target instead of a cliff:
+        1.00                     correct (exact target)
+        0.10 .. ~0.95            right numbers, wrong value -> scaled by CLOSENESS to target
+        0.05                     parsable expression, wrong numbers
+        0.00                     no answer / garbage
+
+    Why: the original reward() gives the SAME 0.10 whether the value is 1 away or 5000
+    away from the target. Within a GRPO group every near-miss then ties -> zero variance
+    -> zero advantage -> no gradient (the 12% plateau). Rewarding closeness breaks the tie
+    so GRPO can climb toward correct answers. The LEADERBOARD is unaffected: scoring still
+    uses is_correct() (exact), so this only shapes the training signal.
+    """
+    ans = extract_answer(completion)
+    if ans is None:
+        return 0.0
+    res = verify(puzzle, ans)
+    # exact target -> full reward (same as the original)
+    if res.correct:
+        return 1.0
+    # not a parsable expression at all -> no credit
+    if not res.parsable:
+        return 0.0
+    # parsable but used the wrong numbers -> small "real attempt" credit
+    if not res.numbers_ok:
+        return 0.05
+
+    # right numbers, wrong value: give partial credit that GROWS as we near the target.
+    # gap = distance between the evaluated value and the target.
+    gap = abs(float(res.value) - puzzle.target)
+    # exp(-gap/10) is a smooth bump: 1.0 at gap=0, decaying to ~0 as gap grows.
+    #   * 0.10 base keeps parity with the original "real attempt" floor,
+    #   * + up to 0.85 for closeness, so the ceiling (~0.95) stays BELOW the exact
+    #     reward of 1.0 -> being close is good, being exactly right is still strictly best.
+    #   * the "10" is the closeness scale (how many units away still counts as "warm").
+    return 0.10 + 0.85 * math.exp(-gap / 10.0)
 
 
 # --------------------------------------------------------------------------- #

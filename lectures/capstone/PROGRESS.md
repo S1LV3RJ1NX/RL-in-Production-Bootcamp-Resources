@@ -270,6 +270,17 @@ leaderboard.csv:
 - SUBMISSION PICK: grpo-lr3e6  (model_lr3e6/ + dev_preds_lr3e6.jsonl)  = 12.00% dev accuracy.
 - Report headline results table + synthesis paragraph updated. Next: package submission.
 
+## DENSE REWARD — NEW BEST (12.00% -> 14.67%)
+Added dense_reward() in countdown.py + --reward {shaped,dense} flag in train_grpo.py.
+Dense = 0.10 + 0.85*exp(-|value-target|/10) for right-numbers/wrong-value (slope, not cliff).
+Run: --reward dense --lr 3e-6 --group 8 --bsz 2 --max-new-tokens 128 --steps 1500 -> model_dense/
+    grpo-dense  accuracy 14.67% (44/300)  easy 29.17%  medium 7.50%  hard 0.00%  format 0
+- +8 puzzles over grpo-lr3e6 (12.00%). Gain in easy/medium (medium doubled); hard -> 0 (small-n).
+- Why it worked: near-misses no longer tie inside a group -> non-zero std -> non-zero advantage.
+- Leaderboard scorer untouched (is_correct exact); only training signal shaped.
+- NEW SUBMISSION PICK: model_dense -> HF repo countdown-qwen2.5-0.5b-grpo-dense (14.67%).
+- Report updated (dense section + headline). Model card written. Follow-up email to Rajat planned.
+
 ---
 
 ## CURRENT STEP → Ablation run (lr 3e-6, 1500 steps) to beat Run 1

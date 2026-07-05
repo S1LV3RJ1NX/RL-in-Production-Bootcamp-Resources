@@ -1,6 +1,6 @@
 # RLVR Arena — Capstone Report
 
-**Submitted checkpoint:** [`s1lv3rj1nx/countdown-qwen2.5-0.5b-grpo-lr3e6`](https://huggingface.co/s1lv3rj1nx/countdown-qwen2.5-0.5b-grpo-lr3e6) — loads with `AutoModelForCausalLM.from_pretrained`.
+**Submitted checkpoint:** [`s1lv3rj1nx/countdown-qwen2.5-0.5b-grpo-dense`](https://huggingface.co/s1lv3rj1nx/countdown-qwen2.5-0.5b-grpo-dense) (14.67% dev) — loads with `AutoModelForCausalLM.from_pretrained`. (Earlier 12.00% checkpoint: `…-grpo-lr3e6`.)
 
 **Task.** Train `Qwen2.5-0.5B-Instruct` with GRPO to solve Countdown puzzles (combine all given
 numbers exactly once with `+ - * /` to hit a target), reasoning in `<think>` and answering in
@@ -22,15 +22,16 @@ From-scratch GRPO in `train_grpo.py`; I wrote the two core functions:
   segments) fit comfortably; gradient checkpointing was not needed.
 
 ## Results (dev_public, 300 puzzles, greedy, exact verifier)
-| run | accuracy | hard | format_rate | avg_tokens(correct) |
-|---|---|---|---|---|
-| base (floor, no RL) | 0.33% | 0.00% | 0.00% | 20.0 |
-| GRPO Run 1 (lr 1e-6, 1000 steps) | 1.00% | 0.00% | 0.00% | 16.7 |
-| **GRPO best (lr 3e-6, group 8, 1500 steps)** | **12.00%** | **1.67%** | 0.00% | 16.9 |
+| run | accuracy | easy | medium | hard | format_rate | avg_tokens(correct) |
+|---|---|---|---|---|---|---|
+| base (floor, no RL) | 0.33% | — | — | 0.00% | 0.00% | 20.0 |
+| GRPO Run 1 (lr 1e-6, 1000 steps) | 1.00% | — | — | 0.00% | 0.00% | 16.7 |
+| GRPO (lr 3e-6, group 8, 1500 steps) | 12.00% | 25.83% | 3.33% | 1.67% | 0.00% | 16.9 |
+| **GRPO + dense reward (lr 3e-6, 1500 steps)** | **14.67%** | 29.17% | 7.50% | 0.00% | 0.00% | 17.1 |
 
-Best GRPO run reached **12.00%** dev accuracy — **36× the base floor** (1/300 → 36/300) — and began
-solving hard 5-number puzzles (1.67%). See `reward_curve.png` and the ablation section below for how
-the learning rate got us there. (Full per-run comparison in `leaderboard.csv` / `leaderboard.png`.)
+Best run reached **14.67%** dev accuracy — **44× the base floor** (1/300 → 44/300). The learning rate
+took us from 1% → 12% (ablation below); a **dense closeness reward** then took 12% → 14.67% (reward
+section below). See `reward_curve.png` and `leaderboard.png` for the full comparison.
 
 ## Reward curve (see reward_curve.png)
 Three phases: (1) fast rise 0.03→0.05 in the first ~50 steps = learning the format gate;
@@ -64,11 +65,30 @@ plateau band, so it was not run to completion (it also OOM'd at step 1379 from a
 fragmentation on the ref forward; `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` is the fix, but
 the result did not justify a rerun).
 
-**Synthesis.** Three levers, one conclusion: only the learning rate moved the needle (1% -> 12%);
-neither more steps nor a larger group helped. The recipe saturates at ~12% and the binding
-constraint is the reward design (reasoning collapse, `format_rate = 0` in every run), not the
-hyperparameters. Best checkpoint kept for submission: **Ablation A (lr 3e-6, group 8, 1500 steps,
-12.00%)**.
+**Synthesis of hyperparameter ablations.** Only the learning rate moved the needle (1% -> 12%);
+neither more steps nor a larger group helped. The recipe saturated at ~12% — and the diagnosis was
+that the binding constraint is the **reward design**, not the hyperparameters. That motivated the
+next section.
+
+## Improvement: dense (closeness-shaped) reward — 12.00% -> 14.67%
+The original `reward()` gives the SAME 0.10 whether an expression evaluates 1 away or 5000 away from
+the target. Inside a GRPO group, near-misses then all tie -> zero std -> zero advantage -> no
+gradient. So I added `dense_reward()` (in `countdown.py`, selected via `--reward dense`; the
+leaderboard scorer is untouched — still `is_correct()`): keep 1.0 for exact, but for the
+right-numbers/wrong-value case return `0.10 + 0.85 * exp(-|value - target| / 10)`, a smooth slope
+that pays more the closer you land. Ceiling ~0.95 stays below the exact reward of 1.0, so exact is
+still strictly best.
+
+| reward | dev accuracy | easy | medium | hard |
+|---|---|---|---|---|
+| original step-function | 12.00% | 25.83% | 3.33% | 1.67% |
+| **dense closeness** | **14.67%** | 29.17% | 7.50% | 0.00% |
+
++8 correct puzzles (36 -> 44). The gain is concentrated in **medium (3.3% -> 7.5%, doubled)** and easy
+— exactly where the model often lands *near* the target, which is what the dense signal rewards. Hard
+(5-number) fell to 0 (near-misses are rarer there, and it's a small-n split), a minor tie-break-1
+tradeoff. Net: converting the reward from a cliff into a slope broke the ~12% plateau. Submitted
+checkpoint: **dense reward, lr 3e-6, group 8, 1500 steps (14.67%)**.
 
 ## Failure mode: reasoning collapse (format_rate = 0%)
 Despite the system prompt asking for `<think>`, the trained model emits **bare** answers with **no

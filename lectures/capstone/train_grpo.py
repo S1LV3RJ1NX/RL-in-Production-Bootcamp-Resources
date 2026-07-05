@@ -25,7 +25,7 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from countdown import Puzzle, chat_messages, reward as countdown_reward, is_correct
+from countdown import Puzzle, chat_messages, reward as countdown_reward, is_correct, dense_reward
 
 
 # --------------------------------------------------------------------------- #
@@ -47,7 +47,7 @@ def token_logprobs(model, input_ids, attn_mask, prompt_len):
 # ✅ PROVIDED — rollout: for each puzzle, sample a GROUP of completions + reward
 # --------------------------------------------------------------------------- #
 @torch.no_grad()  # just sampling answers here, so no gradients
-def rollout(model, tok, puzzles, group, max_new_tokens, device):
+def rollout(model, tok, puzzles, group, max_new_tokens, device, reward_fn):
     # For each puzzle, ask the model for `group` answers. Total = bsz * group.
 
     # Repeat each puzzle's prompt `group` times, back to back. Keeping them
@@ -76,9 +76,9 @@ def rollout(model, tok, puzzles, group, max_new_tokens, device):
     # Keep only the newly generated part and turn it back into text.
     completions = tok.batch_decode(gen[:, prompt_len:], skip_special_tokens=True)
 
-    # Score every answer with the shaped reward -> {0.0, 0.05, 0.10, 1.0}.
+    # Score every answer with the chosen reward (shaped step-fn or dense closeness).
     # Same grouped order as above, so rewards is [bsz*group] -> exactly what TODO 1 wants.
-    rewards = torch.tensor([countdown_reward(c, p) for c, p in zip(completions, metas)],
+    rewards = torch.tensor([reward_fn(c, p) for c, p in zip(completions, metas)],
                            dtype=torch.float32)
 
     # Fraction actually correct (exact verifier). For logging only, not training.
@@ -175,7 +175,13 @@ def main() -> None:
     ap.add_argument("--smoke", action="store_true", help="tiny run to test plumbing")
     ap.add_argument("--save-every", type=int, default=200,
                     help="checkpoint every N steps (0 disables intermediate saves)")
+    ap.add_argument("--reward", choices=["shaped", "dense"], default="shaped",
+                    help="training reward: 'shaped' = original step-function (countdown.reward), "
+                         "'dense' = closeness-scaled near-miss (countdown.dense_reward)")
     args = ap.parse_args()
+
+    # Pick the training reward once, up front. Scoring still uses is_correct() regardless.
+    reward_fn = dense_reward if args.reward == "dense" else countdown_reward
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(args.model)
@@ -202,10 +208,13 @@ def main() -> None:
     if args.smoke:
         pool, args.steps, args.group, args.bsz = pool[:8], 2, 4, 2
 
+    print(f"config | reward={args.reward} | steps={args.steps} | group={args.group} | "
+          f"bsz={args.bsz} | lr={args.lr} | max_new_tokens={args.max_new_tokens} | out={args.out}")
+
     for step in range(args.steps):
         puzzles = rng.sample(pool, args.bsz)
         seqs, attn, prompt_len, rewards, solved, _ = rollout(
-            policy, tok, puzzles, args.group, args.max_new_tokens, device)
+            policy, tok, puzzles, args.group, args.max_new_tokens, device, reward_fn)
         rewards = rewards.to(device)
 
         advantages = group_advantages(rewards, args.group)            # 📝 TODO 1
