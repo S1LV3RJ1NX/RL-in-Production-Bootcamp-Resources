@@ -96,5 +96,12 @@ reasoning** (e.g. puzzle `5,5,10` → `<answer>5 * (5 + 5)</answer>`, ~15 tokens
 wrong numbers). Root cause: the shaped reward (`countdown.reward`) scores **only** the `<answer>`
 content and gives **zero credit for `<think>`**. GRPO therefore found the cheapest reward — skip
 reasoning, emit any parsable answer (0.05) — a local optimum it never escaped in 1000 steps. This is
-the classic "the model optimizes the reward you gave, not the reward you meant." A `<think>`/format
-reward term (as real recipes use, GRPO blog §2.1) would likely pull reasoning back and lift accuracy.
+the classic "the model optimizes the reward you gave, not the reward you meant."
+
+I tested the obvious remedy: a `dense_format` reward (dense + a +0.10 bonus for a non-trivial
+`<think>` block) plus an entropy bonus for exploration. It *failed* — accuracy fell to 9.67% and
+`format_rate` stayed at 0. Root cause is cold-start: the policy almost never *samples* a `<think>`
+block, so the bonus is essentially never triggered and provides no gradient toward format; and the
+closeness term (≤0.95) dwarfs the 0.10 bonus, so bare near-misses stay optimal. Reward-only induction
+of a rare structured behavior is very hard at 0.5B; the clean fix (a short SFT warm-up on `<think>`
+traces) is disallowed by the rules, so the dense-reward checkpoint (14.67%) stands as the best result.

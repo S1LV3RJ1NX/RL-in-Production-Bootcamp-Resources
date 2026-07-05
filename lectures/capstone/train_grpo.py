@@ -25,14 +25,22 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from countdown import Puzzle, chat_messages, reward as countdown_reward, is_correct, dense_reward
+from countdown import (Puzzle, chat_messages, reward as countdown_reward, is_correct,
+                       dense_reward, dense_format_reward)
 
 
 # --------------------------------------------------------------------------- #
 # ✅ PROVIDED — per-token log-probs of `completion` tokens under a model
 # --------------------------------------------------------------------------- #
-def token_logprobs(model, input_ids, attn_mask, prompt_len):
-    """log p(token_t | token_<t) for every position; caller masks the prompt."""
+def token_logprobs(model, input_ids, attn_mask, prompt_len, need_entropy=False):
+    """log p(token_t | token_<t) for every position; caller masks the prompt.
+
+    If need_entropy=True, also returns per-token entropy H = -Σ_v p_v log p_v (for the
+    exploration bonus). Entropy is only computed over COMPLETION positions (the prompt is
+    masked out downstream anyway) and only for the policy pass — computing the full-vocab
+    p·log p product over the whole sequence, or for the frozen reference, would waste GBs
+    and OOM the A10.
+    """
     out = model(input_ids=input_ids, attention_mask=attn_mask).logits[:, :-1, :]
     targets = input_ids[:, 1:]
     logp = torch.log_softmax(out, dim=-1)
@@ -40,7 +48,17 @@ def token_logprobs(model, input_ids, attn_mask, prompt_len):
     # mask: only completion tokens (positions >= prompt_len-1 in the shifted frame)
     idx = torch.arange(tok_logp.shape[1], device=tok_logp.device).unsqueeze(0)
     comp_mask = (idx >= (prompt_len - 1)) & (attn_mask[:, 1:] == 1)
-    return tok_logp, comp_mask.float()
+
+    entropy = None
+    if need_entropy:
+        # Only the completion slice — the expensive [B, L, vocab] product shrinks ~8x since
+        # completions are ~18 tokens vs a ~130-token prompt. Zeros elsewhere (masked anyway).
+        cs = prompt_len - 1
+        comp_logp = logp[:, cs:, :]
+        ent_comp = -(comp_logp.exp() * comp_logp).sum(-1)  # [B, L_comp]
+        entropy = torch.zeros_like(tok_logp)
+        entropy[:, cs:] = ent_comp
+    return tok_logp, comp_mask.float(), entropy
 
 
 # --------------------------------------------------------------------------- #
@@ -119,7 +137,8 @@ def group_advantages(rewards: torch.Tensor, group: int) -> torch.Tensor:
 # --------------------------------------------------------------------------- #
 # 📝 TODO 2 — the GRPO loss (clipped surrogate + KL to reference)
 # --------------------------------------------------------------------------- #
-def grpo_loss(logp, logp_old, logp_ref, comp_mask, advantages, clip_eps=0.2, kl_beta=0.04):
+def grpo_loss(logp, logp_old, logp_ref, comp_mask, advantages, clip_eps=0.2, kl_beta=0.04,
+              entropy=None, entropy_coef=0.0):
     """
     logp, logp_old, logp_ref : [B, T-1] per-token log-probs (policy / behavior / reference)
     comp_mask                : [B, T-1] 1.0 on completion tokens, else 0
@@ -153,6 +172,11 @@ def grpo_loss(logp, logp_old, logp_ref, comp_mask, advantages, clip_eps=0.2, kl_
     # Reward beating the group, minus a small fee for drifting from the reference.
     per_token_objective = surrogate - kl_beta * KL
 
+    # Optional exploration bonus: reward higher-entropy (less peaked) token distributions,
+    # so the policy keeps exploring instead of collapsing to one terse mode.
+    if entropy is not None and entropy_coef:
+        per_token_objective = per_token_objective + entropy_coef * entropy
+
     # Average over REAL completion tokens only (mask hides prompt/padding), then
     # flip sign because the optimizer minimizes but we want to maximize the objective.
     loss = -(per_token_objective * comp_mask).sum() / comp_mask.sum().clamp(min=1)
@@ -175,13 +199,18 @@ def main() -> None:
     ap.add_argument("--smoke", action="store_true", help="tiny run to test plumbing")
     ap.add_argument("--save-every", type=int, default=200,
                     help="checkpoint every N steps (0 disables intermediate saves)")
-    ap.add_argument("--reward", choices=["shaped", "dense"], default="shaped",
+    ap.add_argument("--reward", choices=["shaped", "dense", "dense_format"], default="shaped",
                     help="training reward: 'shaped' = original step-function (countdown.reward), "
-                         "'dense' = closeness-scaled near-miss (countdown.dense_reward)")
+                         "'dense' = closeness-scaled near-miss, "
+                         "'dense_format' = dense + bonus for a real <think> block")
+    ap.add_argument("--entropy-coef", type=float, default=0.0,
+                    help="exploration bonus weight on per-token entropy (0 disables)")
     args = ap.parse_args()
 
     # Pick the training reward once, up front. Scoring still uses is_correct() regardless.
-    reward_fn = dense_reward if args.reward == "dense" else countdown_reward
+    reward_fn = {"shaped": countdown_reward,
+                 "dense": dense_reward,
+                 "dense_format": dense_format_reward}[args.reward]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(args.model)
@@ -208,8 +237,9 @@ def main() -> None:
     if args.smoke:
         pool, args.steps, args.group, args.bsz = pool[:8], 2, 4, 2
 
-    print(f"config | reward={args.reward} | steps={args.steps} | group={args.group} | "
-          f"bsz={args.bsz} | lr={args.lr} | max_new_tokens={args.max_new_tokens} | out={args.out}")
+    print(f"config | reward={args.reward} | entropy_coef={args.entropy_coef} | steps={args.steps} | "
+          f"group={args.group} | bsz={args.bsz} | lr={args.lr} | "
+          f"max_new_tokens={args.max_new_tokens} | out={args.out}")
 
     for step in range(args.steps):
         puzzles = rng.sample(pool, args.bsz)
@@ -219,12 +249,14 @@ def main() -> None:
 
         advantages = group_advantages(rewards, args.group)            # 📝 TODO 1
         attn_full = (seqs != tok.pad_token_id).long()
-        logp, comp_mask = token_logprobs(policy, seqs, attn_full, prompt_len)
+        logp, comp_mask, entropy = token_logprobs(
+            policy, seqs, attn_full, prompt_len, need_entropy=(args.entropy_coef > 0))
         with torch.no_grad():
             logp_old = logp.detach()
-            logp_ref, _ = token_logprobs(ref, seqs, attn_full, prompt_len)
+            logp_ref, _, _ = token_logprobs(ref, seqs, attn_full, prompt_len)
 
-        loss = grpo_loss(logp, logp_old, logp_ref, comp_mask, advantages)  # 📝 TODO 2
+        loss = grpo_loss(logp, logp_old, logp_ref, comp_mask, advantages,  # 📝 TODO 2
+                         entropy=entropy, entropy_coef=args.entropy_coef)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(policy.parameters(), 1.0)

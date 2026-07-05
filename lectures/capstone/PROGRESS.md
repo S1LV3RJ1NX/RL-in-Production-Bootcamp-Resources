@@ -281,6 +281,19 @@ Run: --reward dense --lr 3e-6 --group 8 --bsz 2 --max-new-tokens 128 --steps 150
 - NEW SUBMISSION PICK: model_dense -> HF repo countdown-qwen2.5-0.5b-grpo-dense (14.67%).
 - Report updated (dense section + headline). Model card written. Follow-up email to Rajat planned.
 
+## FORMAT REWARD + ENTROPY — FAILED (9.67%, format still 0)
+Added dense_format_reward (dense + 0.10 bonus for non-trivial <think>) + --entropy-coef.
+Run: --reward dense_format --entropy-coef 0.01 --lr 3e-6 --group 8 --bsz 2 --steps 1500 -> model_dfmt
+    grpo-dfmt  accuracy 9.67% (29/300)  easy 21.67%  medium 2.50%  hard 0.00%  format 0.00%
+- WORSE than dense (14.67%) and format_rate STILL 0. Negative result.
+- Why: cold-start. Model almost never SAMPLES a <think> block, so the +0.10 bonus is almost never
+  triggered -> ~no gradient toward format. Closeness reward (<=0.95) dwarfs the 0.10 bonus, so bare
+  near-misses stay optimal. entropy_coef 0.01 added noise, didn't help discover the structure.
+- Fixed an OOM on the way: entropy was computed on the ref pass + full sequence (2.4GB); now
+  policy-only + completion-slice (need_entropy flag in token_logprobs).
+- CONCLUSION: reward-only format induction fails at 0.5B without SFT (which is banned). Keeping
+  grpo-dense (14.67%) as the submission. Tuning effectively closed.
+
 ---
 
 ## CURRENT STEP → Ablation run (lr 3e-6, 1500 steps) to beat Run 1

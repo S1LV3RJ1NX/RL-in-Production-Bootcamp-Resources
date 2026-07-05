@@ -235,6 +235,30 @@ def dense_reward(completion: str, puzzle: Puzzle) -> float:
     return 0.10 + 0.85 * math.exp(-gap / 10.0)
 
 
+# regex for a well-formed reasoning trace: a <think>...</think> block, then <answer>...</answer>.
+_FORMAT_RE = re.compile(r"<think>\s*(.+?)\s*</think>.*?<answer>\s*(.+?)\s*</answer>", re.S)
+_MIN_THINK_CHARS = 20  # a think block must be non-trivial to earn the bonus (guards empty filler)
+
+
+def dense_format_reward(completion: str, puzzle: Puzzle) -> float:
+    """
+    dense_reward() PLUS a small bonus for actually REASONING in a <think> block.
+
+    Motivation: the model collapsed to bare answers (format_rate = 0). Since the rules forbid
+    SFT on solution traces, the ONLY lever to induce reasoning is the reward. So we pay a small
+    +0.10 when the completion contains a non-trivial <think>...</think> followed by <answer>...
+    </answer>. Kept small so exact-correctness (1.0) still dominates; guarded by a minimum think
+    length so the model can't farm the bonus with an empty <think></think>.
+
+    The LEADERBOARD is unaffected (scoring still uses is_correct()); this only shapes training.
+    """
+    r = dense_reward(completion, puzzle)
+    m = _FORMAT_RE.search(completion)
+    if m and len(m.group(1)) >= _MIN_THINK_CHARS:
+        r += 0.10
+    return r
+
+
 # --------------------------------------------------------------------------- #
 # 6. Puzzle generation (guaranteed solvable)
 # --------------------------------------------------------------------------- #
