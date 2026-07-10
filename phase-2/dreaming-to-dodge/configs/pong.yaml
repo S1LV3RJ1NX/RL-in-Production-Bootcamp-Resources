@@ -1,0 +1,47 @@
+# STRETCH / FALLBACK config — ALE/Pong-v5 wired behind the same interface.
+# NOT on the critical path. Attempt only if the smoke test shows ale-py builds
+# fast + steps cheaply AND there is >= ~1.5 GPU-h of budget banked after Catch
+# ships (see CAPSTONE.md, "The switch rule").
+env: atari
+game: ALE/Pong-v5
+resolution: 64
+
+collect:
+  rounds: 5
+  steps_per_round: 10000   # 50k total real steps
+  eps_greedy: 0.05
+  buffer_capacity: 60000
+
+tokenizer:
+  num_tokens: 16
+  vocab_size: 256
+  embed_dim: 128
+  ch: 32
+  beta: 0.25
+  steps_per_round: 3000
+  batch_size: 64
+  lr: 0.0003
+
+world_model:
+  max_timesteps: 20
+  embed_dim: 256
+  num_layers: 6
+  num_heads: 4
+  dropout: 0.1
+  steps_per_round: 6000
+  batch_size: 16
+  lr: 0.0003
+
+policy:
+  hidden_dim: 512
+  conv_ch: 32
+  gamma: 0.995
+  lam: 0.95
+  entropy_coef: 0.001
+  horizon: 20
+  updates_per_round: 1000
+  batch_size: 64
+  lr: 0.0001
+  temperature: 1.0
+
+seed: 0

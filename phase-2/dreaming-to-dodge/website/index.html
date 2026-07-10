@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dreaming to Dodge — an agent that learns to survive VizDoom inside a world model</title>
+<meta name="description" content="An agent trained 100% inside a from-scratch Transformer world model learns to dodge fireballs in VizDoom take_cover — beating model-free RL and matching a reactive oracle. Paper, code, and a playable neural simulator.">
+<meta property="og:title" content="Dreaming to Dodge">
+<meta property="og:description" content="An agent that learns to survive VizDoom entirely inside a from-scratch Transformer world model.">
+<meta property="og:image" content="assets/screenshot_2.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff; --ink:#161a20; --mut:#5c626f; --line:#e8eaef; --soft:#f6f7f9; --soft-2:#eef1f6;
+    --teal:#0f8f68; --teal-d:#0b5f45; --blue:#2f6fd0; --amber:#c9871a; --red:#b23636;
+    --acc:#0f8f68;
+    --shadow:0 14px 40px -22px rgba(30,41,59,.30);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65;font-size:17px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+  h1,h2,h3{line-height:1.22;font-weight:700;letter-spacing:-.02em}
+  h2{font-size:27px;margin:56px 0 6px}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--acc);margin:56px 0 2px}
+  .eyebrow + h2{margin-top:2px}
+  h3{font-size:19px;margin:26px 0 8px}
+  p{margin:12px 0}
+  .lead{font-size:18.5px;color:var(--mut);max-width:70ch}
+  code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.86em;
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+  header{padding:52px 0 10px;text-align:center;border-bottom:1px solid var(--line)}
+  .title{font-size:44px;letter-spacing:-.03em;margin:0 0 8px}
+  .title .em{color:var(--acc)}
+  .tag{color:var(--mut);font-size:18.5px;margin:0 auto 18px;max-width:700px}
+  .authors{font-size:17px;margin:6px 0 2px}
+  .aff{color:var(--mut);font-size:15px;margin:0 0 20px}
+  .links{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0 6px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;
+    color:var(--ink);border-radius:10px;padding:10px 16px;font-size:15px;font-weight:600;transition:.15s;box-shadow:var(--shadow)}
+  .btn:hover{border-color:var(--acc);text-decoration:none;transform:translateY(-1px)}
+  .btn.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .hero{margin:30px 0 8px;text-align:center}
+  .hero img{width:100%;max-width:560px;border-radius:14px;image-rendering:pixelated;
+    box-shadow:0 18px 48px -20px rgba(30,41,59,.42);border:1px solid var(--line)}
+  .cap{color:var(--mut);font-size:13.5px;margin:10px auto 0;max-width:640px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:36px 0}
+  .stat{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px 12px;text-align:center}
+  .stat .n{font-size:27px;font-weight:800;color:var(--acc);letter-spacing:-.02em}
+  .stat .l{font-size:12.5px;color:var(--mut);margin-top:4px;line-height:1.35}
+  figure{margin:22px 0}
+  figure img{width:100%;border-radius:14px;border:1px solid var(--line);background:#fff}
+  figure.pb img{padding:4px}
+  figure.game img{image-rendering:pixelated}
+  figcaption{color:var(--mut);font-size:14px;margin-top:10px}
+  .two{display:grid;grid-template-columns:0.88fr 1.12fr;gap:36px;align-items:center;margin:14px 0}
+  .two.rev{grid-template-columns:1.12fr 0.88fr}
+  .two.rev .txt{order:2} .two.rev figure{order:1}
+  .two .txt h2{margin-top:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .callout{border-left:3px solid var(--c,var(--acc));background:var(--soft);border:1px solid var(--line);
+    border-left-width:3px;border-radius:0 12px 12px 0;padding:12px 16px;margin:16px 0}
+  .callout .k{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--c,var(--acc))}
+  .callout p{margin:4px 0 0;font-size:15px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.hi td{background:rgba(15,143,104,.09);font-weight:700}
+  .demo{background:var(--soft);border:1px solid var(--line);border-radius:16px;padding:22px;margin:18px 0}
+  .demo iframe{width:100%;height:620px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block}
+  .demo .note{color:var(--mut);font-size:14px;margin-top:12px}
+  .bibtex{background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:18px;overflow:auto;font-size:13px;
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;line-height:1.6}
+  footer{border-top:1px solid var(--line);margin-top:64px;padding:26px 0 60px;color:var(--mut);font-size:14px;text-align:center}
+  .kbd{background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 7px;font-size:13px;box-shadow:0 1px 0 var(--line)}
+  @media (max-width:760px){.stats{grid-template-columns:1fr 1fr}.grid2,.grid3,.two,.two.rev{grid-template-columns:1fr}.title{font-size:33px}.demo iframe{height:560px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1 class="title">Dreaming&nbsp;to&nbsp;<span class="em">Dodge</span></h1>
+  <p class="tag">An agent learns to survive first-person <b>VizDoom</b> <em>entirely inside a from-scratch
+    Transformer world model</em> — it never touches the real game during training.</p>
+  <p class="authors"><b>Rajat Dandekar</b></p>
+  <p class="aff">Vizuara AI Labs</p>
+  <div class="links">
+    <a class="btn primary" href="assets/dreaming-to-dodge.pdf">📄 Paper (PDF)</a>
+    <a class="btn" href="https://github.com/RajatDandekar/dreaming-to-dodge">⌨️ Code</a>
+    <a class="btn" href="https://teamvizuara--dreaming-to-dodge-sim-web.modal.run" target="_blank" rel="noopener">🕹️ Play the demo</a>
+    <a class="btn" href="#bibtex">📑 BibTeX</a>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <div class="hero">
+    <img src="assets/agent_real.gif" alt="The trained agent dodging fireballs in VizDoom take_cover">
+    <p class="cap">The imagination-trained agent playing the <b>real</b> game. It learned to strafe away from
+      incoming fireballs having practised <b>only in a dream</b> — a learned neural simulator, never the real engine.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">96.8</div><div class="l">steps survived<br>(40 held-out seeds)</div></div>
+    <div class="stat"><div class="n">99%</div><div class="l">of oracle survival<br>(97.7 reactive oracle)</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">real-env gradient<br>steps in training</div></div>
+    <div class="stat"><div class="n">~1.8k</div><div class="l">policy parameters<br>(evolved in the dream)</div></div>
+  </div>
+
+  <div class="two">
+    <div class="txt">
+      <div class="eyebrow">The whole idea</div>
+      <h2>Practise in a dream,<br>then play for real</h2>
+      <p class="lead">A <b>world model</b> is a neural network that learns to <em>imagine</em> the game. Once it can
+        dream convincingly, the agent rehearses thousands of lives inside the dream — cheap, fast, and safe —
+        and only ever <em>plays</em> the real game.</p>
+      <div class="callout" style="--c:var(--teal)">
+        <div class="k">why it's surprising</div>
+        <p>The agent we ship <b>never touched the real game while learning to act.</b> It learned to dodge
+          entirely from imagined experience.</p>
+      </div>
+    </div>
+    <figure class="pb"><img src="assets/pb/concept_dream.png" alt="Practise in a dream, then play for real">
+      <figcaption>Sleep, dream the corridor, rehearse the dodge — then wake up and play.</figcaption></figure>
+  </div>
+
+  <div class="eyebrow">Abstract</div>
+  <h2>Abstract</h2>
+  <p>World models promise <b>sample-efficient</b> reinforcement learning: rather than learn from expensive real
+    interaction, an agent practises inside a learned neural simulator. We reproduce, <em>from scratch</em>, the
+    landmark <a href="https://worldmodels.github.io/">World Models</a> (2018) result — training a policy
+    <em>entirely inside its own dream</em> on VizDoom <code>take_cover</code> — using the stronger discrete,
+    Transformer-based <a href="https://arxiv.org/abs/2209.00588">IRIS</a> (2023) recipe: a VQ-VAE tokenizer, a
+    GPT world model over frame tokens, and a policy optimised purely on imagined rollouts. Our final agent —
+    which <b>never touches the real game during learning</b> — survives <b>96.8 steps</b> on 40 held-out
+    episodes, <b>beating a random policy by +30%</b>, beating a model-free Double-DQN trained on the same
+    real-frame budget, and <b>matching a hand-coded reactive oracle</b> (97.7, i.e. 99% of oracle survival).
+    Beyond the number, we document the failures that make model-based RL brittle — codebook collapse dropping the
+    lethal object, a termination head that never predicts death, and <b>world-model exploitation</b> — and the
+    fixes that overcome them. We release the code and a <b>playable neural simulator</b> in which anyone can drive
+    the world model directly.</p>
+
+  <div class="eyebrow">Method</div>
+  <h2>How it works — three from-scratch parts</h2>
+  <figure class="pb"><img src="assets/pb/pipeline.png" alt="Method pipeline: tokenizer, world model, controller">
+    <figcaption>A <b>VQ-VAE tokenizer</b> maps each 64×64 frame to a small grid of discrete tokens; a
+      <b>GPT world model</b> predicts the next frame's tokens, the reward, and termination; a <b>tiny controller</b>
+      (~1.8k params) is evolved by CMA-ES to maximise survival <em>inside the dream</em>. The policy is only ever
+      <em>evaluated</em> in the real game.</figcaption></figure>
+  <div class="grid3">
+    <figure class="pb"><img src="assets/pb/tokenizer_intuition.png" alt="Tokenizer intuition">
+      <figcaption><b>Tokenizer.</b> Compress a frame to symbols, then rebuild it — keeping the tiny bright fireball.</figcaption></figure>
+    <figure class="pb"><img src="assets/pb/wm_predicts_next.png" alt="World model predicts the next frame">
+      <figcaption><b>World model.</b> Given the past and an action, predict the next frame — like a language model over pixels.</figcaption></figure>
+    <figure class="pb"><img src="assets/pb/imagination_rollout.png" alt="Imagination rollout">
+      <figcaption><b>Imagination.</b> Feed predictions back in to roll the dream forward, with no game engine.</figcaption></figure>
+  </div>
+  <p>The lethal object — a fireball — is only a few bright pixels, so a naive tokenizer smooths it away and the
+    dream has no threat. A <b>warmth-weighted reconstruction loss</b> keeps it (fireball-recall 0.53 → 0.95).
+    Because death is ~1% of steps, an unweighted termination head collapses to "always alive"; a
+    <b>class-weighted</b> loss restores it. And a <b>KV cache</b> makes the autoregressive dream 9.6× faster —
+    the difference between feasible and infeasible policy search.</p>
+
+  <div class="eyebrow">Results</div>
+  <h2>Trained in the dream, oracle-level survival</h2>
+  <p class="lead">On 40 held-out seeds the imagination-trained agent nearly matches a hand-coded oracle and clearly
+    beats random play — despite never training in the real game.</p>
+  <div class="grid2">
+    <figure><img src="assets/fig_survival.png" alt="Survival distributions">
+      <figcaption>Survival distributions on held-out seeds: our agent (blue) tracks the oracle (green); random (grey) trails.</figcaption></figure>
+    <figure><img src="assets/fig_summary_bars.png" alt="Mean survival with 95% CI">
+      <figcaption>Mean steps survived with 95% confidence intervals — small gap to the oracle, large gap over random.</figcaption></figure>
+  </div>
+  <table>
+    <tr><th>Agent</th><th>Survival (steps)</th><th>Note</th></tr>
+    <tr><td>Random</td><td class="n">74.4</td><td>lower reference</td></tr>
+    <tr><td>Model-free Double-DQN (same real-frame budget)</td><td class="n">90</td><td>sample-efficiency bar</td></tr>
+    <tr class="hi"><td>IRIS agent — trained 100% in imagination</td><td class="n">96.8</td><td>held-out, 40 seeds</td></tr>
+    <tr><td>Heuristic oracle (reactive; sees the game)</td><td class="n">97.7</td><td>upper reference</td></tr>
+  </table>
+  <p>Verified consistent across <b>three independent seed sets</b>. The agent's action distribution is
+    <code>[0.00, 0.54, 0.46]</code> over {no-op, left, right} — genuinely <b>reactive</b>, choosing its strafe from
+    the fireball rather than collapsing to one direction.</p>
+
+  <div class="two rev">
+    <div class="txt">
+      <div class="eyebrow">Analysis · what it learned</div>
+      <h2>A genuine dodging reflex</h2>
+      <p class="lead">Across ~3,900 real moments we logged where the fireball was and which way the agent stepped.
+        The avoidance pattern is unmistakable:</p>
+      <p style="margin:8px 0 0">&nbsp;&nbsp;• fireball on the <b>left</b> → agent moves <b>right</b><br>
+        &nbsp;&nbsp;• fireball on the <b>right</b> → agent moves <b>left</b></p>
+      <div class="callout"><div class="k">not a memorised script</div>
+        <p>It learned to <em>react</em> to the threat position — a real policy, learned only from dreaming.</p></div>
+    </div>
+    <figure><img src="assets/fig_reactivity.png" alt="Action tendency vs fireball position">
+      <figcaption>Action tendency vs fireball position — a clean avoidance curve.</figcaption></figure>
+  </div>
+
+  <div class="two">
+    <div class="txt">
+      <div class="eyebrow">Analysis · trusting the dream</div>
+      <h2>Sharp up close,<br>blurry far out</h2>
+      <p class="lead">Imagined rollouts <b>drift</b>: errors compound the further ahead the model dreams. We measure
+        it directly and train the policy on the short, faithful window.</p>
+      <div class="callout" style="--c:var(--amber)"><div class="k">design choice</div>
+        <p>Short imagined rollouts stay close to reality — so that is where policy search happens.</p></div>
+    </div>
+    <figure><img src="assets/fig_fidelity.png" alt="Dream fidelity vs rollout horizon">
+      <figcaption>Pixel error vs how far ahead the model dreams (25 real seeds).</figcaption></figure>
+  </div>
+
+  <div class="eyebrow">The hard part</div>
+  <h2>The agent tries to cheat the dream</h2>
+  <div class="two">
+    <div class="txt">
+      <p class="lead">Train a policy against a model and it will <b>find the model's blind spots</b> — an imagined
+        "safe corner" where the dream forgets to spawn fireballs. It scores perfectly in imagination and dies
+        instantly in reality. Early controllers collapsed to a <b>single fixed action</b>.</p>
+      <p><b>The fix — three disciplines.</b> A <b>tiny controller</b> too small to memorise exploits; acting on the
+        <b>reconstructed image</b> so the policy can't latch onto token quirks; and <b>held-out selection with
+        best-of-N</b> — keep the brain that survives dream seeds it never trained on.</p>
+    </div>
+    <figure class="pb"><img src="assets/pb/exploitation.png" alt="Model exploitation">
+      <figcaption>Model exploitation: winning the dream by exploiting its flaws.</figcaption></figure>
+  </div>
+  <figure class="pb"><img src="assets/pb/heldout_selection.png" alt="Held-out selection" style="max-width:820px;display:block;margin:0 auto">
+    <figcaption style="text-align:center">Choose the controller that generalises to unseen dream seeds — the exploiters get filtered out.</figcaption></figure>
+
+  <div class="eyebrow">The wow moment</div>
+  <h2>Play inside the dream 🕹️</h2>
+  <p>There is <b>no game engine</b> below — every frame is predicted by the Transformer world model in response
+    to your keypresses. Hold <span class="kbd">←</span>/<span class="kbd">→</span> to strafe, or switch to
+    <b>watch the AI</b> to see the trained controller play inside its own dream. <em>(First load cold-starts a
+    GPU, ~30–60 s.)</em></p>
+  <div class="demo">
+    <iframe src="https://teamvizuara--dreaming-to-dodge-sim-web.modal.run" title="Playable neural simulator" loading="lazy"></iframe>
+    <p class="note">Trouble loading here? <a href="https://teamvizuara--dreaming-to-dodge-sim-web.modal.run" target="_blank" rel="noopener">Open the simulator in a new tab →</a></p>
+  </div>
+
+  <div class="eyebrow">Inside vs. outside the dream</div>
+  <h2>The same agent, two worlds</h2>
+  <div class="grid2">
+    <figure class="game"><img src="assets/agent_dream.gif" alt="Agent acting inside the dream">
+      <figcaption>The agent acting <b>inside the world model's dream</b> — no engine; the Transformer generates
+        each frame.</figcaption></figure>
+    <figure class="game"><img src="assets/agent_filmstrip.png" alt="Agent dodging in the real game">
+      <figcaption>The same agent in the <b>real</b> game across one episode, strafing clear of fireballs.</figcaption></figure>
+  </div>
+  <div class="grid3">
+    <figure class="game"><img src="assets/recon.png" alt="Tokenizer reconstructions">
+      <figcaption>Tokenizer keeps the fireball through quantization (left: real, right: decoded).</figcaption></figure>
+    <figure><img src="assets/fig_recall.png" alt="Fireball recall">
+      <figcaption>Warmth-weighting lifts fireball recall 0.53 → 0.95.</figcaption></figure>
+    <figure class="game"><img src="assets/screenshot_2.png" alt="A real game frame">
+      <figcaption>A real <code>take_cover</code> frame: the rare bright fireball is the whole challenge.</figcaption></figure>
+  </div>
+
+  <div class="two rev">
+    <div class="txt">
+      <div class="eyebrow">Zoom out</div>
+      <h2>One recipe, bigger worlds</h2>
+      <p class="lead">The bouncing ball, the spreading outbreak, the incoming fireball — all are the same move:
+        <b>predict the next state, then plan inside the prediction.</b> Master the small world and the method
+        scales up.</p>
+    </div>
+    <figure class="pb"><img src="assets/pb/ball_outbreak_fireball.png" alt="One idea at three scales">
+      <figcaption>One idea at three scales: the ball, the outbreak, the fireball.</figcaption></figure>
+  </div>
+
+  <div class="eyebrow">Citation</div>
+  <h2 id="bibtex">Citation</h2>
+  <div class="bibtex">@misc{dandekar2026dreamingtododge,<br>
+&nbsp;&nbsp;title&nbsp;&nbsp;= {Dreaming to Dodge: An Agent that Learns to Survive VizDoom<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Entirely Inside a From-Scratch Transformer World Model},<br>
+&nbsp;&nbsp;author = {Dandekar, Rajat},<br>
+&nbsp;&nbsp;year&nbsp;&nbsp;&nbsp;= {2026},<br>
+&nbsp;&nbsp;note&nbsp;&nbsp;&nbsp;= {Vizuara AI Labs}<br>
+}</div>
+</main>
+
+<footer><div class="wrap">
+  Dreaming to Dodge · Vizuara AI Labs · MIT-licensed ·
+  <a href="https://github.com/RajatDandekar/dreaming-to-dodge">code</a> ·
+  <a href="assets/dreaming-to-dodge.pdf">paper</a> ·
+  <a href="https://teamvizuara--dreaming-to-dodge-sim-web.modal.run" target="_blank" rel="noopener">demo</a>
+  <br>Reproduced from scratch on Modal. Built on the IRIS world-model recipe; VizDoom © its authors.
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,50 @@
+# "Dream to Catch" — the primary IRIS-from-scratch config.
+# A deterministic pixel Catch game at IRIS's native 64x64 frame size.
+env: catch
+grid: 8              # 8x8 logical board -> episodes are 7 steps long
+resolution: 64      # 64x64x3 frames (same as IRIS)
+
+# --- data collection (the collect<->train loop) ---
+collect:
+  rounds: 1              # rounds actually run for the reported result (~23 min A10G); raise to 5 for the full IRIS-style loop
+  steps_per_round: 8000  # real env steps collected each round (40k total)
+  eps_greedy: 0.05       # exploration noise mixed into the policy at collect time
+  buffer_capacity: 60000 # replay buffer (keep ~everything)
+
+# --- tokenizer (discrete autoencoder) ---
+tokenizer:
+  num_tokens: 16     # K  (4x4 latent grid)
+  vocab_size: 256    # N  codebook entries
+  embed_dim: 128     # d  code vector dim
+  ch: 32             # base conv width
+  beta: 0.25
+  epochs_per_round: 1
+  steps_per_round: 1500
+  batch_size: 128
+  lr: 0.0003
+
+# --- world model (token Transformer) ---
+world_model:
+  max_timesteps: 10  # L  context length in timesteps (matches the trained checkpoint: seq = 10*(16+1) = 170)
+  embed_dim: 256     # D
+  num_layers: 4      # M  (matches the trained checkpoint)
+  num_heads: 4
+  dropout: 0.1
+  steps_per_round: 3000
+  batch_size: 32
+  lr: 0.0003
+
+# --- actor-critic (trained purely in imagination) ---
+policy:
+  hidden_dim: 256
+  conv_ch: 32
+  gamma: 0.995
+  lam: 0.95
+  entropy_coef: 0.01
+  horizon: 10        # H  imagination horizon (>= episode length 7; matches trained context)
+  updates_per_round: 800
+  batch_size: 128    # imagined trajectories per update
+  lr: 0.0003
+  temperature: 1.0
+
+seed: 0

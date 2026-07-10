@@ -1,0 +1,24 @@
+# virtualenvs (huge)
+.venv/
+.plotvenv/
+# python
+__pycache__/
+*.pyc
+*.bak
+# results / large binaries (regenerable; kept off the repo)
+results/
+demo/
+*.npz
+*.pt
+# big media (the small publication figures under figures/ ARE tracked)
+*.mp4
+figures/**/*.gif
+# latex build artifacts (keep .tex and .pdf)
+paper_dtd/*.aux
+paper_dtd/*.log
+paper_dtd/*.out
+paper_dtd/build*.log
+paper_dtd/page1*.png
+# website build (deployed separately to Vercel)
+website/node_modules/
+website/.vercel/
