@@ -1,0 +1,17 @@
+# Local client needs only `modal` (+ pyyaml) to launch runs; everything below is
+# what the Modal image installs and what training/serving actually use.
+modal>=1.5
+pyyaml==6.0.2
+
+# --- runtime (installed in the Modal image; pin numpy<2 for vizdoom 1.2.3) ---
+torch==2.6.0
+numpy==1.26.4          # REQUIRED: numpy>=2 makes vizdoom 1.2.3 return blank frames
+vizdoom==1.2.3
+cma==3.3.0             # CMA-ES for the tiny controller
+einops==0.8.0
+matplotlib==3.9.2
+imageio==2.36.0
+pillow                 # asset upscaling / simulator frames
+gymnasium==1.0.0
+ale-py==0.10.1
+fastapi[standard]==0.115.6   # the playable simulator web app

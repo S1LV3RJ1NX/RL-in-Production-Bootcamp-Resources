@@ -1,0 +1,110 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{iris}
+\citation{vqvae2}
+\citation{jukebox}
+\citation{worldmodels}
+\citation{dreamer}
+\citation{dreamerv2}
+\citation{dreamerv3}
+\citation{iris}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
+\citation{vqvae2}
+\citation{jukebox}
+\citation{worldmodels}
+\citation{dreamer}
+\citation{dreamerv2}
+\citation{dreamerv3}
+\citation{iris}
+\citation{simple}
+\citation{vqvae}
+\citation{vqvae2}
+\citation{jukebox}
+\citation{bsuite}
+\@writefile{toc}{\contentsline {paragraph}{Contributions.}{2}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background and Related Work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{2}{2}{Background and Related Work}{section.2}{}}
+\citation{vqvae}
+\citation{vqvae2}
+\citation{jukebox}
+\@writefile{toc}{\contentsline {section}{\numberline {3}The Three Components, From Scratch}{3}{section.3}\protected@file@percent }
+\newlabel{sec:components}{{3}{3}{The Three Components, From Scratch}{section.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces The from-scratch IRIS pipeline. The tokenizer (orange) maps a frame to $K$ discrete tokens; the Transformer world model (green) autoregressively predicts the next frame's tokens, reward, and done; the actor-critic (blue) observes decoded dream frames $\hat  x_t=D(z_t)$ and its actions feed back into the world model. During policy learning the real environment is never touched.\relax }}{3}{figure.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:pipeline}{{1}{3}{The from-scratch IRIS pipeline. The tokenizer (orange) maps a frame to $K$ discrete tokens; the Transformer world model (green) autoregressively predicts the next frame's tokens, reward, and done; the actor-critic (blue) observes decoded dream frames $\hat x_t=D(z_t)$ and its actions feed back into the world model. During policy learning the real environment is never touched.\relax }{figure.caption.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{1. Tokenizer (VQ-VAE), 0.83\,M params.}{3}{section*.3}\protected@file@percent }
+\newlabel{eq:tok}{{1}{3}{1. Tokenizer (VQ-VAE), 0.83\,M params}{equation.3.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{2. World model (Transformer), 3.34\,M params.}{3}{section*.4}\protected@file@percent }
+\citation{dreamerv2}
+\citation{bsuite}
+\@writefile{toc}{\contentsline {paragraph}{3. Actor-critic, trained in imagination, 0.82\,M params.}{4}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Setup}{4}{section.4}\protected@file@percent }
+\newlabel{sec:setup}{{4}{4}{Experimental Setup}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Environment.}{4}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Training loop and compute.}{4}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Metrics.}{4}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{4}{section.5}\protected@file@percent }
+\newlabel{sec:results}{{5}{4}{Results}{section.5}{}}
+\citation{vqvae2}
+\citation{jukebox}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Two failures in the tokenizer, disentangled}{5}{subsection.5.1}\protected@file@percent }
+\newlabel{sec:tok-results}{{5.1}{5}{Two failures in the tokenizer, disentangled}{subsection.5.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Tokenizer ablation over $11$ seeds on the same replay buffer (2000 steps each). ``Ball reliably preserved'' counts seeds with recall $>0.5$. Codebook health and ball preservation are \emph  {independent}: under a uniform loss the ball is an unreliable coin-flip whether the codebook is collapsed (plain VQ) or healthy (EMA). The last two rows share the EMA codebook and differ \emph  {only} in the loss, so the jump from $2/11$ to $11/11$ is attributable to the reconstruction objective alone.\relax }}{5}{table.caption.9}\protected@file@percent }
+\newlabel{tab:ablation}{{1}{5}{Tokenizer ablation over $\nseeds $ seeds on the same replay buffer (2000 steps each). ``Ball reliably preserved'' counts seeds with recall $>0.5$. Codebook health and ball preservation are \emph {independent}: under a uniform loss the ball is an unreliable coin-flip whether the codebook is collapsed (plain VQ) or healthy (EMA). The last two rows share the EMA codebook and differ \emph {only} in the loss, so the jump from $\keptEMA /\nseeds $ to $\keptFG /\nseeds $ is attributable to the reconstruction objective alone.\relax }{table.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces (a) Reconstructions of frames with the ball at every column. Plain VQ and EMA-with-uniform-loss both drop the white ball (keeping only the fixed blue paddle); the foreground-weighted loss restores it. (b) Active codes over training: EMA and EMA+fg keep the whole codebook alive, plain VQ collapses.\relax }}{6}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:ablation}{{2}{6}{(a) Reconstructions of frames with the ball at every column. Plain VQ and EMA-with-uniform-loss both drop the white ball (keeping only the fixed blue paddle); the foreground-weighted loss restores it. (b) Active codes over training: EMA and EMA+fg keep the whole codebook alive, plain VQ collapses.\relax }{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}The world model: the easy part}{6}{subsection.5.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces World-model training: next-token, reward, and done accuracy all climb rapidly.\relax }}{6}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:wm}{{3}{6}{World-model training: next-token, reward, and done accuracy all climb rapidly.\relax }{figure.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Tokenizer reconstructions with the fix: the ball is preserved at every position (recall $\approx \!1.00$).\relax }}{6}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:recon}{{4}{6}{Tokenizer reconstructions with the fix: the ball is preserved at every position (recall $\approx \!\ballFG $).\relax }{figure.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Real environment (top) vs.\ the world model's dream (bottom) under identical actions, with per-step MSE. The dream now reproduces the falling ball \emph  {and} the moving paddle.\relax }}{7}{figure.caption.12}\protected@file@percent }
+\newlabel{fig:wmreal}{{5}{7}{Real environment (top) vs.\ the world model's dream (bottom) under identical actions, with per-step MSE. The dream now reproduces the falling ball \emph {and} the moving paddle.\relax }{figure.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}The policy learns to catch}{7}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:policy-results}{{5.3}{7}{The policy learns to catch}{subsection.5.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Actor-critic in imagination: imagined return climbs while entropy anneals.\relax }}{7}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:policy}{{6}{7}{Actor-critic in imagination: imagined return climbs while entropy anneals.\relax }{figure.caption.13}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Evaluation over 500 real episodes: the imagination-trained policy vs.\ random and oracle.\relax }}{7}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:baseline}{{7}{7}{Evaluation over 500 real episodes: the imagination-trained policy vs.\^^Mrandom and oracle.\relax }{figure.caption.13}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces One imagined rollout. Every frame after $t{=}0$ is hallucinated by the world model; the learned paddle tracks the ball and the world model predicts the terminal catch reward.\relax }}{8}{figure.caption.14}\protected@file@percent }
+\newlabel{fig:film}{{8}{8}{One imagined rollout. Every frame after $t{=}0$ is hallucinated by the world model; the learned paddle tracks the ball and the world model predicts the terminal catch reward.\relax }{figure.caption.14}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Scorecard after the fixes. Every number is from the real Modal run.\relax }}{8}{table.caption.15}\protected@file@percent }
+\newlabel{tab:scorecard}{{2}{8}{Scorecard after the fixes. Every number is from the real Modal run.\relax }{table.caption.15}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Discussion}{8}{section.6}\protected@file@percent }
+\newlabel{sec:discussion}{{6}{8}{Discussion}{section.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{Codebook collapse is a red herring for the dropped ball.}{8}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The coupling is the whole story.}{8}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{A cheap sanity check that would have caught it.}{8}{section*.18}\protected@file@percent }
+\bibcite{iris}{1}
+\bibcite{worldmodels}{2}
+\bibcite{dreamer}{3}
+\@writefile{toc}{\contentsline {paragraph}{Limitations.}{9}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Reproducibility}{9}{section.7}\protected@file@percent }
+\newlabel{sec:reproduce}{{7}{9}{Reproducibility}{section.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Conclusion}{9}{section.8}\protected@file@percent }
+\newlabel{sec:conclusion}{{8}{9}{Conclusion}{section.8}{}}
+\bibcite{dreamerv2}{4}
+\bibcite{dreamerv3}{5}
+\bibcite{vqvae}{6}
+\bibcite{vqvae2}{7}
+\bibcite{jukebox}{8}
+\bibcite{simple}{9}
+\bibcite{bsuite}{10}
+\gdef \@abspage@last{10}

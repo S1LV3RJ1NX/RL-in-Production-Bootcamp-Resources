@@ -1,0 +1,52 @@
+# "Dream to Catch" (BOUNDED) — the config actually used for the real Modal run.
+# Same mechanism as catch.yaml, tuned to show clear learning under the project's
+# <=6 GPU-hour cap.  Catch is deterministic and simple, so a big random-collected
+# buffer + a well-trained tokenizer/world-model + lots of imagination updates is
+# enough to reach an oracle-level policy without the full 5-round schedule.
+env: catch
+grid: 8              # 8x8 board -> 7-step episodes
+resolution: 64      # 64x64x3 frames (IRIS native size)
+
+# --- data collection ---
+collect:
+  rounds: 3               # interleaved collect/train rounds (bounded)
+  steps_per_round: 12000  # real env steps per round (~1700 episodes/round)
+  eps_greedy: 0.10        # exploration noise mixed into the policy at collect time
+  buffer_capacity: 60000  # replay buffer
+
+# --- tokenizer (discrete autoencoder) ---
+tokenizer:
+  num_tokens: 16     # K  (4x4 latent grid)
+  vocab_size: 256    # N  codebook entries
+  embed_dim: 128     # d  code vector dim
+  ch: 32             # base conv width
+  beta: 0.25
+  steps_per_round: 1200
+  batch_size: 128
+  lr: 0.0003
+
+# --- world model (token Transformer) ---
+world_model:
+  max_timesteps: 10  # L  context length in timesteps (episode is 7 steps)
+  embed_dim: 256     # D
+  num_layers: 4      # M  (4 blocks is plenty for Catch; cheaper than 6)
+  num_heads: 4
+  dropout: 0.1
+  steps_per_round: 2000
+  batch_size: 32
+  lr: 0.0003
+
+# --- actor-critic (trained purely in imagination) ---
+policy:
+  hidden_dim: 256
+  conv_ch: 32
+  gamma: 0.995
+  lam: 0.95
+  entropy_coef: 0.01
+  horizon: 10        # H  imagination horizon (>= episode length)
+  updates_per_round: 500
+  batch_size: 128    # imagined trajectories per update
+  lr: 0.0003
+  temperature: 1.0
+
+seed: 0

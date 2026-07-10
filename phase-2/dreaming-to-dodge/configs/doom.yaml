@@ -1,0 +1,94 @@
+# "Dreaming to Dodge" — VizDoom take_cover, learned entirely in imagination.
+#
+# The SAME from-scratch IRIS mechanism as catch_win.yaml (VQ-VAE tokenizer +
+# GPT world model + actor-critic trained purely in imagination), pointed at the
+# scenario Ha & Schmidhuber's "World Models" (2018) made famous: a first-person
+# agent that STRAFES to dodge fireballs and survives as long as it can.  The
+# policy never touches the real game during training — it practises inside a
+# world model that has only watched a few thousand frames of Doom.
+#
+# Doom frames are far richer than Catch's flat sprites, so the tokenizer and
+# world model are scaled up accordingly (more tokens, wider/deeper Transformer).
+# Runs on A10G; the policy-in-imagination stage is the wall-clock dominant one.
+env: doom
+resolution: 64       # 64x64x3 frames (IRIS native size)
+frame_skip: 4        # game tics per agent step (survival_tics = steps * 4)
+t_max: 525           # cap an episode at 525 steps (2100 tics) so eval is bounded
+living_reward: 1.0   # +1 per survived step, 0 on death -> return == steps survived
+
+# --- data collection (the collect<->train loop) ---
+collect:
+  rounds: 5                # real IRIS loop: round 0 seeds w/ random+oracle, then policy-driven
+  steps_per_round: 40000   # real agent steps/round (~hundreds of episodes; take_cover is short early)
+  eps_greedy: 0.10         # exploration noise mixed into the policy at collect time
+  oracle_frac: 0.6         # HEAVY heuristic-dodger seeding: the policy kept finding
+                           # fixed-action exploits (always-left, then always-right) that
+                           # the WM wrongly thought were safe. Flooding the buffer with
+                           # REACTIVE dodging teaches the WM real fireball-avoidance
+                           # dynamics (and gives the imagination good start states).
+  buffer_capacity: 200000  # replay buffer (Doom needs more real data than Catch)
+
+# --- tokenizer (discrete autoencoder) ---
+# The rare-but-lethal detail is the bright fireball; fg_weight upweights bright
+# pixels so it survives quantization (the dropped-ball fix, transferred). EMA +
+# dead-code revival keep the codebook from collapsing on the busy scene.
+tokenizer:
+  num_tokens: 64      # K  (8x8 latent grid) — enough to localise the fireball's column
+  vocab_size: 512     # N  codebook entries
+  embed_dim: 128      # d  code vector dim
+  ch: 64              # base conv width (richer scene than Catch -> more capacity)
+  beta: 0.25
+  fg_weight: 12.0     # luminance-weighted recon (keep the bright fireball). stage-1
+                      # showed fg 0->7 lifted fireball-recall 0.53->0.63; push harder.
+  warm_weight: 45.0   # warmth-weighted recon: upweight ORANGE/RED (fireball) pixels
+                      # specifically. luminance alone caps ~0.5-0.6 recall because lit
+                      # walls are bright too; targeting warmth keeps the actual threat.
+  ema: true           # EMA codebook updates (VQ-VAE-2) — un-collapse the codebook
+  ema_decay: 0.99
+  revive_dead: true   # random-restart dead codes toward live encoder vectors
+  revive_every: 150
+  dead_threshold: 1.0
+  steps_per_round: 5000
+  batch_size: 128
+  lr: 0.0003
+
+# --- world model (token Transformer) — the imagination engine ---
+world_model:
+  max_timesteps: 16   # L  context length in timesteps; seq = (K+1)*L = 65*16 = 1040 tokens
+  embed_dim: 256      # D
+  num_layers: 8       # M  (deeper than Catch — Doom dynamics are harder)
+  num_heads: 4
+  dropout: 0.1
+  done_pos_weight: 55.0  # class weight on the rare death event. At 25 the dream was
+                         # still too "safe" (only ~11% of 16-step dreams died vs ~23%
+                         # in reality) -> too weak a survival signal. 55 makes the
+                         # dream end when a fireball closes in, as it should.
+  steps_per_round: 8000
+  batch_size: 24      # sequences are long; keep memory in check on A10G
+  lr: 0.0003
+
+# --- actor-critic (trained purely in imagination) ---
+policy:
+  hidden_dim: 512
+  conv_ch: 32
+  gamma: 0.995        # long-horizon survival
+  lam: 0.95
+  entropy_coef: 0.02  # fallback if no schedule given
+  entropy_start: 0.06 # explore early (which way to dodge) — higher, to avoid the
+                      # premature collapse-to-one-action we saw at 0.04
+  entropy_end: 0.02   # keep exploring; commit only mildly
+  horizon: 32         # H  imagination horizon. 16 was FATALLY short: death takes
+                      # ~70 steps so a 16-step dream survived regardless of action
+                      # (no dodge signal). 32 steps (128 tics) from diverse real
+                      # starts lets "fail to dodge -> die" actually happen in the dream.
+  updates_per_round: 300   # per round in the IRIS loop (grounding the WM across
+                           # rounds matters more than more updates on a stale WM);
+                           # fits comfortably under the function timeout w/ periodic ckpt
+  batch_size: 48      # imagined trajectories per update (KV-cached imagination)
+  lr: 0.0003
+  temperature: 1.25   # >1 adds dream stochasticity -> harder for the policy to
+                      # exploit deterministic world-model quirks (the World Models
+                      # anti-cheating fix). 1.1 was too mild; the policy still found
+                      # fixed-action exploits. 1.25 forces more robust (reactive) play.
+
+seed: 0

@@ -1,0 +1,64 @@
+# "Dream to Catch" — the WINNING config.
+# Same IRIS-from-scratch mechanism as catch.yaml, but with the two documented
+# failures FIXED:
+#   * tokenizer: EMA codebook updates + dead-code revival (un-collapse the codebook
+#     so the small moving ball survives quantization);
+#   * policy: a real multi-round IRIS collect<->train loop, more imagination
+#     updates, and an entropy anneal so the actor-critic commits to catching.
+# Runs on a single A10G via Modal.
+env: catch
+grid: 8              # 8x8 board -> 7-step episodes
+resolution: 64      # 64x64x3 frames (IRIS native size)
+
+# --- data collection (the collect<->train loop) ---
+collect:
+  rounds: 4               # real IRIS-style loop (round 0 random, then policy-driven)
+  steps_per_round: 12000  # real env steps per round (~1700 episodes)
+  eps_greedy: 0.10        # exploration noise mixed into the policy at collect time
+  buffer_capacity: 80000  # replay buffer
+
+# --- tokenizer (discrete autoencoder) — THE FIX ---
+tokenizer:
+  num_tokens: 16     # K  (4x4 latent grid)
+  vocab_size: 256    # N  codebook entries
+  embed_dim: 128     # d  code vector dim
+  ch: 32             # base conv width
+  beta: 0.25
+  fg_weight: 25.0    # foreground-weighted recon loss — makes the tiny ball worth
+                     # reconstructing (the TRUE fix for the dropped ball)
+  ema: true          # EMA codebook updates (VQ-VAE-2) — un-collapses the codebook
+  ema_decay: 0.99
+  revive_dead: true  # random-restart dead codes toward live encoder vectors
+  revive_every: 150
+  dead_threshold: 1.0
+  steps_per_round: 2500
+  batch_size: 128
+  lr: 0.0003
+
+# --- world model (token Transformer) — already works; unchanged recipe ---
+world_model:
+  max_timesteps: 10  # L  context length in timesteps (episode is 7 steps)
+  embed_dim: 256     # D
+  num_layers: 4      # M
+  num_heads: 4
+  dropout: 0.1
+  steps_per_round: 3000
+  batch_size: 32
+  lr: 0.0003
+
+# --- actor-critic (trained purely in imagination) — more updates + entropy anneal ---
+policy:
+  hidden_dim: 256
+  conv_ch: 32
+  gamma: 0.995
+  lam: 0.95
+  entropy_coef: 0.01      # fallback if no schedule given
+  entropy_start: 0.03     # explore early
+  entropy_end: 0.003      # commit late
+  horizon: 10             # H  imagination horizon (>= episode length)
+  updates_per_round: 1200 # ~30 min/round on A10G (well under the function timeout)
+  batch_size: 128         # imagined trajectories per update
+  lr: 0.0003
+  temperature: 1.0
+
+seed: 0

@@ -1,0 +1,61 @@
+# "Dreaming to Dodge" — K=256 FINER tokenizer variant (Track A).
+# 16x16 latent (vs 8x8 at K=64): each token covers a 4x4 patch, so the fireball
+# gets its own token(s) and the dream can localise the threat sharply enough to
+# reward GOOD (not just reactive) dodging. Trains on the SAME frame buffer as the
+# K=64 stack (data_tag: doom); only the tokenizer/WM change.
+env: doom
+resolution: 64
+frame_skip: 4
+t_max: 525
+living_reward: 1.0
+
+collect:
+  rounds: 1
+  steps_per_round: 40000
+  eps_greedy: 0.10
+  oracle_frac: 0.6
+  buffer_capacity: 200000
+
+tokenizer:
+  num_tokens: 256     # K = 16x16 latent (finer fireball localisation)
+  vocab_size: 512
+  embed_dim: 128
+  ch: 64
+  beta: 0.25
+  fg_weight: 12.0
+  warm_weight: 45.0
+  ema: true
+  ema_decay: 0.99
+  revive_dead: true
+  revive_every: 150
+  dead_threshold: 1.0
+  steps_per_round: 6000
+  batch_size: 128
+  lr: 0.0003
+
+world_model:
+  max_timesteps: 8    # L; seq = (256+1)*8 = 2056 tokens (kept modest since K is 4x)
+  embed_dim: 256
+  num_layers: 6
+  num_heads: 4
+  dropout: 0.1
+  done_pos_weight: 55.0
+  steps_per_round: 8000
+  batch_size: 8       # long sequences -> small batch on A10G
+  lr: 0.0003
+
+policy:
+  hidden_dim: 512
+  conv_ch: 32
+  gamma: 0.995
+  lam: 0.95
+  entropy_coef: 0.02
+  entropy_start: 0.06
+  entropy_end: 0.02
+  horizon: 40
+  updates_per_round: 300
+  batch_size: 48
+  lr: 0.0003
+  temperature: 1.1
+
+seed: 0

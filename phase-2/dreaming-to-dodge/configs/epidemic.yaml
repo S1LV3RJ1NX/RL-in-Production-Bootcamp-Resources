@@ -1,0 +1,76 @@
+# "Dreaming to Contain" — spatial-SIR epidemic containment.
+# The SAME from-scratch IRIS mechanism as catch_win.yaml (VQ-VAE tokenizer +
+# GPT world model + actor-critic trained purely in imagination), pointed at a
+# real, practical problem: a policy that learns WHERE/WHEN to vaccinate to
+# contain a stochastic outbreak it has only seen spread a handful of times.
+# Runs on a single A10G via Modal.  Numbers below are Stage-1 starting points.
+env: epidemic
+grid: 16            # 16x16 = 256 individuals
+resolution: 64      # 64x64x3 frames (IRIS native size); cell = 4px
+
+# --- epidemic dynamics (the environment) ---
+beta: 0.3           # per-infected-neighbour transmission prob
+gamma: 0.2          # per-step recovery prob (I -> R)
+init_infected: 2    # seed infections at reset
+t_max: 32           # episode horizon (or ends early at burnout, I=0)
+cursor_step: 2      # responder cursor cells moved per step
+patch: 3            # vaccination patch is patch x patch (S -> V)
+
+# --- data collection (the collect<->train loop) ---
+collect:
+  rounds: 2               # round 0 (random+oracle seed), round 1 policy-driven
+  steps_per_round: 12000  # ~400 episodes/round (episodes are ~32 steps)
+  eps_greedy: 0.10        # exploration noise at collect time
+  oracle_frac: 0.4        # seed exploration w/ ring vaccination so the WM sees
+                          # CONTAINED outbreaks (0-reward steps exist to learn)
+  buffer_capacity: 60000
+
+# --- tokenizer (discrete autoencoder) ---
+# NOTE: here the rare class is the RED infection front (a few cells among many
+# green), a class-imbalance rather than Catch's background-dominance. fg_weight
+# (luminance upweight) helps but a class/rareness-aware weight is the planned
+# epidemic-specific fix to verify in Stage 1 (ball-recall analogue = I-recall).
+tokenizer:
+  num_tokens: 64     # K  (8x8 latent) — finer than Catch's 16, to localise the front
+  vocab_size: 512    # N  codebook entries
+  embed_dim: 128     # d  code vector dim
+  ch: 32             # base conv width
+  beta: 0.25
+  fg_weight: 25.0    # foreground-weighted recon (keep the tiny infection front)
+  ema: true          # EMA codebook updates (VQ-VAE-2) — un-collapse the codebook
+  ema_decay: 0.99
+  revive_dead: true  # random-restart dead codes toward live encoder vectors
+  revive_every: 150
+  dead_threshold: 1.0
+  steps_per_round: 2500
+  batch_size: 128
+  lr: 0.0003
+
+# --- world model (token Transformer) ---
+world_model:
+  max_timesteps: 16  # L  context in timesteps; seq = (K+1)*L = 65*16 = 1040 tokens
+  embed_dim: 256     # D
+  num_layers: 4      # M
+  num_heads: 4
+  dropout: 0.1
+  steps_per_round: 3500
+  batch_size: 16     # smaller batch — sequences are longer than Catch
+  lr: 0.0003
+
+# --- actor-critic (trained purely in imagination) ---
+policy:
+  hidden_dim: 256
+  conv_ch: 32
+  gamma: 0.99
+  lam: 0.95
+  entropy_coef: 0.01
+  entropy_start: 0.03     # explore early (where to place barriers)
+  entropy_end: 0.003      # commit late
+  horizon: 16             # H  imagination horizon (autoregressive dream is
+                          # K*H world-model forwards/update — 16 keeps it cheap)
+  updates_per_round: 500
+  batch_size: 64          # imagined trajectories per update
+  lr: 0.0003
+  temperature: 1.0
+
+seed: 0
