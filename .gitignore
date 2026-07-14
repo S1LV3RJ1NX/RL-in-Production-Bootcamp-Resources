@@ -12,3 +12,12 @@ assignments/rm/
 
 # Capstone trained checkpoints (large; upload to HF Hub instead of git)
 lectures/capstone/model*/
+*.mp4
+*.mp3
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.webp
