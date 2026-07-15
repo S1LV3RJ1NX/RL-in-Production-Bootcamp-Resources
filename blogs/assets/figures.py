@@ -1923,6 +1923,139 @@ def build_blog09() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 10 — Socratic alignment of small language models
+# ----------------------------------------------------------------------------
+BLOG10 = "10-socratic-alignment"
+
+# Headline numbers on Qwen2.5-0.5B (from the study's master table).
+SOCRATIC_RECIPES = ["SFT", "KTO", "ORPO", "SimPO", "DPO", "GRPO", "PPO"]
+SOCRATIC_DJUDGE = [15.6, 18.8, 17.2, 17.0, -8.0, -5.4, -0.2]
+SOCRATIC_JUDGE = [73.0, 76.2, 74.6, 74.4, 49.4, 52.0, 57.2]
+SOCRATIC_LEAK = [0.076, 0.12, 0.082, 0.080, 0.056, 0.36, 0.41]
+SOCRATIC_BASE_JUDGE = 57.4
+SOCRATIC_BASE_LEAK = 0.43
+
+
+def fig_delta_judge() -> None:
+    """Delta judge score per recipe on Qwen2.5-0.5B: guide, evade, or flatline."""
+    fig, ax = plt.subplots(figsize=(8.8, 4.8))
+    colors = [ACCENT if d > 5 else (INK if d < -4 else MUTED) for d in SOCRATIC_DJUDGE]
+    pos = np.arange(len(SOCRATIC_RECIPES))
+    ax.bar(pos, SOCRATIC_DJUDGE, width=0.62, color=colors, edgecolor=INK, lw=0.8)
+    ax.axhline(0, lw=1.2, color=INK)
+    for x, d in zip(pos, SOCRATIC_DJUDGE):
+        va = "bottom" if d > 0 else "top"
+        off = 0.5 if d > 0 else -0.5
+        ax.text(x, d + off, f"{d:+.1f}", ha="center", va=va, fontsize=10,
+                color=INK, fontweight="bold")
+    ax.text(1.5, -6.5, "anchored: guide", ha="center", fontsize=10, color=ACCENT,
+            style="italic")
+    ax.text(4.0, 10.0, "pure contrast:\nevade", ha="center", fontsize=10,
+            color=INK, style="italic")
+    ax.text(5.55, 10.0, "online RL:\nbarely moves", ha="center", fontsize=10,
+            color=MUTED, style="italic")
+    ax.set_xticks(pos)
+    ax.set_xticklabels(SOCRATIC_RECIPES)
+    ax.set_ylabel(r"$\Delta$ judge score vs base (57.4)")
+    ax.set_title("Same data, same budget, seven objectives: only the anchored recipes teach")
+    ax.set_ylim(-12, 24)
+    save(fig, BLOG10, "fig-delta-judge")
+
+
+def fig_guide_evade() -> None:
+    """Judge score vs leakage per recipe: the guide / evade / flatline corners."""
+    fig, ax = plt.subplots(figsize=(8.6, 5.4))
+    ax.axhline(SOCRATIC_BASE_JUDGE, ls="--", lw=1.2, color=MUTED)
+    ax.axvline(SOCRATIC_BASE_LEAK, ls="--", lw=1.2, color=MUTED)
+    ax.scatter([SOCRATIC_BASE_LEAK], [SOCRATIC_BASE_JUDGE], s=180, marker="s",
+               color=DIVIDER, edgecolor=INK, lw=1.2, zorder=4)
+    ax.annotate("base", xy=(SOCRATIC_BASE_LEAK, SOCRATIC_BASE_JUDGE),
+                xytext=(SOCRATIC_BASE_LEAK + 0.012, SOCRATIC_BASE_JUDGE + 1.2),
+                fontsize=10, color=INK, fontweight="bold")
+    # hand-placed label offsets so the tight anchored cluster stays readable
+    offsets = {"SFT": (-0.041, -1.6), "KTO": (0.010, 0.9), "ORPO": (-0.020, 2.0),
+               "SimPO": (0.010, -2.6), "DPO": (0.010, 1.2), "GRPO": (0.010, 1.2),
+               "PPO": (-0.014, -3.0)}
+    for name, leak, judge in zip(SOCRATIC_RECIPES, SOCRATIC_LEAK, SOCRATIC_JUDGE):
+        anchored = name in ("SFT", "KTO", "ORPO", "SimPO")
+        color = ACCENT if anchored else (INK if name == "DPO" else MUTED)
+        ax.scatter([leak], [judge], s=130, color=color, edgecolor=INK, lw=0.9, zorder=5)
+        dx, dy = offsets[name]
+        ax.annotate(name, xy=(leak, judge), xytext=(leak + dx, judge + dy),
+                    fontsize=10, color=color)
+    ax.annotate("guide: leak less,\nteach more", xy=(0.135, 76.2), xytext=(0.19, 78.0),
+                fontsize=10, color=ACCENT, style="italic",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.1))
+    ax.annotate("evade: lowest leakage,\nworst teaching", xy=(0.058, 49.6),
+                xytext=(0.13, 46.5), fontsize=10, color=INK, style="italic",
+                arrowprops=dict(arrowstyle="->", color=INK, lw=1.1))
+    ax.text(0.385, 62.5, "flatline:\nbarely moved", fontsize=10, color=MUTED,
+            style="italic", ha="center")
+    ax.set_xlabel("answer-leakage rate  (lower is better)")
+    ax.set_ylabel("judge Socratic score  (higher is better)")
+    ax.set_title("Every recipe on two axes: guide, evade, or barely move (Qwen2.5-0.5B)")
+    ax.set_xlim(0, 0.48)
+    ax.set_ylim(43, 82)
+    save(fig, BLOG10, "fig-guide-evade")
+
+
+def fig_judge_axes() -> None:
+    """The five judge axes and the ~30-point ceiling of a pure evader."""
+    axes_names = ["withholds\n(0-30)", "guiding q.\n(0-25)", "scaffolding\n(0-20)",
+                  "correctness\n(0-15)", "tone\n(0-10)"]
+    maxima = [30, 25, 20, 15, 10]
+    evader = [30, 2, 0, 0, 5]
+    real = [28, 22, 17, 14, 9]
+    pos = np.arange(len(axes_names))
+    w = 0.38
+
+    fig, ax = plt.subplots(figsize=(9.0, 4.8))
+    ax.bar(pos, maxima, width=0.82, color=CANVAS, edgecolor=DIVIDER, lw=1.2, zorder=1)
+    ax.bar(pos - w / 2, evader, width=w, color=MUTED, edgecolor=INK, lw=0.8,
+           zorder=3, label='evader: "Sure, what do you think?"  (total 37)')
+    ax.bar(pos + w / 2, real, width=w, color=ACCENT, edgecolor=INK, lw=0.8,
+           zorder=3, label="real guiding question  (total 90)")
+    ax.set_xticks(pos)
+    ax.set_xticklabels(axes_names, fontsize=10)
+    ax.set_ylabel("points earned per axis")
+    ax.set_title("Silence maxes one axis and forfeits the rest: the evader caps out low")
+    ax.legend(frameon=False, fontsize=9.5, loc="upper right")
+    ax.set_ylim(0, 33)
+    save(fig, BLOG10, "fig-judge-axes")
+
+
+def fig_simpo_sizes() -> None:
+    """SimPO's judge lift at three model sizes: the one recipe that never dips."""
+    sizes = ["SmolLM2-360M", "Qwen2.5-0.5B", "SmolLM2-1.7B"]
+    gains = [13.6, 17.0, 17.6]
+    pos = np.arange(len(sizes))
+
+    fig, ax = plt.subplots(figsize=(8.2, 4.6))
+    ax.bar(pos, gains, width=0.55, color=ACCENT, edgecolor=INK, lw=0.8)
+    ax.axhline(0, lw=1.2, color=INK)
+    for x, g in zip(pos, gains):
+        ax.text(x, g + 0.4, f"+{g:.1f}", ha="center", va="bottom", fontsize=11,
+                color=INK, fontweight="bold")
+    ax.annotate("the size where most recipes stall or regress\n(next best here: ORPO at +5.1)",
+                xy=(0, 13.6), xytext=(0.35, 20.0), fontsize=9.5, color=MUTED,
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.1))
+    ax.set_xticks(pos)
+    ax.set_xticklabels(sizes)
+    ax.set_ylabel(r"$\Delta$ judge score vs each model's base")
+    ax.set_title("SimPO is the recipe that works at every size, including the smallest")
+    ax.set_ylim(0, 24)
+    save(fig, BLOG10, "fig-simpo-sizes")
+
+
+def build_blog10() -> None:
+    print(f"[{BLOG10}]")
+    fig_delta_judge()
+    fig_guide_evade()
+    fig_judge_axes()
+    fig_simpo_sizes()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -1935,6 +2068,7 @@ BUILDERS = {
     "07": build_blog07,
     "08": build_blog08,
     "09": build_blog09,
+    "10": build_blog10,
 }
 
 

@@ -18,6 +18,7 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 07 | [RLHF: Teaching a Language Model What "Good" Means](./07-rlhf/) | ✅ Draft |
 | 08 | [GRPO: Teaching a Model to Reason by Comparing It to Itself](./08-grpo/) | ✅ Draft |
 | 09 | [DPO and Agentic RL: Align Without a Reward Model, Then Step Into the World](./09-dpo-and-agentic-rl/) | ✅ Draft |
+| 10 | [Socratic Alignment: Teaching a Small Model to Withhold the Answer](./10-socratic-alignment/) | ✅ Draft |
 
 ## Writing a new post
 
