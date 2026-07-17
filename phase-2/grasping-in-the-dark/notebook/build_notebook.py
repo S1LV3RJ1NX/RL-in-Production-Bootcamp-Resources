@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "hil_serl_grasp.ipynb")
 
 # The published checkpoint repo (set after `modal run ... --hf-repo <this>` publishes it).
-CKPT_REPO = "REPLACE_ME/hilserl-panda-pickcube-sac"
+CKPT_REPO = "RajatDandekar/hilserl-panda-pickcube-sac"
 
 
 def md(*lines):
@@ -165,6 +165,7 @@ cells = [
         "from lerobot.rl import gym_manipulator as gm",
         "from lerobot.processor import TransitionKey",
         "from lerobot.policies.gaussian_actor.modeling_gaussian_actor import GaussianActorPolicy",
+        "from lerobot.policies import make_pre_post_processors",
         "",
         "device = 'cuda' if torch.cuda.is_available() else 'cpu'",
         "local = snapshot_download(CKPT_REPO)",
@@ -174,7 +175,25 @@ cells = [
         "eval_env, teleop = gm.make_robot_env(cfg.env)",
         "env_proc, act_proc = gm.make_processors(eval_env, teleop, cfg.env, device)",
         "input_keys = list(cfg.policy.input_features.keys())",
-        "print('loaded policy on', device, '| inputs:', input_keys)",
+        "",
+        "# CRITICAL: from_pretrained loads the network WEIGHTS ONLY, and GaussianActorPolicy.select_action",
+        "# does NO normalization internally — it assumes obs are already normalized and returns a tanh action",
+        "# in [-1, 1]. So we must load the checkpoint's SAVED processors and wrap every step: normalize the",
+        "# observation going in, un-normalize the action coming out. Skip this and the gripper never closes —",
+        "# the policy scores ~0% despite having trained to ~100%. (This is the exact bug that made an earlier",
+        "# demo look like the cube was never grasped.)",
+        "pre, post = make_pre_post_processors(policy_cfg=cfg.policy, pretrained_path=local)",
+        "n_disc = getattr(cfg.policy, 'num_discrete_actions', None)",
+        "",
+        "def act(obs_full):",
+        "    with torch.no_grad():",
+        "        a = policy.select_action(batch=pre.process_observation(obs_full))",
+        "    if n_disc is not None:                       # un-normalize continuous dims; keep the discrete gripper bit",
+        "        cont = post.process_action(a[..., :-1])",
+        "        return torch.cat([cont, a[..., -1:].to(cont.device)], dim=-1)",
+        "    return post.process_action(a)",
+        "",
+        "print('loaded policy on', device, '| inputs:', input_keys, '| normalizers loaded \\u2713')",
     ),
     code(
         "def eval_policy(n_episodes=20, record_first=True):",
@@ -182,9 +201,7 @@ cells = [
         "    for ep in range(n_episodes):",
         "        tr = gm.reset_and_build_transition(eval_env, env_proc, act_proc)",
         "        while True:",
-        "            obs = {k: v for k, v in tr[TransitionKey.OBSERVATION].items() if k in input_keys}",
-        "            with torch.no_grad():",
-        "                action = policy.select_action(batch=obs)",
+        "            action = act(tr[TransitionKey.OBSERVATION])   # normalize \\u2192 select_action \\u2192 un-normalize",
         "            tr = gm.step_env_and_process_transition(env=eval_env, transition=tr, action=action,",
         "                                                    env_processor=env_proc, action_processor=act_proc)",
         "            if record_first and ep == 0:",
