@@ -199,6 +199,9 @@ day). The other six days (Wed–Mon) run follow-ups on that same blog from its `
 | 06 | TRPO & PPO | ☐ Tue Jul 28 | ☐ Tue Jul 28 |
 | 07 | RLHF | ☐ Tue Aug 4 | ☐ Tue Aug 4 |
 | 08 | GRPO | ☐ Tue Aug 11 | ☐ Tue Aug 11 |
+| 09 | DPO and Agentic RL | ☐ Tue Aug 18 | ☐ Tue Aug 18 |
+| 10 | Socratic Alignment | ☐ Tue Aug 25 | ☐ Tue Aug 25 |
+| 11 | World Models | ☐ Tue Sep 1 | ☐ Tue Sep 1 |
 
 > Blog 01 was already live (it is the prerequisites post), so it launched on a Thursday and
 > gets a short follow-up run; from Blog 02 onward, every launch lands on a Tuesday.
@@ -209,7 +212,7 @@ day). The other six days (Wed–Mon) run follow-ups on that same blog from its `
 
 All marketing copy (LinkedIn posts, X articles, comments) must be run through the **humanizer skill** before it ships, so the writing doesn't read as AI-generated. The skill lives at `~/.cursor/skills/humanizer/SKILL.md` (source: https://github.com/blader/humanizer) and is based on Wikipedia's "Signs of AI writing" guide.
 
-Apply this to the published copy of every blog (1 through 9). The meta sections (Schedule, Image Suggestions, Formatting Tips) don't need it.
+Apply this to the published copy of every blog (1 through 10). The meta sections (Schedule, Image Suggestions, Formatting Tips) don't need it.
 
 The tells it removes, worth scanning for by hand:
 - **Em and en dashes** (`—`, `–`): hard cut. Replace with a period, comma, colon, or parentheses.
