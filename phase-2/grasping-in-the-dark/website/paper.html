@@ -162,12 +162,34 @@ hr{border:none;border-top:1px solid var(--line);margin:2em 0}
 <p><strong>Must be re-collected on the physical arm:</strong> ~15–25 fresh teleoperated demonstrations, and — crucially — a <strong>reward-classifier dataset</strong> of real labeled camera frames, because on hardware there is no simulator to hand you the reward. Here the human returns, both to demonstrate and to intervene.</p>
 <p>Practitioners have trained a real SO-101 grasp from scratch this way in roughly <strong>1–3 hours</strong>. The simulation study in this paper is, quite literally, one configuration file away from that.</p>
 <hr />
-<h2 id="7-discussion-and-limitations">7. Discussion and Limitations</h2>
+<h2 id="7-a-real-robot-case-study">7. A real-robot case study: HIL-SERL on an SO-101 (whiteboard wiping)</h2>
+<p>To pressure-test the bridge, we ran the same method on a <strong>physical SO-101</strong> — the honest counterpart to the clean simulation above. The task: <strong>pick up a duster and wipe a marker off a whiteboard.</strong> The rig is deliberately modest — a single SO-101 <em>follower</em> arm doing the task, an SO-101 <em>leader</em> arm through which a human demonstrates and intervenes, two 128&times;128 cameras (front + wrist), and, notably, an <strong>Apple-Silicon Mac (MPS, no CUDA)</strong>. Every RL tutorial assumes a gamepad and an NVIDIA GPU; we had neither.</p>
+<p><img alt="The real SO-101 rig" src="figures/gen/wb_real_rig.png" /></p>
+<h3 id="71-the-method-on-hardware">7.1 The method on hardware</h3>
+<p>The learning core is unchanged — SAC + RLPD, an asynchronous actor&ndash;learner, offline demos seeding the replay buffer. What changes is the reward and the human: on hardware the environment cannot hand you a reward, so the human presses a key on success; and the human <em>intervenes</em> by physically moving the leader arm whenever the policy is about to fail. Those corrections flow into the buffer, and the <strong>intervention rate falling over time</strong> is the clearest signal of progress.</p>
+<p><img alt="The leader-arm human-in-the-loop cycle" src="figures/gen/wb_intervention_loop.png" /></p>
+<h3 id="72-four-walls">7.2 Four walls (and why the docs lie)</h3>
+<p>Stock LeRobot does not support this setup out of the box, and each gap taught us something structural:</p>
+<ol>
+<li><strong>No CUDA.</strong> The SAC learner assumes NVIDIA; Apple&rsquo;s MPS runs the (small, ~8&nbsp;M-param) networks but at ~8&nbsp;fps against a 10&nbsp;fps target — fine for a proof-of-concept loop, not for same-day convergence.</li>
+<li><strong>The leader arm is not a supported controller.</strong> HIL-SERL&rsquo;s intervention step is hardcoded to end-effector deltas and requires <code>get_teleop_events()</code>, which only the gamepad and keyboard teleoperators implement. The <code>control_mode: "leader"</code> the docs describe is a dead config field. <em>The documentation is ahead of the implementation</em> — verified on the release and on <code>main</code>.</li>
+<li><strong>The whole pipeline assumes end-effector space.</strong> Running joint-space (to match the leader) means the policy&rsquo;s batched <code>[1,6]</code> action is never squeezed, and — more subtly — the SAC actor never normalizes its action.</li>
+<li><strong>Recorded demos have no reward.</strong> <code>lerobot-record</code> datasets lack the <code>next.reward</code> column the SAC offline buffer requires.</li>
+</ol>
+<p><img alt="The four walls and their fixes" src="figures/gen/wb_four_walls.png" /></p>
+<h3 id="73-the-subtlest-bug-action-normalization-again">7.3 The subtlest bug: action normalization (again)</h3>
+<p>The most instructive failure is one we had <em>already met in simulation</em>. The SAC actor returns a raw <code>tanh</code>-squashed action in <code>[-1,1]</code> and does <strong>no</strong> normalization; a separate processor is supposed to map it to the real action scale. In end-effector space the <code>[-1,1]</code> output <em>is</em> the delta (scaled downstream), so the omission is invisible. In joint space that <code>[-1,1]</code> goes straight to the motors as a joint target — so the arm drifts to a near-zero pose and <strong>freezes</strong>. It looks like the policy gave up; in fact the action space was never mapped to real joints. The fix is a single unified convention: demos, policy output, leader interventions, and the replay buffer all live in <code>[-1,1]</code>, and the value is unnormalized to joint degrees <strong>only at the robot boundary</strong> (<code>RobotEnv.step</code>), which keeps the buffer consistent while the motors still receive real targets.</p>
+<p><img alt="The unified action convention" src="figures/gen/wb_action_convention.png" /></p>
+<p>This is the same lesson as our simulation eval bug (&sect;5.4 note), in a different disguise: <strong>inference-time normalization is a separate, easy-to-omit pipeline, and omitting it produces a policy that looks broken but isn&rsquo;t.</strong></p>
+<h3 id="74-honest-results">7.4 Honest results</h3>
+<p><img alt="Sim proves the method; real hardware shows what it takes" src="figures/gen/wb_sim_to_real.png" /> The full HIL-SERL loop ran <strong>live on real hardware with leader interventions</strong> — none of which stock LeRobot supports. Ten leader-teleoperated demos warm-started the buffer; human corrections flowed in as designed. A <strong>fully autonomous, reliable wipe did not emerge in a single session</strong> — three factors stack against it: MPS-speed training, only 10 seed demos, and the harder joint-space formulation (the paper leans on end-effector space and far more interaction). The value here is the <em>loop</em>, not the trophy: watching a real arm explore, stall, get corrected by a human, and fold that correction into its own learning is a more honest picture of RL in robotics than a highlight reel. For faster convergence the levers are clear — a gamepad, end-effector space, CUDA, more demos, and a trained reward classifier. Full code and the complete autopsy of every wall are open (see references).</p>
+<hr />
+<h2 id="8-discussion-and-limitations">8. Discussion and Limitations</h2>
 <p><strong>What we did not do.</strong> We did not run the human-in-the-loop or the learned reward classifier: in simulation the environment supplies the reward, so both are unnecessary at runtime. This is a faithful reproduction of HIL-SERL's <em>learning core</em>, not its full real-robot loop — a distinction we keep explicit throughout.</p>
 <p><strong>Autonomous vs. human-guided.</strong> On real hardware, human interventions dramatically accelerate and stabilize learning and provide safety. Our autonomous sim result shows the <em>lower bound</em> of what the algorithm achieves with no human — and it is already near-perfect on this task, which is itself an argument for the strength of RLPD on well-shaped simulation dynamics.</p>
 <p><strong>Task simplicity.</strong> <code>PandaPickCube</code> is a deliberately simple, single-object lift. The value of the study is pedagogical and infrastructural — the <em>recipe</em> and the <em>reproducibility</em>, not task difficulty. The method scales to the far harder tasks in the original HIL-SERL paper.</p>
 <hr />
-<h2 id="8-conclusion">8. Conclusion</h2>
+<h2 id="9-conclusion">9. Conclusion</h2>
 <p>Reinforcement learning is not a simulator toy. On a single, cheap GPU, from a reward it initially never receives, SAC + RLPD teaches a robot arm to grasp — going from zero to near-perfect in about forty minutes, fully autonomously. The same code is one configuration file from a $200 arm on a real desk. The workshop's central question — <em>does RL actually work in robotics?</em> — has a concrete, reproducible answer, and it is yes.</p>
 <hr />
 <h2 id="references">References</h2>
@@ -177,6 +199,7 @@ hr{border:none;border-top:1px solid var(--line);margin:2em 0}
 <li>J. Luo et al. <em>SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning.</em> ICRA 2024. arXiv:2401.16013.</li>
 <li>T. Haarnoja, A. Zhou, P. Abbeel, S. Levine. <em>Soft Actor-Critic.</em> ICML 2018. arXiv:1801.01290.</li>
 <li>LeRobot / Hugging Face. <em>HIL-SERL in simulation (<code>gym-hil</code>).</em> https://huggingface.co/docs/lerobot/hilserl_sim</li>
+<li>R. Dandekar. <em>HIL-SERL on a real SO-101: whiteboard wiping with leader-arm interventions</em> (code + autopsy). https://github.com/RajatDandekar/so101-hilserl-whiteboard — dataset <code>RajatDandekar/so101_whiteboard_wipe</code>, policy <code>RajatDandekar/so101_whiteboard_wipe_hilserl</code> on the Hugging Face Hub.</li>
 </ul>
 <hr />
 <h2 id="appendix-a-reproducibility">Appendix A — Reproducibility</h2>

@@ -93,6 +93,7 @@
   <p class="aff">Vizuara AI Labs · RL in Production — Session 3 (Robotics)</p>
   <div class="links">
     <a class="btn primary" href="paper.html">📄 Read the paper</a>
+    <a class="btn" href="#real">🤖 Real SO-101</a>
     <a class="btn" href="https://colab.research.google.com/github/VizuaraAI/RL-in-Production-Bootcamp-Resources/blob/main/phase-2/grasping-in-the-dark/notebook/hil_serl_grasp.ipynb" target="_blank">▶️ Open in Colab</a>
     <a class="btn" href="https://huggingface.co/RajatDandekar/hilserl-panda-pickcube-sac" target="_blank">🤗 Checkpoint</a>
     <a class="btn" href="https://github.com/VizuaraAI/RL-in-Production-Bootcamp-Resources/tree/main/phase-2/grasping-in-the-dark" target="_blank">⌨️ Code</a>
@@ -275,8 +276,79 @@
       <td>~15–25 teleop demos · a <b>reward-classifier</b> dataset of real labeled frames <span style="color:var(--mut)">(sim gives reward for free)</span></td>
     </tr>
   </table>
-  <p>People have trained a real SO-101 grasp from scratch this way in roughly <b>1–3 hours</b>. This simulation study
-    is, quite literally, one configuration file from that.</p>
+  <p>People have trained a real SO-101 grasp from scratch this way in roughly <b>1–3 hours</b>. And the best part of the
+    sim-to-real story is that we didn't just describe it — <b>we ran it on a real arm.</b></p>
+
+  <div class="eyebrow" id="real">Real hardware · we actually did it</div>
+  <h2>HIL-SERL on a real SO-101 — teaching an arm to wipe a whiteboard</h2>
+  <p class="lead">We took the exact same method to a physical <b>$200 SO-101</b> on a desk, on an
+    <b>Apple-Silicon Mac (no CUDA)</b>, using the <b>leader arm</b> for human interventions. The task:
+    <b>pick up a duster and wipe a marker off a whiteboard.</b> This is the honest, unpolished counterpart to the
+    clean simulation above — and it's where you actually learn what RL on hardware takes.</p>
+
+  <figure class="pb"><img src="figures/gen/wb_real_rig.png" alt="The real SO-101 rig: leader + follower arms, two cameras, a Mac">
+    <figcaption>The rig: one SO-101 <b>follower</b> does the task, an SO-101 <b>leader</b> is how a human demonstrates
+      and intervenes, two 128×128 cameras (front + wrist), all driven from an Apple-Silicon Mac (MPS, no CUDA).</figcaption></figure>
+
+  <div class="grid2">
+    <figure><div class="media"><video src="videos/wb_demo.mp4" autoplay loop muted playsinline poster="figures/real/wb_poster.jpg"></video></div>
+      <figcaption><b>The task, teleoperated.</b> A leader-arm demonstration of the wipe (front camera) — the kind of
+        successful episode that seeds the offline replay buffer.</figcaption></figure>
+    <figure><div class="media"><video src="videos/wb_intervention.mp4" autoplay loop muted playsinline></video></div>
+      <figcaption><b>Human-in-the-loop, live.</b> During training the policy drives the follower; when it drifts, a
+        human takes over the <b>leader arm</b> to correct it — and those corrections become training data.</figcaption></figure>
+  </div>
+
+  <div class="two">
+    <div class="txt">
+      <div class="eyebrow">The mechanic</div>
+      <h2>The human is the lever, SAC is the engine</h2>
+      <p>The policy explores; the moment it's about to do something unsafe or unproductive, you press <code>SPACE</code>
+        and guide the follower by physically moving the leader arm. The correction flows straight into the replay
+        buffer, and your <b>intervention rate falling over time</b> is the single clearest signal that learning is working.</p>
+      <div class="callout" style="--c:var(--blue)">
+        <div class="k">what stock LeRobot doesn't support</div>
+        <p>The leader arm as an intervention controller, joint-space actions, and an Apple-Silicon (MPS) backend — none
+          of it works out of the box. Every fix lives in launcher shims + one teleop subclass; LeRobot's source stays untouched.</p>
+      </div>
+    </div>
+    <figure class="pb"><img src="figures/gen/wb_intervention_loop.png" alt="The leader-arm human-in-the-loop correction cycle"></figure>
+  </div>
+
+  <div class="two rev">
+    <div class="txt">
+      <div class="eyebrow">The subtlest bug</div>
+      <h2>One action convention, unnormalize only at the robot</h2>
+      <p>The SAC actor never normalizes its actions. In end-effector space that's invisible; in joint space the raw
+        <code>[-1,1]</code> output goes straight to the motors and <b>the arm drifts to zero and freezes</b> — it looks
+        like the policy gave up, but the action space was simply never mapped to real joints. The fix: keep every source
+        (demos, policy, leader, buffer) in <code>[-1,1]</code> and convert to joint degrees only at the robot boundary.
+        <em>(The same normalization trap bit the simulation eval, too — see the paper.)</em></p>
+    </div>
+    <figure class="pb"><img src="figures/gen/wb_action_convention.png" alt="The unified [-1,1] action convention"></figure>
+  </div>
+
+  <figure class="pb"><img src="figures/gen/wb_four_walls.png" alt="The four walls hit making HIL-SERL run on a real SO-101">
+    <figcaption>Four walls between the tutorial and a working loop — and the minimal fix for each. The biggest time sink
+      was a <em>documented</em> feature (leader-arm control) that isn't actually implemented in the code.</figcaption></figure>
+
+  <div class="callout" style="--c:var(--amber)">
+    <div class="k">honest results</div>
+    <p>The full HIL-SERL loop ran <b>live on real hardware with leader interventions</b> — none of which stock LeRobot
+      supports. A fully autonomous wipe did <b>not</b> converge in a single session: MPS-speed training, only 10 seed
+      demos, and joint-space (vs. the paper's end-effector space) all work against it. <b>The value is the loop, not
+      (yet) the trophy</b> — watching a real arm explore, stall, get corrected by a human, and fold that correction into
+      its own learning, live, is a far more honest picture of RL in robotics than a polished highlight reel.</p>
+  </div>
+
+  <figure class="pb"><img src="figures/gen/wb_sim_to_real.png" alt="Sim proves the method; real hardware shows what it takes">
+    <figcaption>The two halves of the story: simulation proves the method converges cleanly; real hardware shows what it
+      actually takes to get there — and why the human, end-effector space, and more compute matter.</figcaption></figure>
+
+  <p>Full code, every wall, and the fixes are in the
+    <a href="https://github.com/RajatDandekar/so101-hilserl-whiteboard" target="_blank">so101-hilserl-whiteboard</a> repo —
+    with the <a href="https://huggingface.co/datasets/RajatDandekar/so101_whiteboard_wipe" target="_blank">demo dataset</a>
+    and <a href="https://huggingface.co/RajatDandekar/so101_whiteboard_wipe_hilserl" target="_blank">policy checkpoint</a> on the Hub.</p>
 
   <div class="eyebrow" id="code">Reproduce it</div>
   <h2>Everything is one notebook and one checkpoint away</h2>

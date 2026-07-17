@@ -155,7 +155,40 @@ Practitioners have trained a real SO-101 grasp from scratch this way in roughly 
 
 ---
 
-## 7. Discussion and Limitations
+## 7. A real-robot case study: HIL-SERL on an SO-101 (whiteboard wiping)
+
+To pressure-test the bridge, we ran the same method on a **physical SO-101** — the honest counterpart to the clean simulation above. The task: **pick up a duster and wipe a marker off a whiteboard.** The rig is deliberately modest — a single SO-101 *follower* arm doing the task, an SO-101 *leader* arm through which a human demonstrates and intervenes, two 128×128 cameras (front + wrist), and, notably, an **Apple-Silicon Mac (MPS, no CUDA)**. Every RL tutorial assumes a gamepad and an NVIDIA GPU; we had neither.
+
+*(Figure: `wb_real_rig.png`)*
+
+### 7.1 The method on hardware
+
+The learning core is unchanged — SAC + RLPD, an asynchronous actor–learner, offline demos seeding the replay buffer. What changes is the reward and the human: on hardware the environment cannot hand you a reward, so the human presses a key on success; and the human *intervenes* by physically moving the leader arm whenever the policy is about to fail. Those corrections flow into the buffer, and the **intervention rate falling over time** is the clearest signal of progress. *(Figure: `wb_intervention_loop.png`)*
+
+### 7.2 Four walls (and why the docs lie)
+
+Stock LeRobot does not support this setup out of the box, and each gap taught us something structural:
+
+1. **No CUDA.** The SAC learner assumes NVIDIA; Apple's MPS runs the (small, ~8 M-param) networks but at ~8 fps against a 10 fps target — fine for a proof-of-concept loop, not for same-day convergence.
+2. **The leader arm is not a supported controller.** HIL-SERL's intervention step is hardcoded to end-effector deltas and requires `get_teleop_events()`, which only the gamepad and keyboard teleoperators implement. The `control_mode: "leader"` the docs describe is a dead config field. *The documentation is ahead of the implementation* — verified on the release and on `main`.
+3. **The whole pipeline assumes end-effector space.** Running joint-space (to match the leader) means the policy's batched `[1,6]` action is never squeezed, and — more subtly — the SAC actor never normalizes its action.
+4. **Recorded demos have no reward.** `lerobot-record` datasets lack the `next.reward` column the SAC offline buffer requires.
+
+*(Figure: `wb_four_walls.png`)*
+
+### 7.3 The subtlest bug: action normalization (again)
+
+The most instructive failure is one we had *already met in simulation*. The SAC actor returns a raw `tanh`-squashed action in `[-1, 1]` and does **no** normalization; a separate processor is supposed to map it to the real action scale. In end-effector space the `[-1,1]` output *is* the delta (scaled downstream), so the omission is invisible. In joint space that `[-1,1]` goes straight to the motors as a joint target — so the arm drifts to a near-zero pose and **freezes**. It looks like the policy gave up; in fact the action space was never mapped to real joints. The fix is a single unified convention: demos, policy output, leader interventions, and the replay buffer all live in `[-1,1]`, and the value is unnormalized to joint degrees **only at the robot boundary** (`RobotEnv.step`), which keeps the buffer consistent while the motors still receive real targets. *(Figure: `wb_action_convention.png`)*
+
+This is the same lesson as our simulation eval bug (§5), in a different disguise: **inference-time normalization is a separate, easy-to-omit pipeline, and omitting it produces a policy that looks broken but isn't.**
+
+### 7.4 Honest results
+
+*(Figure: `wb_sim_to_real.png`)* The full HIL-SERL loop ran **live on real hardware with leader interventions** — none of which stock LeRobot supports. Ten leader-teleoperated demos warm-started the buffer; human corrections flowed in as designed. A **fully autonomous, reliable wipe did not emerge in a single session** — three factors stack against it: MPS-speed training, only 10 seed demos, and the harder joint-space formulation (the paper leans on end-effector space and far more interaction). The value here is the *loop*, not the trophy: watching a real arm explore, stall, get corrected by a human, and fold that correction into its own learning is a more honest picture of RL in robotics than a highlight reel. For faster convergence the levers are clear — a gamepad, end-effector space, CUDA, more demos, and a trained reward classifier. Full code and the complete autopsy of every wall are open (see references).
+
+---
+
+## 8. Discussion and Limitations
 
 **What we did not do.** We did not run the human-in-the-loop or the learned reward classifier: in simulation the environment supplies the reward, so both are unnecessary at runtime. This is a faithful reproduction of HIL-SERL's *learning core*, not its full real-robot loop — a distinction we keep explicit throughout.
 
@@ -165,7 +198,7 @@ Practitioners have trained a real SO-101 grasp from scratch this way in roughly 
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
 Reinforcement learning is not a simulator toy. On a single, cheap GPU, from a reward it initially never receives, SAC + RLPD teaches a robot arm to grasp — going from zero to near-perfect in about forty minutes, fully autonomously. The same code is one configuration file from a $200 arm on a real desk. The workshop's central question — *does RL actually work in robotics?* — has a concrete, reproducible answer, and it is yes.
 
@@ -178,6 +211,7 @@ Reinforcement learning is not a simulator toy. On a single, cheap GPU, from a re
 - J. Luo et al. *SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning.* ICRA 2024. arXiv:2401.16013.
 - T. Haarnoja, A. Zhou, P. Abbeel, S. Levine. *Soft Actor-Critic.* ICML 2018. arXiv:1801.01290.
 - LeRobot / Hugging Face. *HIL-SERL in simulation (`gym-hil`).* https://huggingface.co/docs/lerobot/hilserl_sim
+- R. Dandekar. *HIL-SERL on a real SO-101: whiteboard wiping with leader-arm interventions* (code + autopsy). https://github.com/RajatDandekar/so101-hilserl-whiteboard — dataset `RajatDandekar/so101_whiteboard_wipe`, policy `RajatDandekar/so101_whiteboard_wipe_hilserl` on the Hugging Face Hub.
 
 ---
 
