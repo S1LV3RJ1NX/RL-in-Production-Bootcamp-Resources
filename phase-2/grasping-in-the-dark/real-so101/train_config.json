@@ -1,0 +1,118 @@
+{
+  "output_dir": null,
+  "job_name": "hilserl_wipe",
+  "seed": 1000,
+  "num_workers": 4,
+  "batch_size": 128,
+  "steps": 100000,
+  "save_checkpoint": true,
+  "save_freq": 2000,
+  "log_freq": 100,
+  "wandb": { "enable": false },
+  "dataset": {
+    "repo_id": "RajatDandekar/so101_whiteboard_wipe_cropped_resized"
+  },
+  "policy": {
+    "type": "sac",
+    "push_to_hub": true,
+    "repo_id": "RajatDandekar/so101_whiteboard_wipe_hilserl",
+    "device": "mps",
+    "storage_device": "cpu",
+    "vision_encoder_name": "helper2424/resnet10",
+    "freeze_vision_encoder": true,
+    "shared_encoder": true,
+    "num_discrete_actions": null,
+    "online_steps": 100000,
+    "online_buffer_capacity": 50000,
+    "offline_buffer_capacity": 50000,
+    "online_step_before_learning": 500,
+    "temperature_init": 0.01,
+    "storage_device": "cpu",
+    "input_features": {
+      "observation.images.front": { "type": "VISUAL", "shape": [3, 128, 128] },
+      "observation.images.wrist": { "type": "VISUAL", "shape": [3, 128, 128] },
+      "observation.state": { "type": "STATE", "shape": [6] }
+    },
+    "output_features": {
+      "action": { "type": "ACTION", "shape": [6] }
+    },
+    "dataset_stats": {
+      "observation.images.front": { "mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225] },
+      "observation.images.wrist": { "mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225] },
+      "observation.state": {
+        "min": [-43.43, -86.2, -86.46, 29.85, -26.15, 0.82],
+        "max": [90.55, 89.19, 80.84, 77.23, 34.59, 95.49]
+      },
+      "action": {
+        "min": [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0],
+        "max": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      }
+    },
+    "actor_learner_config": {
+      "learner_host": "127.0.0.1",
+      "learner_port": 50051,
+      "policy_parameters_push_frequency": 4
+    }
+  },
+  "env": {
+    "type": "gym_manipulator",
+    "name": "real_robot",
+    "fps": 10,
+    "task": "Pick up the duster and wipe the marker off the whiteboard",
+    "robot": {
+      "type": "so101_follower",
+      "port": "/dev/tty.wchusbserial5AE60830811",
+      "id": "my_follower",
+      "use_degrees": true,
+      "max_relative_target": 15.0,
+      "cameras": {
+        "front": { "type": "opencv", "index_or_path": 0, "width": 640, "height": 480, "fps": 30 },
+        "wrist": { "type": "opencv", "index_or_path": 1, "width": 640, "height": 480, "fps": 30 }
+      }
+    },
+    "teleop": {
+      "type": "so101_leader_intervention",
+      "port": "/dev/tty.wchusbserial5AE60829961",
+      "id": "right_leader",
+      "use_degrees": true
+    },
+    "processor": {
+      "control_mode": "leader",
+      "observation": {
+        "display_cameras": false,
+        "add_joint_velocity_to_observation": false,
+        "add_current_to_observation": false,
+        "add_ee_pose_to_observation": false
+      },
+      "image_preprocessing": {
+        "crop_params_dict": {
+          "observation.images.front": [235, 88, 230, 344],
+          "observation.images.wrist": [17, 20, 450, 508]
+        },
+        "resize_size": [128, 128]
+      },
+      "gripper": {
+        "use_gripper": true,
+        "gripper_penalty": 0.0
+      },
+      "reset": {
+        "reset_time_s": 5.0,
+        "control_time_s": 120.0,
+        "terminate_on_success": true,
+        "fixed_reset_joint_positions": [55.7, -34.8, 46.4, 23.0, -2.9, 1.0]
+      }
+    },
+    "features": {
+      "observation.images.front": { "type": "VISUAL", "shape": [3, 128, 128] },
+      "observation.images.wrist": { "type": "VISUAL", "shape": [3, 128, 128] },
+      "observation.state": { "type": "STATE", "shape": [6] },
+      "action": { "type": "ACTION", "shape": [6] }
+    },
+    "features_map": {
+      "observation.images.front": "observation.images.front",
+      "observation.images.wrist": "observation.images.wrist",
+      "observation.state": "observation.state",
+      "action": "action"
+    }
+  }
+}

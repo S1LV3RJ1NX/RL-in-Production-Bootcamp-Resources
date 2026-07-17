@@ -30,8 +30,21 @@ smoke/       local env-fact smoke test + scripted-grasp recorder (CPU, ~1 GB)
 figures/     figure generators — reward curve, analysis bar charts, and the hand-drawn (Gemini) diagrams
 website/     the project website (static, deployed to Vercel)
 paper/       the write-up (paper.md)
+real-so101/  the REAL-hardware experiment — HIL-SERL on a physical SO-101 (whiteboard wiping)
 FACTS.md     pinned, source-verified implementation facts · RESOURCES.md  annotated reading list
 ```
+
+## The real-robot experiment (`real-so101/`)
+
+The sim study above has a physical counterpart: the **same HIL-SERL (SAC + RLPD) method on a real
+$200 SO-101 arm**, on Apple Silicon (MPS, no CUDA), using the **leader arm** for human interventions —
+the task is to pick up a duster and wipe a marker off a whiteboard. `real-so101/` is the full pipeline
+and the complete autopsy of every wall we hit (leader-arm control, joint-space actions, action
+normalization, the missing reward column) — each fixed in launcher shims with LeRobot's source
+untouched. See `real-so101/README.md` and `real-so101/CHALLENGES.md`. Honest result: the loop runs live
+with leader interventions, but a fully autonomous wipe did not converge in one session — the value is
+the loop, not (yet) the trophy. Dataset [`RajatDandekar/so101_whiteboard_wipe`](https://huggingface.co/datasets/RajatDandekar/so101_whiteboard_wipe),
+policy [`RajatDandekar/so101_whiteboard_wipe_hilserl`](https://huggingface.co/RajatDandekar/so101_whiteboard_wipe_hilserl).
 
 ## Reproduce
 
