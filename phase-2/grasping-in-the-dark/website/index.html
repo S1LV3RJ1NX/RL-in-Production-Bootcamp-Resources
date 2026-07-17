@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grasping in the Dark — reinforcement learning teaches a robot arm to grasp, from reward, on one GPU</title>
+<meta name="description" content="A reproducible study of HIL-SERL (SAC + RLPD) in simulation: a Franka Panda learns to grasp from a sparse reward — 0% to ~100% in ~40 minutes on a single GPU, fully autonomously — with a bridge to the $200 SO-101 arm.">
+<meta property="og:title" content="Grasping in the Dark — RL teaches a robot arm to grasp">
+<meta property="og:description" content="0% → ~100% grasp success in ~40 minutes on one GPU, from a sparse reward. HIL-SERL (SAC + RLPD) in simulation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff; --ink:#161a20; --mut:#5c626f; --line:#e8eaef; --soft:#f6f7f9; --soft-2:#eef1f6;
+    --teal:#0f8f68; --teal-d:#0b5f45; --blue:#2f6fd0; --amber:#c9871a; --red:#b23636;
+    --acc:#0f8f68;
+    --shadow:0 14px 40px -22px rgba(30,41,59,.30);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65;font-size:17px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+  h1,h2,h3{line-height:1.22;font-weight:700;letter-spacing:-.02em}
+  h2{font-size:27px;margin:56px 0 6px}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--acc);margin:56px 0 2px}
+  .eyebrow + h2{margin-top:2px}
+  h3{font-size:19px;margin:26px 0 8px}
+  p{margin:12px 0}
+  .lead{font-size:18.5px;color:var(--mut);max-width:70ch}
+  code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.86em;
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+  header{padding:52px 0 10px;text-align:center;border-bottom:1px solid var(--line)}
+  .title{font-size:44px;letter-spacing:-.03em;margin:0 0 8px}
+  .title .em{color:var(--acc)}
+  .tag{color:var(--mut);font-size:18.5px;margin:0 auto 18px;max-width:720px}
+  .authors{font-size:17px;margin:6px 0 2px}
+  .aff{color:var(--mut);font-size:15px;margin:0 0 20px}
+  .links{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0 6px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;
+    color:var(--ink);border-radius:10px;padding:10px 16px;font-size:15px;font-weight:600;transition:.15s;box-shadow:var(--shadow)}
+  .btn:hover{border-color:var(--acc);text-decoration:none;transform:translateY(-1px)}
+  .btn.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .hero{margin:30px 0 8px;text-align:center}
+  .hero img{width:100%;max-width:600px;border-radius:14px;box-shadow:0 18px 48px -20px rgba(30,41,59,.42);border:1px solid var(--line)}
+  .cap{color:var(--mut);font-size:13.5px;margin:10px auto 0;max-width:660px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:36px 0}
+  .stat{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:16px 12px;text-align:center}
+  .stat .n{font-size:26px;font-weight:800;color:var(--acc);letter-spacing:-.02em}
+  .stat .l{font-size:12.5px;color:var(--mut);margin-top:4px;line-height:1.35}
+  figure{margin:22px 0}
+  figure img{width:100%;border-radius:14px;border:1px solid var(--line);background:#fff}
+  figure.pb img{padding:6px}
+  figcaption{color:var(--mut);font-size:14px;margin-top:10px}
+  .two{display:grid;grid-template-columns:0.9fr 1.1fr;gap:36px;align-items:center;margin:14px 0}
+  .two.rev{grid-template-columns:1.1fr 0.9fr}
+  .two.rev .txt{order:2} .two.rev figure{order:1}
+  .two .txt h2{margin-top:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .callout{border-left:3px solid var(--c,var(--acc));background:var(--soft);border:1px solid var(--line);
+    border-left-width:3px;border-radius:0 12px 12px 0;padding:12px 16px;margin:16px 0}
+  .callout .k{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--c,var(--acc))}
+  .callout p{margin:4px 0 0;font-size:15px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.hi td{background:rgba(15,143,104,.09);font-weight:700}
+  .media{border:1px solid var(--line);border-radius:14px;background:#0f1420;min-height:210px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .media img,.media video{width:100%;display:block}
+  .ph{color:#8b93a7;font-family:'JetBrains Mono',monospace;font-size:12.5px;text-align:center;line-height:1.8;padding:2.4rem 1rem}
+  .bibtex{background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:18px;overflow:auto;font-size:13px;
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;line-height:1.6}
+  .code{background:#0f1524;color:#d7dcea;border-radius:12px;padding:16px 18px;overflow:auto;font-size:13.5px;
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;line-height:1.7}
+  .code .c{color:#7c88a6}.code .k{color:#8fd6b4}.code .o{color:#e0b354}
+  footer{border-top:1px solid var(--line);margin-top:64px;padding:26px 0 60px;color:var(--mut);font-size:14px;text-align:center}
+  @media (max-width:760px){.stats{grid-template-columns:1fr 1fr}.grid2,.grid3,.two,.two.rev{grid-template-columns:1fr}.title{font-size:33px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1 class="title">Grasping in the <span class="em">Dark</span></h1>
+  <p class="tag">A robot arm learns to pick up and lift a cube <em>from a reward it almost never receives</em> —
+    reinforcement learning, in simulation, on a single GPU, in about forty minutes.</p>
+  <p class="authors"><b>Rajat Dandekar</b></p>
+  <p class="aff">Vizuara AI Labs · RL in Production — Session 3 (Robotics)</p>
+  <div class="links">
+    <a class="btn primary" href="paper.html">📄 Read the paper</a>
+    <a class="btn" href="https://huggingface.co/RajatDandekar/hilserl-panda-pickcube-sac">🤗 Checkpoint</a>
+    <a class="btn" href="#code">⌨️ Code</a>
+    <a class="btn" href="#bibtex">📑 BibTeX</a>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <div class="hero">
+    <img src="videos/after.gif" alt="The trained RL policy grasping the cube">
+    <p class="cap">The <b>trained policy</b> executing a clean <b>reach → grasp → lift</b> (front | wrist cameras) —
+      learned entirely from a sparse reward, in ~40 minutes on a single GPU.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">0 → ~100%</div><div class="l">grasp success<br>over one training run</div></div>
+    <div class="stat"><div class="n">~40 min</div><div class="l">wall-clock<br>to a reliable grasp</div></div>
+    <div class="stat"><div class="n">1× L4</div><div class="l">a single GPU<br>(~$0.55 of compute)</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">human interventions<br>(autonomous in sim)</div></div>
+  </div>
+
+  <div class="two">
+    <div class="txt">
+      <div class="eyebrow">The whole idea</div>
+      <h2>Learn from a reward<br>you almost never see</h2>
+      <p class="lead">The arm gets <b>+1</b> only when it lifts the cube above 10&nbsp;cm, and <b>0</b> otherwise.
+        For thousands of steps it succeeds by accident, if at all. Yet from that whisper of a signal — plus a
+        handful of prior demonstrations — <b>SAC + RLPD</b> shape a reliable grasp.</p>
+      <div class="callout" style="--c:var(--teal)">
+        <div class="k">why it's surprising</div>
+        <p>No hand-designed reward, and <b>no human at runtime</b>: in simulation the environment supplies the
+          reward, so training is fully autonomous. The human is a concept we teach, not a dependency.</p>
+      </div>
+    </div>
+    <figure class="pb"><img src="figures/tutorial/why-rl-is-hard-on-a-robot-1.png" alt="Why RL is hard on a real robot">
+      <figcaption>On a real robot, data is the scarcest resource — no parallelism, no free resets, no free failure.
+        Every design choice in HIL-SERL answers that constraint.</figcaption></figure>
+  </div>
+
+  <figure class="pb"><img src="figures/gen/concept_sparse_reward.png" alt="Learning from a sparse reward">
+    <figcaption>The whole problem in one picture: the reward is <b>0</b> almost everywhere and <b>+1</b> only on a
+      successful lift — so for thousands of steps the agent succeeds by accident, if at all. Prior data does the
+      heavy lifting.</figcaption></figure>
+
+  <div class="eyebrow">Abstract</div>
+  <h2>Abstract</h2>
+  <p>Reinforcement learning is often dismissed as impractical for real robots — too sample-hungry, too fragile,
+    too expensive outside a simulator. <a href="https://arxiv.org/abs/2410.21845"><b>HIL-SERL</b></a> (Luo et&nbsp;al.,
+    2024) is the counter-argument: it trains vision-based manipulation policies to near-perfect success in one to two
+    hours on a <em>single</em> real robot. We reproduce its learning core — <b>Soft Actor-Critic</b> combined with
+    <b><a href="https://arxiv.org/abs/2302.02948">RLPD</a></b> (Reinforcement Learning with Prior Data) — entirely in
+    simulation, <b>fully autonomously</b>, on a <b>single L4 GPU</b>. On LeRobot's
+    <code>gym-hil / PandaPickCube</code> task a Franka Panda goes from <b>0% to ~100% grasp success in ≈5,000
+    gradient steps (≈40 minutes)</b>, learning almost entirely from a sparse reward it initially never receives.
+    We give the full recipe, the learning dynamics, an honest account of the engineering it takes to run distributed
+    RL on ephemeral cloud GPUs, and a concrete <b>sim-to-real bridge</b> to the $200 SO-101 arm — everything one
+    command from reproduction.</p>
+
+  <div class="eyebrow">Method</div>
+  <h2>HIL-SERL = SAC + RLPD + reward-from-pixels + a human option</h2>
+  <p class="lead">Four ideas stack into a system that learns manipulation on raw camera images, sample-efficiently.
+    In simulation we run the first two autonomously; the last two are what carry the method to real hardware.</p>
+  <figure class="pb"><img src="figures/gen/method_pipeline.png" alt="The autonomous simulation pipeline">
+    <figcaption>The autonomous pipeline: two cameras + an 18-D state → a frozen ResNet-10 encoder → the SAC
+      Gaussian-actor policy → an end-effector action → the gym-hil MuJoCo env, which returns the sparse reward and
+      next observation into a replay buffer that <b>RLPD samples 50/50</b>. In simulation the environment supplies the
+      reward — no human, no reward classifier at runtime.</figcaption></figure>
+  <figure class="pb"><img src="figures/tutorial/hil-serl-the-human-in-the-loop-3.png" alt="The HIL-SERL human-in-the-loop correction loop">
+    <figcaption>The full HIL-SERL loop: the policy acts; when it is about to fail a human takes over; corrective
+      transitions flow into a mixed <b>offline buffer</b>; <b>RLPD</b> updates the policy and critics from a 50/50
+      blend of online and prior data; and human guidance — heavy early — fades as reliability rises.</figcaption></figure>
+  <div class="grid3">
+    <figure class="pb"><img src="figures/tutorial/sac-the-full-algorithm-1.png" alt="Soft Actor-Critic">
+      <figcaption><b>SAC.</b> A maximum-entropy, <em>off-policy</em> actor-critic — it learns from a replay buffer,
+        which is what makes it sample-efficient enough for real hardware.</figcaption></figure>
+    <figure class="pb"><img src="figures/tutorial/rlpd-rl-with-prior-data-1.png" alt="RLPD — prior data">
+      <figcaption><b>RLPD.</b> Every batch is <b>50% fresh experience, 50% prior data</b>, with LayerNorm critics —
+        so successful transitions stay in view long before the policy can succeed alone.</figcaption></figure>
+    <figure class="pb"><img src="figures/tutorial/states-and-actions-on-a-panda-1.png" alt="States and actions on a Panda">
+      <figcaption><b>The interface.</b> The policy sees two 128×128 cameras + an 18-D proprioceptive state, and acts
+        with a 3-D end-effector move plus a gripper command.</figcaption></figure>
+  </div>
+  <figure class="pb"><img src="figures/gen/actor_learner.png" alt="Asynchronous actor-learner architecture">
+    <figcaption>The async <b>actor–learner</b>: the actor steps the sim and streams transitions; the learner holds the
+      replay buffers, runs gradient updates on the GPU, and pushes fresh weights back — over localhost gRPC, in one
+      container.</figcaption></figure>
+
+  <div class="two rev">
+    <div class="txt">
+      <div class="eyebrow">Why prior data is decisive</div>
+      <h2>Anchoring a sparse-reward search</h2>
+      <p class="lead">Sparse-reward manipulation is a needle-in-a-haystack exploration problem: the agent gets no
+        gradient until it accidentally succeeds. <b>RLPD's symmetric sampling</b> keeps successful demonstrations in
+        every training batch, so the value function has something to latch onto — and the policy learns to reproduce,
+        then surpass, the demos.</p>
+      <div class="callout" style="--c:var(--amber)"><div class="k">the accelerant</div>
+        <p>This is <em>why</em> a grasp is learnable in thousands, not millions, of steps.</p></div>
+    </div>
+    <figure class="pb"><img src="figures/gen/rlpd_sampling.png" alt="RLPD symmetric 50/50 sampling">
+      <figcaption>50/50 symmetric sampling from online and offline buffers, with LayerNorm critics and a high
+        update-to-data ratio.</figcaption></figure>
+  </div>
+
+  <div class="eyebrow">Results</div>
+  <h2>From 0% to a reliable grasp, in ~40 minutes</h2>
+  <p class="lead">The policy begins by failing every episode. Its first successful lift appears around step 2,900;
+    from there RLPD's prior-data blend compounds fast, and within ≈5,000 gradient steps it grasps essentially every
+    time.</p>
+  <figure><img src="figures/gen/reward_curve.png" alt="Learning curve: grasp success rate rising from 0% to 100% over training">
+    <figcaption>The real learning curve (single autonomous run, one L4 GPU): flat at 0% until the
+      <b>first successful grasp near step 2,900</b>, then RLPD's prior-data blend compounds the climb to
+      <b>~100% by step ~6,800</b>.</figcaption></figure>
+
+  <h3>Before &amp; after</h3>
+  <p>Nothing about the task or the reward changed — only the weights did. That is reinforcement learning doing the one
+    thing imitation cannot: getting <em>better</em> than any single demonstration by optimizing the reward directly.</p>
+  <div class="grid2">
+    <figure><div class="media" id="before-slot"><img src="videos/before.gif" alt="untrained policy flailing, cube untouched"></div>
+      <figcaption><b>Before</b> — the untrained policy flails; the cube is rarely touched.</figcaption></figure>
+    <figure><div class="media" id="after-slot"><img src="videos/after.gif" alt="trained policy reaching, grasping and lifting the cube"></div>
+      <figcaption><b>After</b> — the learned policy: a clean reach → grasp → lift.</figcaption></figure>
+  </div>
+  <table>
+    <tr><th>Policy</th><th class="n">Grasp success</th><th>Note</th></tr>
+    <tr><td>Random / untrained</td><td class="n">~0%</td><td>no reward signal exploited yet</td></tr>
+    <tr><td>First 20 training episodes</td><td class="n">0 / 20</td><td>sparse reward, still exploring</td></tr>
+    <tr><td>Last 20 training episodes</td><td class="n">20 / 20</td><td>converged, ≈opt-step 5,000</td></tr>
+    <tr class="hi"><td>Trained policy — converged checkpoint</td><td class="n" id="final-sr">~95%</td><td id="final-note">19/20 in the last training window; rolling success plateaus near 100%</td></tr>
+  </table>
+
+  <div class="two">
+    <div class="txt">
+      <div class="eyebrow">The engineering, honestly</div>
+      <h2>What it takes to run distributed RL on cloud GPUs</h2>
+      <p class="lead">A claim that "RL is production-ready" is only credible with its failure modes attached. Every one
+        of these was found by <em>running</em> the system — and every one is mundane and fixable.</p>
+      <p style="margin:8px 0 0">&nbsp;&nbsp;• <b>Pristine output dir</b> — learner &amp; actor both validate it; the actor gets its own throwaway dir.<br>
+        &nbsp;&nbsp;• <b>Checkpoint image crash</b> — the buffer dumps <code>float[0,255]</code> images the writer rejects; patch to <code>uint8</code>.<br>
+        &nbsp;&nbsp;• <b>Preemption-proofing</b> — checkpoint every 1,000 steps and push each to the Hub from inside the job.</p>
+    </div>
+    <figure class="pb"><img src="figures/tutorial/how-people-tackle-robot-rl-1.png" alt="How people tackle robot RL">
+      <figcaption>The landscape of approaches to robot RL — HIL-SERL's sample efficiency is what makes the single-GPU
+        run above possible.</figcaption></figure>
+  </div>
+
+  <div class="eyebrow">Sim-to-real · the $200 payoff</div>
+  <h2>The same brain drives a real SO-101</h2>
+  <p class="lead">The point of learning on a Franka Panda in simulation is a $200 <b>SO-101</b> arm on a real desk.
+    The encouraging fact is how little changes.</p>
+  <figure class="pb"><img src="figures/gen/sim_to_real_bridge.png" alt="Sim-to-real bridge from Panda to SO-101">
+    <figcaption>What crosses the sim→real gap: the <b>learning brain</b> (actor–learner, SAC, RLPD, the policy)
+      carries over unchanged; only the robot/camera config changes; and the demos + reward-classifier data must be
+      re-collected on the real arm.</figcaption></figure>
+  <table>
+    <tr><th>Reused unchanged</th><th>Changes (config)</th><th>Re-collect on the real arm</th></tr>
+    <tr>
+      <td>async actor–learner · SAC learner · RLPD · policy network · SAC hyperparameters</td>
+      <td>robot = <code>so101_follower</code> · leader arm for teleop · cameras · EE-space IK &amp; workspace bounds</td>
+      <td>~15–25 teleop demos · a <b>reward-classifier</b> dataset of real labeled frames <span style="color:var(--mut)">(sim gives reward for free)</span></td>
+    </tr>
+  </table>
+  <p>People have trained a real SO-101 grasp from scratch this way in roughly <b>1–3 hours</b>. This simulation study
+    is, quite literally, one configuration file from that.</p>
+
+  <div class="eyebrow" id="code">Reproduce it</div>
+  <h2>Everything is one notebook and one checkpoint away</h2>
+  <div class="code"><span class="c"># train (detached, single L4)</span>
+modal run --detach modal/train_hilserl.py::<span class="k">main</span> \
+  --config configs/train_gym_hil.json --save-freq 1000 --gpu L4 \
+  --hf-repo RajatDandekar/hilserl-panda-pickcube-sac
+<span class="c"># evaluate a checkpoint (success rate + video)</span>
+modal run modal/train_hilserl.py::<span class="k">evaluate</span> --n-episodes <span class="o">50</span></div>
+  <p style="margin-top:14px">The trained policy loads from the
+    <a href="https://huggingface.co/RajatDandekar/hilserl-panda-pickcube-sac">Hugging&nbsp;Face Hub</a> in one line; the
+    <b>Colab notebook</b> walks setup → env facts → demo → eval + reward curve → the SO-101 bridge.</p>
+
+  <div class="eyebrow">Citation</div>
+  <h2 id="bibtex">Citation</h2>
+  <div class="bibtex">@misc{dandekar2026grasp,<br>
+&nbsp;&nbsp;title&nbsp;&nbsp;= {Grasping in the Dark: Sample-Efficient Reinforcement Learning for Robotic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Manipulation, from Reward, on a Single GPU},<br>
+&nbsp;&nbsp;author = {Dandekar, Rajat},<br>
+&nbsp;&nbsp;year&nbsp;&nbsp;&nbsp;= {2026},<br>
+&nbsp;&nbsp;note&nbsp;&nbsp;&nbsp;= {Vizuara AI Labs — RL in Production, Session 3. A reproducible study of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HIL-SERL (SAC + RLPD) in simulation.}<br>
+}</div>
+  <p style="margin-top:12px;font-size:14px;color:var(--mut)">Built on HIL-SERL (Luo et&nbsp;al.,
+    <a href="https://arxiv.org/abs/2410.21845">arXiv:2410.21845</a>), RLPD (Ball et&nbsp;al.,
+    <a href="https://arxiv.org/abs/2302.02948">arXiv:2302.02948</a>), SERL
+    (<a href="https://arxiv.org/abs/2401.16013">arXiv:2401.16013</a>), and SAC
+    (<a href="https://arxiv.org/abs/1801.01290">arXiv:1801.01290</a>), via
+    <a href="https://huggingface.co/docs/lerobot/hilserl_sim">LeRobot</a>.</p>
+</main>
+
+<footer><div class="wrap">
+  Grasping in the Dark · Vizuara AI Labs · RL in Production — Session 3 (Robotics) ·
+  <a href="https://huggingface.co/RajatDandekar/hilserl-panda-pickcube-sac">checkpoint</a> ·
+  <a href="paper.html">paper</a>
+  <br>Reinforcement learning that actually works on a robot — trained on Modal, one config file from a real SO-101.
+</div></footer>
+</body>
+</html>
