@@ -93,8 +93,9 @@
   <p class="aff">Vizuara AI Labs · RL in Production — Session 3 (Robotics)</p>
   <div class="links">
     <a class="btn primary" href="paper.html">📄 Read the paper</a>
-    <a class="btn" href="https://huggingface.co/RajatDandekar/hilserl-panda-pickcube-sac">🤗 Checkpoint</a>
-    <a class="btn" href="#code">⌨️ Code</a>
+    <a class="btn" href="https://colab.research.google.com/github/VizuaraAI/RL-in-Production-Bootcamp-Resources/blob/main/phase-2/grasping-in-the-dark/notebook/hil_serl_grasp.ipynb" target="_blank">▶️ Open in Colab</a>
+    <a class="btn" href="https://huggingface.co/RajatDandekar/hilserl-panda-pickcube-sac" target="_blank">🤗 Checkpoint</a>
+    <a class="btn" href="https://github.com/VizuaraAI/RL-in-Production-Bootcamp-Resources/tree/main/phase-2/grasping-in-the-dark" target="_blank">⌨️ Code</a>
     <a class="btn" href="#bibtex">📑 BibTeX</a>
   </div>
 </div></header>
@@ -189,6 +190,11 @@
         then surpass, the demos.</p>
       <div class="callout" style="--c:var(--amber)"><div class="k">the accelerant</div>
         <p>This is <em>why</em> a grasp is learnable in thousands, not millions, of steps.</p></div>
+      <div class="callout"><div class="k">where the demonstrations come from</div>
+        <p>The offline half is seeded with ~30 teleoperated demonstrations from the <b>public</b>
+          <a href="https://huggingface.co/datasets/lilkm/pick_cube_franka_panda_30" target="_blank">lilkm/pick_cube_franka_panda_30</a>
+          dataset — the standard <code>gym-hil</code> seed set, <em>not collected by us</em>. On a real SO-101 you'd
+          record your own ~15–25 teleop demos instead.</p></div>
     </div>
     <figure class="pb"><img src="figures/gen/rlpd_sampling.png" alt="RLPD symmetric 50/50 sampling">
       <figcaption>50/50 symmetric sampling from online and offline buffers, with LayerNorm critics and a high
@@ -221,6 +227,22 @@
     <tr><td>Last 20 training episodes</td><td class="n">20 / 20</td><td>converged, ≈opt-step 5,000</td></tr>
     <tr class="hi"><td>Trained policy — converged checkpoint</td><td class="n" id="final-sr">~95%</td><td id="final-note">19/20 in the last training window; rolling success plateaus near 100%</td></tr>
   </table>
+
+  <div class="eyebrow">Analysis · how the method actually works</div>
+  <h2>Reading the learning dynamics</h2>
+  <p class="lead">Three views of the same run — what changes as RLPD's 50/50 prior-data blend compounds a near-absent
+    reward signal into a reliable skill.</p>
+  <div class="grid2">
+    <figure><img src="figures/gen/fig_success_bars.png" alt="Grasp success rate by training stage">
+      <figcaption>Grasp success climbs from ~0% (random) through mid-training to a converged policy — the sparse
+        reward is enough, once prior data anchors the search.</figcaption></figure>
+    <figure><img src="figures/gen/fig_episode_outcomes.png" alt="Episode outcomes by training phase">
+      <figcaption>Episode by episode, outcomes shift from <b>failure</b> to <b>grasp</b> — you can watch the value
+        function learn to find the reward.</figcaption></figure>
+  </div>
+  <figure><img src="figures/gen/fig_sample_efficiency.png" alt="Sample efficiency milestones" style="max-width:840px;display:block;margin:14px auto 0">
+    <figcaption style="text-align:center">Sample efficiency: the <b>first</b> successful grasp near step ~2,900, and
+      <b>reliable</b> grasping by ~5,000 — about forty minutes on one L4 GPU.</figcaption></figure>
 
   <div class="two">
     <div class="txt">

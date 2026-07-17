@@ -316,6 +316,17 @@ def evaluate(job_name: str = "smoke", n_episodes: int = 20, ckpt: str = "last") 
         env_processor, action_processor = gm.make_processors(env, teleop, cfg.env, device)
         policy = GaussianActorPolicy.from_pretrained(ckpt_dir).to(device).eval()
         input_keys = list(cfg.policy.input_features.keys())
+        from lerobot.policies import make_pre_post_processors
+        pre, post = make_pre_post_processors(policy_cfg=cfg.policy, pretrained_path=ckpt_dir)
+        n_disc = getattr(cfg.policy, "num_discrete_actions", None)
+
+        def act(obs_full):
+            with torch.no_grad():
+                a = policy.select_action(batch=pre.process_observation(obs_full))
+            if n_disc is not None:
+                cont = post.process_action(a[..., :-1])
+                return torch.cat([cont, a[..., -1:].to(cont.device)], dim=-1)
+            return post.process_action(a)
         print(f"[eval] input_features={input_keys} device={device}")
     except Exception:
         print("[eval] SETUP FAILED — real signatures:")
@@ -335,9 +346,7 @@ def evaluate(job_name: str = "smoke", n_episodes: int = 20, ckpt: str = "last") 
             transition = gm.reset_and_build_transition(env, env_processor, action_processor)
             ep_succ = 0.0
             while True:
-                obs = {k: v for k, v in transition[TransitionKey.OBSERVATION].items() if k in input_keys}
-                with torch.no_grad():
-                    action = policy.select_action(batch=obs)
+                action = act(transition[TransitionKey.OBSERVATION])
                 transition = gm.step_env_and_process_transition(
                     env=env, transition=transition, action=action,
                     env_processor=env_processor, action_processor=action_processor,
@@ -415,6 +424,19 @@ def render_demo(job_name: str = "hilserl_panda_pickcube", ckpt: str = "last", n_
     env_p, act_p = gm.make_processors(env, teleop, cfg.env, device)
     policy = GaussianActorPolicy.from_pretrained(ckpt_dir).to(device).eval()
     keys = list(cfg.policy.input_features.keys())
+    # load the checkpoint's normalization pipeline (from_pretrained loads WEIGHTS ONLY; select_action
+    # does NOT normalize internally). Mirrors lerobot/rl/actor.py:294-307.
+    from lerobot.policies import make_pre_post_processors
+    pre, post = make_pre_post_processors(policy_cfg=cfg.policy, pretrained_path=ckpt_dir)
+    n_disc = getattr(cfg.policy, "num_discrete_actions", None)
+
+    def act(obs_full):
+        with torch.no_grad():
+            a = policy.select_action(batch=pre.process_observation(obs_full))
+        if n_disc is not None:   # un-normalize the continuous dims; keep the discrete gripper bit as-is
+            cont = post.process_action(a[..., :-1])
+            return torch.cat([cont, a[..., -1:].to(cont.device)], dim=-1)
+        return post.process_action(a)
 
     def frame(e):
         r = e.render()
@@ -428,9 +450,7 @@ def render_demo(job_name: str = "hilserl_panda_pickcube", ckpt: str = "last", n_
         frames, succ_at = [], -1
         for t in range(env.spec.max_episode_steps or 120):
             frames.append(frame(env))
-            obs = {k: v for k, v in tr[TransitionKey.OBSERVATION].items() if k in keys}
-            with torch.no_grad():
-                action = policy.select_action(batch=obs)
+            action = act(tr[TransitionKey.OBSERVATION])
             tr = gm.step_env_and_process_transition(env=env, transition=tr, action=action,
                                                     env_processor=env_p, action_processor=act_p)
             r = float(tr[TransitionKey.REWARD])

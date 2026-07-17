@@ -126,22 +126,33 @@ hr{border:none;border-top:1px solid var(--line);margin:2em 0}
 <hr />
 <h2 id="5-results">5. Results</h2>
 <h3 id="51-the-learning-curve">5.1 The learning curve</h3>
-<p><img alt="" src="figures/gen/reward_curve.png" />
+<p><img alt="Training reward curve" src="figures/gen/reward_curve.png" />
  The headline result is the reward curve. The policy begins by <strong>failing every episode</strong> — sparse reward, no idea how to grasp. Its <strong>first successful lift</strong> appears at roughly step 2,900. From there, RLPD's prior-data blend compounds quickly: success rate climbs steeply, and within <strong>≈5,000 gradient steps</strong> the policy grasps essentially every time.</p>
+<p><img alt="Grasp success rate by training stage" src="figures/gen/fig_success_bars.png" />
+ The bar chart makes the same story categorical: <strong>~0%</strong> at random initialization, a noisy <strong>~12%</strong> through mid-training as the first successes trickle in, and <strong>~81–95%</strong> for the converged policy. The jump between the second and third bar is the whole result — a policy that could barely find the reward becomes one that hits it almost every time.</p>
 <p>Concretely, measured over rolling windows of the actor's episodes during a single run:</p>
 <ul>
 <li><strong>First 20 episodes:</strong> <code>0 / 20</code> successes.</li>
-<li><strong>Last 20 episodes:</strong> <code>20 / 20</code> successes.</li>
-<li><strong>Rolling success rate</strong> plateaus at <strong>~100%</strong> by ≈step 6,800 (see the learning curve), from a first successful grasp near step 2,900.</li>
+<li><strong>Last 20 episodes:</strong> <code>19–20 / 20</code> successes.</li>
+<li><strong>Rolling success rate</strong> plateaus at <strong>~95–100%</strong> by ≈step 6,800 (see the learning curve), from a first successful grasp near step 2,900.</li>
 <li><strong>Held-out evaluation</strong> of the released converged checkpoint (autonomous, no exploration noise) over 50 fresh episodes is reported alongside the checkpoint on the Hugging Face Hub.</li>
 </ul>
 <p>The entire run reaches a near-perfect policy in <strong>≈40 minutes on one L4</strong> — on the order of <strong>$0.55 of compute</strong>.</p>
-<h3 id="52-before-and-after">5.2 Before and after</h3>
+<h3 id="52-anatomy-of-the-learning-dynamics">5.2 Anatomy of the learning dynamics</h3>
+<p>The learning curve is not a smooth ramp — it is a <strong>phase transition</strong>, and understanding <em>why</em> is the most instructive part of this study. <img alt="Per-phase episode outcomes" src="figures/gen/fig_episode_outcomes.png" /> Reading the run episode-by-episode, three regimes are visible:</p>
+<ol>
+<li><strong>The dark phase (≈steps 0–2,900): reward never arrives, but the critic is not idle.</strong> The actor flails and collects almost nothing but zeros. It is tempting to call this wasted time — it is the opposite. Because RLPD makes <strong>half of every gradient batch come from the offline demonstrations</strong>, the critic is, from step one, being shown <em>successful</em> (state, action, reward=1) transitions. It is quietly building a <strong>value landscape</strong> — a sense that "end-effector closing on the cube, cube rising" is worth a great deal — long before the actor can produce that state on its own. The policy looks stuck; the value function is doing the homework.</li>
+<li><strong>Discovery (≈steps 2,900–5,000): the actor stumbles into a region the critic already prizes.</strong> The first autonomous success is not the start of learning — it is the moment the actor's exploration finally reaches the part of state space the critic has <em>already</em> learned to value from the offline data. That first success is therefore not diluted into noise; it lands on fertile ground and is immediately reinforced. Successes now enter the <em>online</em> buffer too, the two halves of the batch begin to agree, and the update-to-data ratio of 2 compounds each new success into several gradient steps of improvement.</li>
+<li><strong>Consolidation (≈steps 5,000+): lock-in.</strong> Once online and offline data tell the same story, the entropy term anneals, exploration narrows around the successful trajectory, and success rate saturates near 100%. The policy has not merely memorized the demos — it optimizes the reward directly, which is why it generalizes across randomized cube positions the demonstrations never covered.</li>
+</ol>
+<p>The single most important design decision behind this curve is RLPD's <strong>50/50 symmetric sampling</strong>. On a naive off-policy learner, one success buried in ~2,000 online failures is a signal-to-noise ratio of 1:2000 — statistically invisible. Forcing half of every batch to be known successes raises that ratio to roughly <strong>1:1</strong>, which is what turns a needle-in-a-haystack exploration problem into a tractable one. LayerNorm on the critics is the safety rail that makes this aggressive reuse stable: it caps the value over-estimation that would otherwise explode when bootstrapping from off-distribution offline data.</p>
+<h3 id="53-sample-efficiency-in-context">5.3 Sample efficiency in context</h3>
+<p><img alt="Sample-efficiency milestones" src="figures/gen/fig_sample_efficiency.png" />
+ Two numbers frame the efficiency claim: the <strong>first</strong> successful grasp near step <strong>~2,900</strong>, and <strong>reliable</strong> grasping by <strong>~5,000</strong> gradient steps — the whole trajectory inside ≈40 minutes on one L4. Reaching a reliable grasp in thousands (not millions) of steps, from a reward that is zero for the first ~2,900 of them, is only possible because of RLPD's symmetric sampling: the successful demonstrations anchor the value function while the policy learns to reproduce and then surpass them. Strip out the prior data and this same task reverts to the classic sparse-reward wall, where a from-scratch agent can explore for hundreds of thousands of steps without a single reward to learn from.</p>
+<h3 id="54-before-and-after">5.4 Before and after</h3>
 <p><img alt="Before — untrained, flailing" src="videos/before.gif" /></p>
 <p><img alt="After — trained, a clean grasp" src="videos/after.gif" />
  The clearest evidence is visual. <strong>Before</strong> training, the policy flails: the end-effector wanders, the gripper opens and closes at random, the cube is rarely touched. <strong>After</strong> training, the same policy executes a clean reach, close, and lift — repeatably, across randomized cube positions. Nothing about the task or the reward changed; only the weights did. That is reinforcement learning doing the one thing imitation cannot: getting <em>better</em> than any single demonstration by optimizing the reward directly.</p>
-<h3 id="53-sample-efficiency-in-context">5.3 Sample efficiency in context</h3>
-<p>Reaching a reliable grasp in thousands of gradient steps, from a reward that is zero for the first ~2,900 of them, is only possible because of RLPD's symmetric sampling. Without prior data, sparse-reward manipulation is a needle-in-a-haystack exploration problem; with it, the successful demonstrations anchor the value function while the policy learns to reproduce and then surpass them.</p>
 <hr />
 <h2 id="6-sim-to-real-the-so-101-bridge">6. Sim-to-Real: the SO-101 bridge</h2>
 <p>The point of learning on a <em>Franka Panda in simulation</em> is a <strong>$200 SO-101 arm on a real desk</strong>. The encouraging fact is how little changes.</p>
