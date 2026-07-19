@@ -2056,169 +2056,94 @@ def build_blog10() -> None:
 
 
 # ----------------------------------------------------------------------------
-# Blog 11 — World models (IRIS from scratch: Dream to Catch / Dreaming to Dodge)
+# Blog 11 — Dreaming to Dodge (IRIS world model on VizDoom take_cover)
 # ----------------------------------------------------------------------------
 BLOG11 = "11-world-models"
 
 
-def fig_codebook_usage() -> None:
-    """Active codes out of 256 under three codebook-learning regimes."""
-    labels = ["base run\n(plain VQ, as shipped)", "plain VQ\n(11-seed ablation)",
-              "EMA + dead-code revival\n(11-seed ablation)"]
-    active = [3, 8, 254]
+def fig_fireball_recall() -> None:
+    """Fireball recall under three reconstruction losses."""
+    labels = ["uniform L1\n(every pixel equal)", "luminance-weighted\n(bright pixels count more)",
+              "warmth-weighted\n(orange/red pixels count more)"]
+    recall = [0.53, 0.63, 0.95]
     pos = np.arange(len(labels))
 
     fig, ax = plt.subplots(figsize=(8.4, 4.6))
-    ax.bar(pos, [256] * 3, width=0.6, color=CANVAS, edgecolor=DIVIDER, lw=1.2,
-           zorder=1, label="codebook capacity (256)")
-    colors = [INK, MUTED, ACCENT]
-    ax.bar(pos, active, width=0.6, color=colors, edgecolor=INK, lw=0.8, zorder=3)
-    for x, a in zip(pos, active):
-        ax.text(x, a + 6, f"{a} / 256", ha="center", va="bottom", fontsize=11,
-                color=INK, fontweight="bold")
-    ax.set_xticks(pos)
-    ax.set_xticklabels(labels, fontsize=10)
-    ax.set_ylabel("active codes (EMA cluster size ≥ 1)")
-    ax.set_title("Codebook collapse, and its cure: from 3 living words to 254")
-    ax.set_ylim(0, 285)
-    ax.legend(frameon=False, fontsize=9.5, loc="upper left")
-    save(fig, BLOG11, "fig-codebook-usage")
-
-
-def fig_ball_recall() -> None:
-    """The controlled ablation: seeds preserving the ball out of 11."""
-    labels = ["plain VQ\n+ uniform loss", "healthy EMA codebook\n+ uniform loss",
-              "healthy EMA codebook\n+ foreground weight"]
-    kept = [4, 2, 11]
-    pos = np.arange(len(labels))
-
-    fig, ax = plt.subplots(figsize=(8.4, 4.6))
-    ax.bar(pos, [11] * 3, width=0.58, color=CANVAS, edgecolor=DIVIDER, lw=1.2, zorder=1)
+    ax.bar(pos, [1.0] * 3, width=0.58, color=CANVAS, edgecolor=DIVIDER, lw=1.2, zorder=1)
     colors = [MUTED, INK, ACCENT]
-    ax.bar(pos, kept, width=0.58, color=colors, edgecolor=INK, lw=0.8, zorder=3)
-    for x, k in zip(pos, kept):
-        ax.text(x, k + 0.25, f"{k} / 11 seeds", ha="center", va="bottom",
+    ax.bar(pos, recall, width=0.58, color=colors, edgecolor=INK, lw=0.8, zorder=3)
+    for x, r in zip(pos, recall):
+        ax.text(x, r + 0.025, f"{r:.2f}", ha="center", va="bottom",
                 fontsize=11, color=INK, fontweight="bold")
-    ax.annotate("fixing the codebook\ndid not bring the ball back",
-                xy=(1, 2), xytext=(0.62, 6.4), fontsize=9.5, color=MUTED,
+    ax.annotate("bright walls soak up\nthe extra votes",
+                xy=(1, 0.63), xytext=(0.45, 0.84), fontsize=9.5, color=MUTED,
                 ha="center",
                 arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.1))
-    ax.annotate("changing only the loss\npreserves it every time",
-                xy=(2, 11), xytext=(1.62, 12.5), fontsize=9.5, color=ACCENT,
+    ax.annotate("target warmth, not brightness:\nthe fireball survives",
+                xy=(2, 0.95), xytext=(1.52, 1.10), fontsize=9.5, color=ACCENT,
                 ha="center",
                 arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.1))
     ax.set_xticks(pos)
     ax.set_xticklabels(labels, fontsize=10)
-    ax.set_ylabel("seeds where the ball survives reconstruction")
-    ax.set_title("Codebook health and ball preservation are dissociated (11 seeds)")
-    ax.set_ylim(0, 14.5)
-    save(fig, BLOG11, "fig-ball-recall")
+    ax.set_ylabel("fireball recall (brightness retained)")
+    ax.set_title("Keeping the fireball: the loss decides what the dream contains")
+    ax.set_ylim(0, 1.22)
+    save(fig, BLOG11, "fig-fireball-recall")
 
 
-def fig_pixel_votes() -> None:
-    """Share of the reconstruction objective the ball commands, uniform vs weighted."""
-    labels = ["uniform loss\n(every pixel votes once)",
-              "foreground-weighted\n(ball pixel worth 26 votes)"]
-    ball_share = [0.5, 13.0]
+def fig_dream_rank() -> None:
+    """In-dream survival under fixed strategies vs the reactive oracle."""
+    labels = ["always strafe left", "always strafe right", "reactive oracle\n(dodges the fireball)"]
+    steps = [30, 30, 46]
     pos = np.arange(len(labels))
 
-    fig, ax = plt.subplots(figsize=(7.8, 4.4))
-    ax.bar(pos, [100 - s for s in ball_share], width=0.5, bottom=ball_share,
-           color=DIVIDER, edgecolor=MUTED, lw=0.8, label="background + paddle")
-    ax.bar(pos, ball_share, width=0.5, color=ACCENT, edgecolor=INK, lw=0.8,
-           label="the ball")
-    for x, s in zip(pos, ball_share):
-        ax.text(x + 0.30, s + 1.5, f"{s:.1f}%", ha="left", va="bottom",
-                fontsize=11, color=ACCENT, fontweight="bold")
+    fig, ax = plt.subplots(figsize=(8.2, 4.5))
+    colors = [MUTED, MUTED, ACCENT]
+    ax.bar(pos, steps, width=0.55, color=colors, edgecolor=INK, lw=0.8)
+    for x, s in zip(pos, steps):
+        ax.text(x, s + 1.2, f"~{s}" if s == 30 else f"{s}", ha="center",
+                va="bottom", fontsize=11, color=INK, fontweight="bold")
     ax.set_xticks(pos)
     ax.set_xticklabels(labels, fontsize=10)
-    ax.set_ylabel("share of the effective vote (%)")
-    ax.set_title("The ball's say in the loss: rounding error vs real constituency")
-    ax.set_ylim(0, 105)
+    ax.set_ylabel("steps survived inside the dream")
+    ax.set_title("The dream rewards dodging: reactive play out-survives any fixed action")
+    ax.set_ylim(0, 56)
+    save(fig, BLOG11, "fig-dream-rank")
+
+
+def fig_exploitation_gap() -> None:
+    """Imagined vs real survival: the exploiting policy vs the reactive oracle."""
+    labels = ["exploiting policy\n(holds one direction)", "reactive oracle\n(dodges the fireball)"]
+    dream = [55, 46]
+    real = [45, 98.3]
+    pos = np.arange(len(labels))
+    w = 0.34
+
+    fig, ax = plt.subplots(figsize=(8.2, 4.7))
+    ax.bar(pos - w / 2, dream, width=w, color=DIVIDER, edgecolor=MUTED, lw=0.9,
+           label="inside the dream")
+    ax.bar(pos + w / 2, real, width=w, color=ACCENT, edgecolor=INK, lw=0.9,
+           label="in the real game")
+    for x, d, r in zip(pos, dream, real):
+        ax.text(x - w / 2, d + 2, f"{d:.0f}", ha="center", va="bottom",
+                fontsize=10.5, color=MUTED, fontweight="bold")
+        ax.text(x + w / 2, r + 2, f"{r:.0f}" if r == 45 else f"{r:.1f}",
+                ha="center", va="bottom", fontsize=10.5, color=INK,
+                fontweight="bold")
+    ax.annotate("the dream ranks the cheat\nABOVE the oracle",
+                xy=(-0.17, 55), xytext=(0.28, 88), fontsize=9.5, color=MUTED,
+                ha="center",
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.1))
+    ax.set_xticks(pos)
+    ax.set_xticklabels(labels, fontsize=10)
+    ax.set_ylabel("steps survived")
+    ax.set_title("World-model exploitation: high imagined return, poor real survival")
+    ax.set_ylim(0, 118)
     ax.legend(frameon=False, fontsize=9.5, loc="upper left")
-    save(fig, BLOG11, "fig-pixel-votes")
+    save(fig, BLOG11, "fig-exploitation-gap")
 
 
-def _anchored_curve(anchors_x, anchors_y, n, noise, seed):
-    """Interpolate logged anchor points into a plot-ready curve with mild noise."""
-    rng = np.random.default_rng(seed)
-    x = np.linspace(anchors_x[0], anchors_x[-1], n)
-    y = np.interp(x, anchors_x, anchors_y)
-    y += rng.normal(0, noise, size=n)
-    # keep the logged anchors exact
-    for ax_, ay_ in zip(anchors_x, anchors_y):
-        y[np.argmin(np.abs(x - ax_))] = ay_
-    return x, y
-
-
-def fig_policy_curves() -> None:
-    """Imagined return and entropy across policy updates, broken vs fixed run."""
-    # as-shipped run: flat around -0.7, entropy stuck near ln(3)=1.10 -> 0.88
-    bx, br = _anchored_curve([0, 41, 100, 200, 300, 400, 500],
-                             [-0.28, -0.70, -0.69, -0.65, -0.70, -0.63, -0.78],
-                             120, 0.045, 11)
-    _, be = _anchored_curve([0, 100, 250, 400, 500],
-                            [1.10, 1.02, 0.96, 0.90, 0.88], 120, 0.012, 12)
-    # after-the-fixes run: logged anchors from the training log
-    fx, fr = _anchored_curve([0, 120, 180, 240, 300, 600, 900, 1199],
-                             [-0.27, -0.10, 0.07, 0.27, 0.35, 0.38, 0.40, 0.36],
-                             160, 0.035, 13)
-    _, fe = _anchored_curve([0, 120, 180, 240, 300, 600, 900, 1199],
-                            [1.10, 0.87, 0.71, 0.59, 0.62, 0.71, 0.69, 0.67],
-                            160, 0.012, 14)
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.6, 4.3))
-    ax1.plot(bx, br, lw=1.8, color=MUTED, label="as shipped (ball-less dream)")
-    ax1.plot(fx, fr, lw=2.2, color=ACCENT, label="after the fixes")
-    ax1.axhline(0, ls="--", lw=1.1, color=INK)
-    ax1.annotate("crosses zero\n~update 180", xy=(180, 0.07), xytext=(330, -0.32),
-                 fontsize=9, color=ACCENT,
-                 arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.0))
-    ax1.set_xlabel("policy update")
-    ax1.set_ylabel("imagined return")
-    ax1.set_title("Competence: return inside the dream")
-    ax1.legend(frameon=False, fontsize=9, loc="lower right")
-    ax1.set_ylim(-1.0, 0.6)
-
-    ax2.plot(bx, be, lw=1.8, color=MUTED, label="as shipped")
-    ax2.plot(fx, fe, lw=2.2, color=ACCENT, label="after the fixes")
-    ax2.axhline(np.log(3), ls="--", lw=1.1, color=INK)
-    ax2.text(620, np.log(3) + 0.015, "uniform over 3 actions (ln 3 ≈ 1.10)",
-             fontsize=9, color=MUTED)
-    ax2.set_xlabel("policy update")
-    ax2.set_ylabel("policy entropy")
-    ax2.set_title("Confidence: entropy of the action distribution")
-    ax2.legend(frameon=False, fontsize=9, loc="upper right")
-    ax2.set_ylim(0.5, 1.2)
-    fig.tight_layout()
-    save(fig, BLOG11, "fig-policy-curves")
-
-
-def fig_catch_showdown() -> None:
-    """Real-env catch rate over 500 episodes: broken, random, fixed, oracle."""
-    labels = ["as-shipped policy\n(ball-less dream)", "random\nbaseline",
-              "after the fixes\n(same actor-critic)", "hand-coded\noracle"]
-    rates = [0.11, 0.16, 1.00, 1.00]
-    colors = [INK, MUTED, ACCENT, DIVIDER]
-    edge = [INK, INK, INK, MUTED]
-    pos = np.arange(len(labels))
-
-    fig, ax = plt.subplots(figsize=(8.6, 4.6))
-    ax.bar(pos, rates, width=0.58, color=colors, edgecolor=edge, lw=0.9)
-    ax.axhspan(0.10, 0.15, color=DIVIDER, alpha=0.55, zorder=0)
-    ax.text(3.42, 0.125, "random band", fontsize=9, color=MUTED, va="center")
-    for x, r in zip(pos, rates):
-        ax.text(x, r + 0.02, f"{r:.2f}", ha="center", va="bottom", fontsize=11,
-                color=INK, fontweight="bold")
-    ax.set_xticks(pos)
-    ax.set_xticklabels(labels, fontsize=10)
-    ax.set_ylabel("catch rate over 500 real episodes")
-    ax.set_title("One changed tokenizer: the same policy goes from noise to oracle")
-    ax.set_ylim(0, 1.12)
-    save(fig, BLOG11, "fig-catch-showdown")
-
-
-def fig_doom_survival() -> None:
+def fig_survival_showdown() -> None:
     """VizDoom take_cover survival: the Dreaming to Dodge showdown."""
     labels = ["random", "model-free DQN\n(200k real frames)",
               "IRIS agent\n(100% in imagination)", "reactive oracle\n(sees the game)"]
@@ -2246,17 +2171,15 @@ def fig_doom_survival() -> None:
     ax.set_ylabel("survival (steps, frame_skip = 4)")
     ax.set_title("Dreaming to Dodge: trained on zero real-env gradients, matches the oracle")
     ax.set_ylim(0, 215)
-    save(fig, BLOG11, "fig-doom-survival")
+    save(fig, BLOG11, "fig-survival-showdown")
 
 
 def build_blog11() -> None:
     print(f"[{BLOG11}]")
-    fig_codebook_usage()
-    fig_ball_recall()
-    fig_pixel_votes()
-    fig_policy_curves()
-    fig_catch_showdown()
-    fig_doom_survival()
+    fig_fireball_recall()
+    fig_dream_rank()
+    fig_exploitation_gap()
+    fig_survival_showdown()
 
 
 # ----------------------------------------------------------------------------
