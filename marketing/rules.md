@@ -201,7 +201,7 @@ day). The other six days (Wed–Mon) run follow-ups on that same blog from its `
 | 08 | GRPO | ☐ Tue Aug 11 | ☐ Tue Aug 11 |
 | 09 | DPO and Agentic RL | ☐ Tue Aug 18 | ☐ Tue Aug 18 |
 | 10 | Socratic Alignment | ☐ Tue Aug 25 | ☐ Tue Aug 25 |
-| 11 | World Models | ☐ Tue Sep 1 | ☐ Tue Sep 1 |
+| 11 | Dreaming to Dodge (World Models) | ☐ Tue Sep 1 | ☐ Tue Sep 1 |
 
 > Blog 01 was already live (it is the prerequisites post), so it launched on a Thursday and
 > gets a short follow-up run; from Blog 02 onward, every launch lands on a Tuesday.

@@ -1,4 +1,4 @@
-# Daily Follow-ups — Blog 11: World Models
+# Daily Follow-ups — Blog 11: Dreaming to Dodge (World Models)
 
 Copy-paste posts to keep one blog alive for a whole week, one angle per day, on both LinkedIn and X. The big posts live in `linkedin.md` and `x-article.md`. This file is everything in between.
 
@@ -11,81 +11,68 @@ Copy-paste posts to keep one blog alive for a whole week, one angle per day, on 
 - **This run is 6 days** (Wed-Mon): Follow-up 1 = Wed Sep 2, then one per day through Follow-up 6 = Mon Sep 7.
 
 Blog link: https://prathameshsaraf.com/blogs/11-world-models/
+Simulator link: https://dreaming-to-dodge.vercel.app
 Hashtags (LinkedIn): #ReinforcementLearning #MachineLearning #DeepLearning #AI #LearningInPublic
 
 ---
 
-## Follow-up 1 (Wed Sep 2) — the 98% accurate model of the wrong world
+## Follow-up 1 (Wed Sep 2) — the vanishing fireball (attach fig-fireball-recall)
 
-My world model reached 98.2% next-token accuracy. The agent trained inside it played at random. Both numbers are correct, and neither one is lying.
+My world model's tokenizer had excellent reconstruction error and was missing the one object the task depends on.
 
-Accuracy measures agreement with the model's input, and its input was tokens from a tokenizer that had already deleted the ball. So the Transformer learned a perfect transition function for a game of Catch with nothing to catch, and dreamed it flawlessly. A faithful mirror of an amputated input reflects the amputation just as faithfully.
+A Doom frame is 4,096 pixels. The fireball, the thing that kills you, is a few dozen of them. Under a uniform pixel loss, erasing it entirely makes a fraction of a percent of the pixels wrong, so the network took the cheap path and smoothed it into the wall. Fireball recall: 0.53. The dream had half a threat.
 
-I now treat "the model is accurate" and "the model captures what the task needs" as two separate claims that need two separate checks. My favorite cheap probe: train a tiny classifier to predict the reward from the representation alone. If it can't beat the base rate, stop tuning the policy, the problem is upstream.
+The fix everyone reaches for, weight bright pixels more, stalled at 0.63. The walls in take_cover are bright too, and they absorbed the extra votes. What separates a fireball from a wall is not brightness. It is warmth: red above green and blue. One weight aimed at warmth took recall to 0.95, and the dream finally contained the thing worth dodging.
 
-Which metric in your stack is accurate against the wrong target?
+A uniform loss defines "important" as "occupies many pixels." What small thing is your objective rounding away?
 
-Link in comments.
-
----
-
-## Follow-up 2 (Thu Sep 3) — the ball is 0.5% of the pixels
-
-Here is the arithmetic that broke my agent.
-
-A Catch frame is 4,096 pixels. The ball is about 20 of them, half a percent. My tokenizer's reconstruction loss was a uniform average over pixels, so erasing the ball entirely made 0.5% of the pixels wrong while thousands of correct background pixels kept the average looking excellent. The reported error: 0.0165. Looks great. The one object the task depends on was gone.
-
-Keeping the ball means rendering a small bright object at a precise, always-moving position. Dropping it costs almost nothing. When two solutions land that close, seed noise picks the winner, and across 11 seeds the ball survived in 2.
-
-The fix was one line: weight each pixel by brightness, so a ball pixel is worth 26 votes instead of 1. That lifts the ball from 0.5% of the objective to 13%. Eleven seeds, eleven survivals, zero variance.
-
-A uniform loss defines "important" as "occupies many pixels." What small thing is your loss function rounding away?
+(Attach: fig-fireball-recall.png)
 
 Link in comments.
 
 ---
 
-## Follow-up 3 (Fri Sep 4) — the diagnosis that survived its own fix (attach fig-ball-recall)
+## Follow-up 2 (Thu Sep 3) — the model that refused to dream death
 
-Everyone who saw my broken tokenizer said the same thing: codebook collapse. They were right. It was using 3 of its 256 codes, and dead codes get exactly zero gradient, so they never come back on their own.
+My world model dreamed beautiful, controllable Doom. One problem: nobody ever died in it.
 
-So I fixed it. EMA updates plus dead-code revival took the codebook from 3 living codes to 254. Textbook cure, worked perfectly.
+Death lands on about 1% of steps in take_cover, an 89-to-1 class imbalance. The done head worked out that predicting "alive" every single time costs almost nothing under an unweighted loss, so it did. And in this task, that deletes the entire training signal: reward is +1 per surviving step, so return equals survival time, and the only thing separating a good action from a bad one is whether the episode ends. In a dream where nobody dies, every policy looks equally good and the gradient is zero.
 
-Then I ran the ablation. Healthy codebook, 11 seeds: the ball survived reconstruction in 2 of 11. The collapsed codebook had kept it in 4 of 11. The celebrated fix did nothing for the actual problem.
+The fix was a 55x class weight on the death class. Death recall went from 0 to 1.0, and the dream started ending when a fireball closed in, as it should.
 
-Changing only the loss function, with the codebook mechanism held fixed, went 11 for 11. Collapse was real, curable, and not the cause.
+Same failure as the fireball, one level up: rare events carry the task, and uniform objectives round them away.
 
-The general rule I took away: a diagnosis that survives its own fix is not the cause, and the only way to find that out is to change one variable at a time and count.
-
-(Attach: fig-ball-recall.png)
+Which rare event in your data is your model quietly ignoring?
 
 Link in comments.
 
 ---
 
-## Follow-up 4 (Sat Sep 5) — the policy that cheated the dream
+## Follow-up 3 (Fri Sep 4) — the policy that cheated the dream (attach fig-exploitation-gap)
 
-On the Doom version of this project, my policy found a strategy that survived longer than the oracle inside the dream and collapsed in the real game. Its strategy: hold left forever.
+My policy found a strategy that out-survived the oracle inside the dream and collapsed in the real game. Its strategy: hold one direction forever.
 
-The world model had blind spots, and the policy optimized straight into them. It stopped learning to dodge fireballs and started learning to exploit the simulator. If you've read about reward hacking in RLHF, this is the same event with the world model playing the gameable reward model.
+The world model had a soft spot that scored wall-hugging as safe, and an 0.8M-parameter gradient policy found it. Inside the dream it lasted 55 steps against the reactive oracle's 46. In reality it did 45 against the oracle's 98.3. If you've read about reward hacking in RLHF, this is the same event with the world model playing the gameable reward model.
 
-What fixed it, in order of impact: longer dream horizons (short dreams ended before death could occur, so everything looked safe), more collect-train rounds so the model got grounded on the policy's own mistakes, and selecting the final controller on held-out real episodes, where an exploiter can't win.
+The diagnostic that saved the project: roll the dream under canned policies. The oracle out-survived any fixed strafe 46 to about 30, so the dream itself rewards dodging. The signal existed. The failure was the policy's capacity to exploit, plus how I selected what to deploy.
 
-Final score, trained with zero real-environment gradients: 96.6 steps survived, against 67 random and 90 for a DQN trained on 200k real frames.
+What closed it: a controller too small to cheat (1,795 parameters, evolved by CMA-ES), a decoded-image feature that looks the same in dream and reality, and picking the final controller on held-out real episodes, where an exploiter can't win.
 
 Every simulator is wrong somewhere. What stops your policy from finding out where?
 
+(Attach: fig-exploitation-gap.png)
+
 Link in comments.
 
 ---
 
-## Follow-up 5 (Sun Sep 6) — the whole agent is smaller than you think
+## Follow-up 4 (Sat Sep 5) — the whole agent is 1,795 parameters
 
-The Doom agent from this project, the one that beats a DQN trained on 200,000 real frames, is an MLP with about 1,800 parameters. Not 1.8 million. 1,800, evolved with CMA-ES instead of gradients.
+The Doom agent from this project, the one that beats a DQN trained on 200,000 real frames, is an MLP with 1,795 parameters. Not 1.8 million. 1,795, evolved with CMA-ES instead of gradients.
 
-It can be that small because the heavy lifting happens elsewhere. The tokenizer (0.8M params) compresses each frame to discrete tokens. The Transformer world model (3.3M) learns the dynamics and generates unlimited practice. By the time the controller sees the world, dodging fireballs is almost linearly separable.
+The small size is not a stunt; it is one of the anti-cheating disciplines. A big policy has enough capacity to memorize the world model's soft spots and exploit them. A tiny one can barely represent more than an honest reactive rule: find the threatening column, move away from it. (It does need one hidden layer. A purely linear controller reacted to fireballs and still dodged below random, because "move away from the threat" is not a linear function of the input.)
 
-That division of labor is the world-models thesis from Ha and Schmidhuber's 2018 paper, and it still holds up: learn the world once, then even a tiny policy can act well in it. The expensive part of RL was never the acting. It was understanding what you're looking at.
+The heavy lifting happens upstream. The tokenizer compresses each frame to 64 tokens, the Transformer world model learns the dynamics and generates unlimited practice, and by the time the controller sees the world, dodging is almost easy. That was the thesis of Ha and Schmidhuber's 2018 World Models paper, and it held up here: learn the world once, then even a tiny policy can act well in it.
 
 Where in your stack would a learned world model let you shrink everything downstream of it?
 
@@ -93,17 +80,29 @@ Link in comments.
 
 ---
 
-## Follow-up 6 (Mon Sep 7) — the debugging chain, and a series recap
+## Follow-up 5 (Sun Sep 6) — the bug that had nothing to do with RL
 
-The most useful artifact from blog 11 is a seven-link chain:
+The very first Doom run of this project produced frames that were uniform gray rectangles. No walls, no fireballs, just gray.
 
-codebook collapses, so there is no code for the ball, so reconstructions have no ball, so the dream has no ball, so reward never varies with the paddle, so there is no gradient, so the agent plays at random.
+The obvious suspect was headless OpenGL rendering in a cloud container with no display, and I burned real time down that rabbit hole: Xvfb, software Mesa, environment variables. The actual culprit was numpy 2.x. VizDoom 1.2.3's screen-buffer readback silently breaks under numpy >= 2, a known upstream issue, and the fix was one pin in the container image: numpy==1.26.4.
 
-The symptom appeared at the last link. The cause lived at the first. Every hour I spent tuning the policy (reward shaping, longer horizons, more updates) was spent on the wrong end of the chain, because no policy work can recover a signal the representation destroyed. Debug coupled systems upstream, and verify each link with your eyes before spending compute on the next.
+The habit that would have caught it faster: cheap verification gates between expensive stages. Before spending GPU-days evolving a controller, render the dream and look at it. Does the fireball exist? Does strafing move the room? Those checks cost minutes and validate exactly the assumptions the expensive stage depends on. When a sensor returns implausibly uniform data, check the plumbing before the physics.
 
-That closes the series: eleven posts from the Bellman equation through RLHF, GRPO, and DPO, to a production alignment study and an agent that learned inside its own dream. One throughline held the whole way: the value of where I am is the reward I just got plus a discounted value of where I'll land next.
+What's the cheapest gate you could add between two expensive stages of your pipeline?
 
-Which link of your current pipeline have you actually verified, rather than assumed?
+Link in comments.
+
+---
+
+## Follow-up 6 (Mon Sep 7) — you can play the dream, and a series recap
+
+The strangest artifact from blog 11 is a web page. It looks like Doom. It is not Doom. There is no game engine behind it; a Transformer predicts every frame from your strafes, 64 tokens at a time, and a "watch the AI" mode lets the trained agent play inside its own dream: dreaming-to-dodge.vercel.app
+
+That agent never touched the real game during training. It saw its first real fireball at evaluation time and dodged it, because it had already dodged thousands of imagined ones. Final numbers on held-out episodes: 96.6 steps survived, against 67 random, 90 for a DQN trained on the same 200k real frames, and 98.3 for a hand-coded oracle that reads the real screen.
+
+That closes the series: eleven posts from the Bellman equation through RLHF, GRPO, and DPO, to a production alignment study and an agent that learned inside its own dream. One throughline held the whole way: the value of where I am is the reward I just got plus a discounted value of where I'll land next. The finale's addendum: when a model, not the world, tells you where you'll land next, audit it, because a policy will optimize the model's promises rather than the world.
+
+Which post in the series should I go deeper on next?
 
 Link in comments.
 
@@ -112,5 +111,5 @@ Link in comments.
 ## Notes
 
 - Vary the opening line when you reuse an angle; identical reposts on one platform get penalized.
-- Plain text only in these posts, no LaTeX. Keep numbers readable (for example "catch rate 0.11 to 1.00" and "survival 96.6 vs 90").
-- If a world-models, JEPA, Genie, or Dreamer-style paper trends this week, quote-post with "I rebuilt the 2023 version of this from scratch and watched it fail in the most instructive way" plus your link.
+- Plain text only in these posts, no LaTeX. Keep numbers readable (for example "survival 96.6 vs 90" and "recall 0.53 to 0.95").
+- If a world-models, JEPA, Genie, or Dreamer-style paper trends this week, quote-post with "I reproduced the 2018 version of this from scratch and the hard part surprised me" plus your link.

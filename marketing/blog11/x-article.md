@@ -1,4 +1,4 @@
-# X Article (Long-Form) — Blog 11: World Models
+# X Article (Long-Form) — Blog 11: Dreaming to Dodge (World Models)
 
 ## Schedule
 
@@ -9,102 +9,102 @@
 
 ## Article Title
 
-**World Models: Training an Agent Entirely Inside Its Own Dream**
+**Dreaming to Dodge: Training a Doom Agent Entirely Inside Its Own Dream**
 
 ---
 
 ## Article Body (~1,300 words)
 
-I trained an RL agent that never played the real game. It practiced inside a neural network's dream of the game, then went out and caught the ball 500 times out of 500 in reality, matching a hand-coded oracle.
+I trained a Doom agent that never played the real game. It practiced dodging fireballs inside a neural network's dream, then walked into the actual game and matched a hand-coded oracle that reads the real screen.
 
-The first version of that agent played at random. The bug was four components upstream of the agent, in a loss function that had quietly deleted the ball from the dream. Finding it taught me more than the win did.
+The dream was the easy part. The whole project turned on three failures the dream produced along the way: it erased the fireball, it refused to let anyone die, and the policy learned to cheat it.
 
-This is the final post in the series: IRIS, the 2023 "world models as language models" architecture, rebuilt from scratch in three small networks, run honestly, debugged in public, then scaled to VizDoom.
+This is the final post in the series: Ha and Schmidhuber's famous 2018 result (train a VizDoom dodger inside a learned dream) reproduced from scratch with the 2023 IRIS recipe, on rented cloud GPUs, with a paper and a playable neural simulator at the end.
 
 ---
 
 ### A language model for pixels
 
-A world model is a network that learned to simulate an environment. Give it the current observation and an action and it predicts the next observation, the reward, and whether the episode ends. Once it dreams plausibly, you can train a policy inside the dream. Real experience gets spent once, on the model. After that, the policy's millions of practice steps cost almost nothing and risk nothing.
+A world model is a network that learned to simulate an environment. Give it the current observation and an action and it predicts the next observation, the reward, and whether the episode ends. Once it dreams plausibly, you train the policy inside the dream. Real experience gets spent once, on the model; after that, practice steps are generated, parallel, and safe.
 
-IRIS makes this concrete with a move borrowed from NLP. A VQ-VAE tokenizer turns each 64x64 frame into 16 discrete tokens from a 256-word codebook. A GPT-style Transformer then predicts the environment one token at a time, exactly like a language model predicts the next word. An actor-critic watches decoded dream frames and picks actions.
+IRIS makes this concrete with a move borrowed from NLP. A VQ-VAE tokenizer turns each 64x64 frame into 64 discrete tokens from a 512-word codebook. A GPT-style Transformer then predicts the game one token at a time, exactly like a language model predicts the next word. The context is an interleaved ribbon of frame tokens and actions:
 
-The testbed is pixel Catch: a paddle, one falling ball, +1 for a catch, -1 for a miss. Small enough that every failure is visible. That mattered more than I expected.
+$$16 \times (64 + 1) = 1040$$
 
----
+Sixteen timesteps, 64 frame tokens plus 1 action each. That ribbon is the model's entire visible universe, about a second and a half of Doom.
 
-### The world model was never the problem
-
-The scary-sounding component, the Transformer that "learns physics," trained in 48 seconds to 98.2% next-token accuracy. Rolled forward from one real frame, its dream diverged from reality by a pixel MSE of about 0.02. Frame for frame, the dream and the game were nearly the same picture.
-
-Why so easy? Next-token prediction over a 256-way discrete space, in a deterministic environment, with a correct label at every position, is the most favorable setup a Transformer can be handed. It is ordinary supervised learning. The policy, meanwhile, gets one sparse scalar at the end of an episode.
-
-So when the fully assembled agent finished 500 evaluation episodes with a catch rate of 0.11, statistically identical to random, the world model looked innocent. It was, and it wasn't.
-
-$$10 \times (16 + 1) = 170$$
-
-That is the Transformer's whole universe: ten timesteps of 16 frame tokens plus 1 action token each. The model is 98% accurate at reproducing what the tokenizer kept. Nobody promised the tokenizer kept the ball.
+The task is take_cover: monsters lob fireballs, you can only strafe left or right, +1 per step you survive. Return equals survival time. Death lands on about 1% of steps. Hold those two facts; they each break a component.
 
 ---
 
-### The vanishing ball
+### Failure one: the vanishing fireball
 
-Render the tokenizer's reconstructions and there is the smoking gun: the paddle is redrawn perfectly, and the ball is gone. The dream was a game of Catch with nothing to catch. Random play is the correct answer to a game with no visible objective.
+Train the tokenizer with a plain uniform pixel loss and measure how much fireball brightness survives reconstruction: 0.53. Half the threat is gone, because the fireball is a few dozen pixels in a 4,096-pixel frame, and erasing it barely moves an average. A dream with pre-dimmed fireballs cannot teach dodging.
 
-The obvious diagnosis is codebook collapse, and it was real: the tokenizer used 3 of its 256 codes, all three describing background. Dead codes get exactly zero gradient (they appear in the loss zero times), so collapse is a stable rich-get-richer equilibrium, and the textbook cures work. EMA codebook updates plus dead-code revival took usage from 3 codes to 254.
-
-Then the controlled experiment ruined the story. With a fully healthy codebook, across 11 random seeds, the ball survived reconstruction in 2 of 11 runs. The collapsed codebook had managed 4 of 11. Fixing the codebook did not bring the ball back at all.
-
-The real culprit was the reconstruction loss. The ball is about 0.5% of the pixels. Under a uniform per-pixel average, erasing it entirely barely moves the number; the reconstruction error stays excellent (0.0165) with the one task-critical object missing. Keeping the ball and dropping the ball cost nearly the same, so seed noise decided. A coin flip, which is exactly what 2 of 11 looks like.
-
-The fix is one line. Weight each pixel by its brightness:
+The obvious fix, weight bright pixels more, stalled at 0.63. The walls in take_cover are bright too, and they soaked up the extra votes. What actually distinguishes a fireball is not brightness. It is warmth: red-orange in a gray and brown room. Weighting pixels by how much red exceeds green and blue took recall to 0.95.
 
 ```python
-# w_p = 1 + 25 * brightness: a ball pixel is worth 26 votes
-w = 1.0 + self.cfg.fg_weight * x.amax(dim=1, keepdim=True)
+# per-pixel weight: brightness + warmth (R above G,B => fireballs)
+lum = x.amax(dim=1, keepdim=True)
+warm = (x[:, :1] - 0.5 * (x[:, 1:2] + x[:, 2:3])).clamp(min=0.0)
+w = 1.0 + self.cfg.fg_weight * lum + self.cfg.warm_weight * warm
 err = (x_hat - x).abs().mean(dim=1, keepdim=True)
 recon = (w * err).sum() / w.sum()
 ```
 
-The ball's share of the objective goes from 0.5% to about 13%. Across the same 11 seeds: 11 of 11, recall 1.00, zero variance. When the variance vanishes, you fixed the cause, not a symptom.
+[EMBED IMAGE HERE: fig-fireball-recall.png — uniform 0.53, luminance 0.63, warmth 0.95]
 
-[EMBED IMAGE HERE: fig-ball-recall.png — the dissociation: codebook fix 2/11, loss fix 11/11]
-
----
-
-### One upstream fix, noise to oracle
-
-With the ball back in the tokens, I changed nothing about the world model or the actor-critic and retrained. The same policy that flatlined for 500 updates crossed zero imagined return around update 180 and kept climbing.
-
-Greedy evaluation on 500 fresh real episodes: catch rate 1.00, mean return +1.00, standard deviation 0.0. Identical to the hand-coded oracle that always moves toward the ball's column.
-
-[EMBED IMAGE HERE: fig-catch-showdown.png — 0.11 in the random band, then 1.00 matching the oracle]
-
-Only the first frame of any training rollout was real. The ball it learned to track was invented by the Transformer, the catches were declared by the model's own reward head, and the skill transferred to reality anyway.
+The lesson generalizes past Doom: a uniform objective defines "important" as "occupies many pixels," and it will quietly discard the pedestrian at the edge of the frame, the tumor a few pixels wide, the one indicator light that turned red. Somebody has to tell the representation what to keep.
 
 ---
 
-### Scaling the dream to Doom
+### Failure two: the model that refused to dream death
 
-The same skeleton, pointed at VizDoom's take_cover (dodge fireballs, +1 per surviving step), is where the lessons compound. Nothing went smoothly, and each failure had the same shape as Catch's.
+The trained world model produced gorgeous, controllable Doom. And its dreams never ended. Roll them a thousand steps and nobody dies.
 
-The tokenizer smoothed the fireball into the wall until a warmth term (upweight pixels where red beats green and blue) took fireball recall from 0.53 to 0.95. The done head never predicted death (about 1% of steps, an 89-to-1 imbalance) until a class weight took death recall from 0 to 1.0. Uniform objectives keep dropping the rare thing that matters.
+Death is 1% of steps, an 89-to-1 class imbalance, so the done head discovered that predicting "alive" every time costs almost nothing under an unweighted loss. In a survival task that is fatal in the literal sense: return equals survival time, so termination is the entire training signal. A dream where nobody dies makes every policy look equally good.
 
-And one failure Catch could not teach: the policy learned to exploit the world model. Degenerate strategies (hold one direction forever) out-survived the oracle inside the dream and collapsed in reality. Reward hacking, with the world model as the gameable reward. Longer horizons, more collect-train rounds, and held-out real-episode selection closed the gap.
+The fix is a 55x class weight on the death class. Death recall went from 0 to 1.0. Same disease as the fireball, one level up the stack: a rare event that a uniform objective rounds away.
 
-Final numbers, on held-out episodes: the dream-trained agent survives 96.6 steps against 67 for random, 90 for a model-free DQN trained on 200,000 real frames, and 98.3 for a reactive oracle that sees the real game. Zero real-environment gradients.
+---
 
-[EMBED IMAGE HERE: fig-doom-survival.png — the survival showdown]
+### Failure three: the policy cheated the dream
+
+With fireballs in the tokens and death in the dream, I trained an LSTM actor-critic on imagined rollouts. Imagined return climbed beautifully. Real performance came back worse than random.
+
+The agent had learned to hold one direction forever. The world model had a soft spot that scored wall-hugging as safe, and a gradient policy with 0.8M parameters found it and moved in. Inside the dream, the cheat out-survived the reactive oracle, 55 steps to 46. In reality it collapsed to 45 while the oracle did 98.3. If you know reward hacking from RLHF, this is the same event with the world model playing the gameable reward model.
+
+[EMBED IMAGE HERE: fig-exploitation-gap.png — the dream ranks the cheat above the oracle; reality inverts it]
+
+A diagnostic saved the project: roll the dream under canned policies and count survival. The oracle lasted 46 in-dream against about 30 for any fixed strafe. So the dream itself rewards dodging; the training signal existed. The problem was the policy's power to exploit, and how I selected what to deploy.
+
+The recipe that closed it, straight from the 2018 playbook plus two modern twists:
+
+- A controller too small to cheat: a 1,795-parameter MLP, evolved by CMA-ES on dream survival. Not enough capacity to memorize the model's soft spots, enough to express "move away from the threatening column."
+- A feature that transfers: dream tokens and real tokens have different statistics, so the controller reads the decoded image instead, pooled to 54 numbers. Same view in both worlds.
+- Selection the dream cannot inflate: run six independent CMA searches and pick the winner on held-out real episodes. An earlier controller scored 75 on its selection seeds and 50 on fresh ones. Selection optimism is real.
+
+---
+
+### The result
+
+On held-out episodes, the dream-trained agent survives 96.6 steps: above random (67), above a model-free Double-DQN trained on the same 200,000 real frames (90), statistically matching the oracle (98.3). Its best episodes clear the original World Models "solved" bar of 188 steps. Zero real-environment gradients anywhere in training.
+
+[EMBED IMAGE HERE: fig-survival-showdown.png — the survival showdown with the 188-step solved bar]
+
+The DQN bar is the one to stare at. Same real-data budget, two ways to spend it: direct model-free learning got 90, building a dream and practicing inside it got 96.6.
+
+And the claim is playable. At dreaming-to-dodge.vercel.app there is no game engine; the Transformer predicts every frame from your strafes, and a "watch the AI" mode lets the trained controller play inside its own dream.
 
 ---
 
 ### Who this is for
 
-If you train policies on top of any learned representation (a VQ tokenizer, an encoder, a reward model), this post is a field guide to the failure mode where every component reports healthy metrics and the system learns nothing. The debugging discipline transfers: walk upstream from the symptom, and distrust any diagnosis you haven't isolated with a one-variable experiment. Codebook collapse was real, curable, and not the cause.
+If you train policies on top of any learned model (a world model, a reward model, a simulator), this post is a field guide to the gap between "the model is accurate" and "the thing trained inside it works in reality." The three leaks (capacity, transfer, selection) each needed their own fix, and none of them showed up in the model's own metrics.
 
-The sentence I keep coming back to: a world model can only teach a policy what its tokenizer chooses to preserve. Somebody has to tell the representation what matters, because a uniform loss defines "important" as "numerous," and the ball never is.
+The sentence I kept coming back to: the world model is the easy part; getting a policy to learn a robust skill inside an imperfect model, without exploiting it, is the hard part.
 
-Full post with the straight-through estimator, the EMA and revival code, lambda-returns worked by hand, the Modal harness, and the Doom capstone: https://prathameshsaraf.com/blogs/11-world-models/
+Full post with the VQ-VAE from basics, the straight-through estimator, the codebook-collapse toy, the KV cache, and the Modal harness: https://prathameshsaraf.com/blogs/11-world-models/
 
 Learning RL for LLMs through the @VizuraAI bootcamp. The full series, from the Bellman equation to this, is on the same site.
 
@@ -112,18 +112,18 @@ Learning RL for LLMs through the @VizuraAI bootcamp. The full series, from the B
 
 ## Header Image
 
-- Use **`blog11-x-banner.png`** (this folder) for the article header. It matches the series template: dark navy with a faint grid, neon nodes (TOKENIZER, WORLD MODEL, ACTOR-CRITIC) looping into a glowing "DREAM" node, with the title and subtitle set on the right.
-- Embed `fig-ball-recall.png` in the vanishing-ball section (the dissociation result).
-- Embed `fig-catch-showdown.png` in the noise-to-oracle section. This is the headline figure.
-- Embed `fig-doom-survival.png` in the Doom section.
-- Optional inline image: `fig-policy-curves.png` next to the "crossed zero around update 180" paragraph.
+- Use **`blog11-x-banner.png`** (this folder) for the article header. It matches the series template: dark navy with a faint grid, neon nodes (FRAME, TOKENIZER, WORLD MODEL, CONTROLLER) looping into a glowing "DREAM" node, with the title and subtitle set on the right.
+- Embed `fig-fireball-recall.png` in the vanishing-fireball section.
+- Embed `fig-exploitation-gap.png` in the cheating-policy section.
+- Embed `fig-survival-showdown.png` in the results section. This is the headline figure.
+- Optional inline image: `fig-dream-rank.png` next to the "the dream rewards dodging" paragraph.
 - Fallback header: `ai-hero.png` from `blogs/11-world-models/images/`.
 
 ## First 30 Minutes Strategy
 
 After publishing:
 
-1. Self-reply with: "The whole post in one line. The world model was 98% accurate and the agent still learned nothing, because it was a faithful model of a world whose tokenizer had already deleted the ball. Fix the loss one line upstream and the same policy goes from random to matching an oracle."
+1. Self-reply with: "The whole post in one line. The agent saw its first real fireball at evaluation time and dodged it, because it had already dodged thousands of imagined ones. The hard part was stopping it from cheating the imagination."
 2. Reply to every comment in the first hour.
 3. Quote-repost with a one-line hook later the same day (options below).
 
@@ -131,9 +131,9 @@ After publishing:
 
 Hit repost on your own article, choose "Quote," and put one of these on top:
 
-1. "My world model hit 98.2% accuracy and the agent trained inside it played at random. Both facts were true at once, and the reason is the most useful bug I've ever chased." (recommended: pattern interrupt plus open loop)
-2. "I fixed codebook collapse across 11 seeds and the ball came back in 2 of them. The fix everyone reaches for was real, curable, and not the cause."
-3. "The ball is 0.5% of the pixels. A uniform reconstruction loss will delete it and still report an excellent error. One line reweights it to 13% of the vote and the agent goes from random to oracle."
-4. "An agent trained with zero real-environment gradients survived 96.6 steps in Doom. A DQN trained on 200,000 real frames managed 90."
+1. "My policy found a strategy that out-survived the oracle inside the dream (55 vs 46 steps) and collapsed in the real game. Model-based RL's dirty secret is that the policy is an adversary of its own world model." (recommended: pattern interrupt plus open loop)
+2. "An agent trained with zero real-environment gradients survived 96.6 steps in Doom. A DQN trained on the same 200,000 real frames managed 90."
+3. "The tokenizer kept 53% of the fireball. Weighting bright pixels got 63%, because the walls are bright too. Weighting warm pixels got 95%. The loss decides what the dream contains."
+4. "There is no game engine behind this page. A Transformer predicts every frame from your strafes, and the agent that plays it was trained entirely inside: dreaming-to-dodge.vercel.app"
 
 Then reply to anyone who engages, same as the first hour of the original.

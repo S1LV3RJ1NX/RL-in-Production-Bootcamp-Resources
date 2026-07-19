@@ -1,4 +1,4 @@
-# LinkedIn Post — Blog 11: World Models
+# LinkedIn Post — Blog 11: Dreaming to Dodge (World Models)
 
 ## Schedule
 
@@ -8,24 +8,23 @@
 
 ## Post Text
 
-I trained an RL agent that never played the real game. It practiced entirely inside a neural network's dream, then caught the ball 500 times out of 500 in reality.
+I trained a Doom agent that never played the real game. It practiced dodging fireballs inside a neural network's dream, then matched a hand-coded oracle in reality.
 
-The first version played at random, and the bug was nowhere near the agent.
+The hard part was not the dream. It was everything the dream got subtly wrong.
 
-Blog 11 is live: "World Models: Training an Agent Entirely Inside Its Own Dream." It rebuilds IRIS from scratch: a VQ-VAE tokenizer, a GPT-style Transformer that dreams the game forward, and an actor-critic trained purely in imagination.
+Blog 11 is live: "Dreaming to Dodge: Training a Doom Agent Entirely Inside Its Own Dream." The IRIS recipe from scratch on VizDoom take_cover: a VQ-VAE tokenizer, a GPT that predicts the game forward, and a 1,795-parameter controller evolved inside the hallucination.
 
-What the honest run taught me:
+Every classic model-based failure showed up:
 
-- The world model hit 98.2% accuracy and the agent still learned nothing. It was a faithful model of the wrong world.
-- The tokenizer's loss had quietly deleted the ball. It is 0.5% of the pixels, so erasing it barely moves an average pixel error.
-- Codebook collapse looked like the culprit. I cured it across 11 seeds and the ball came back in 2. One changed loss line (a ball pixel gets 26 votes) made it 11 of 11.
-- Same skeleton on VizDoom: survival 96.6 vs 67 random and 90 for a DQN trained on 200k real frames.
+- The tokenizer erased the fireball. Brightness weighting stalled at 0.63 recall (the walls are bright too); weighting warm pixels took it to 0.95.
+- The model refused to dream death (1% of steps) until a class weight made laziness expensive.
+- The policy cheated: it held one direction, beat the oracle inside the dream, and collapsed in reality. Reward hacking, one abstraction down.
 
-The lesson I keep reusing: a world model can only teach a policy what its tokenizer chooses to preserve.
+Final score, zero real-environment gradients: 96.6 steps vs 67 random, 90 for a DQN given the same 200k real frames, 98.3 oracle.
 
-I'm working through the @VizuraAI RL-for-LLMs bootcamp and writing these up for anyone on the same path.
+You can drive the dream yourself in the browser. Link in comments.
 
-Link in comments.
+Written while working through the @VizuraAI RL-for-LLMs bootcamp.
 
 #ReinforcementLearning #MachineLearning #DeepLearning #AI #LearningInPublic
 
@@ -35,7 +34,9 @@ Link in comments.
 
 Read the full post: https://prathameshsaraf.com/blogs/11-world-models/
 
-Everything is built from scratch and runs for a couple of dollars on Modal: the straight-through estimator, EMA codebook updates with dead-code revival, the foreground-weighted reconstruction loss, the 170-position token Transformer, lambda-returns worked by hand, the full diagnosis of why the agent played at random, and the Doom capstone where the policy learned to exploit the dream and had to be caught.
+Play the neural simulator (no game engine, the Transformer renders every frame): https://dreaming-to-dodge.vercel.app
+
+Everything is built from scratch and runs on a single A10G via Modal: the straight-through estimator, EMA codebook updates with dead-code revival, the warmth-weighted reconstruction loss, the 1040-position token Transformer with a KV cache, CMA-ES on a tiny controller, and held-out real-episode selection so the dream never grades its own homework.
 
 Series so far:
 
@@ -49,7 +50,7 @@ Series so far:
 8. GRPO
 9. DPO and Agentic RL
 10. Socratic Alignment
-11. World Models (this one, the series finale)
+11. Dreaming to Dodge (this one, the series finale)
 
 Each post has typed Python, worked examples, and figures.
 
@@ -57,11 +58,11 @@ Each post has typed Python, worked examples, and figures.
 
 ## Image Suggestions
 
-1. **Social cover**: `marketing/blog11/blog11-social-cover.png` — series-style diagram cover: dark navy with a faint grid, neon nodes (TOKENIZER, WORLD MODEL, ACTOR-CRITIC) looping into a glowing "DREAM" node, title and subtitle below (recommended hero)
-2. **Catch showdown**: `marketing/blog11/fig-catch-showdown.png` — four bars: the as-shipped policy inside the random band, then 1.00 matching the oracle after one upstream fix (the headline figure)
-3. **Ball-recall ablation**: `marketing/blog11/fig-ball-recall.png` — the 11-seed experiment: fixing the codebook did nothing (2/11), changing the loss fixed everything (11/11)
-4. **Doom survival**: `marketing/blog11/fig-doom-survival.png` — random 67, DQN 90, the dream-trained agent 96.6, oracle 98.3
-5. **Policy curves**: `marketing/blog11/fig-policy-curves.png` — the flatlined broken run against the fixed run crossing zero
-6. **Blog hero (fallback)**: `blogs/11-world-models/images/ai-hero.png` — a sleeper dreaming a pixel game of Catch
+1. **Social cover**: `marketing/blog11/blog11-social-cover.png` — series-style diagram cover: dark navy with a faint grid, neon nodes (FRAME, TOKENIZER, WORLD MODEL, CONTROLLER) looping into a glowing "DREAM" node, title and subtitle below (recommended hero)
+2. **Survival showdown**: `marketing/blog11/fig-survival-showdown.png` — random 67, DQN 90, the dream-trained agent 96.6, oracle 98.3, with the 188-step "solved" bar (the headline figure)
+3. **Exploitation gap**: `marketing/blog11/fig-exploitation-gap.png` — the cheat scores 55 in-dream vs the oracle's 46, then the ranking inverts in reality (45 vs 98.3)
+4. **Fireball recall**: `marketing/blog11/fig-fireball-recall.png` — uniform 0.53, luminance 0.63, warmth 0.95: the loss decides what the dream contains
+5. **Dream rank**: `marketing/blog11/fig-dream-rank.png` — inside the dream, the reactive oracle (46) out-survives any fixed strafe (~30): the dream rewards dodging
+6. **Blog hero (fallback)**: `blogs/11-world-models/images/ai-hero.png` — a sleeper dreaming a dungeon corridor with an incoming fireball
 
-Recommended: lead with `blog11-social-cover.png`, or use `fig-catch-showdown.png` if you want the noise-to-oracle result front and center. A carousel works well: slide 1 the "never played the real game" hook, slide 2 the ball as 0.5% of the pixels, slide 3 the 98%-accurate model of the wrong world, slide 4 the showdown bars, final slide the tokenizer lesson plus link.
+Recommended: lead with `blog11-social-cover.png`, or use `fig-survival-showdown.png` if you want the result front and center. A carousel works well: slide 1 the "never played the real game" hook, slide 2 the vanishing fireball, slide 3 the policy that cheated the dream, slide 4 the showdown bars, final slide the playable simulator plus link.
