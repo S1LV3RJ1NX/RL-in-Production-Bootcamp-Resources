@@ -1,0 +1,217 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grasping in the Dark — paper</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#161a20;--mut:#5c626f;--line:#e8eaef;--soft:#f6f7f9;--acc:#0f8f68}
+body{margin:0;background:#fff;color:var(--ink);font-family:'Newsreader',Georgia,serif;font-size:18px;line-height:1.65}
+.wrap{max-width:760px;margin:0 auto;padding:40px 22px 80px}
+h1,h2,h3,h4{font-family:Inter,system-ui,sans-serif;letter-spacing:-.02em;line-height:1.2}
+h1{font-size:34px;margin:.2em 0}h2{font-size:24px;margin:1.6em 0 .3em;border-top:1px solid var(--line);padding-top:1em}
+h3{font-size:18px}a{color:var(--acc)}code{font-family:'JetBrains Mono',monospace;background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.85em}
+pre{background:#0f1524;color:#d7dcea;border-radius:10px;padding:14px 16px;overflow:auto;font-size:13px;line-height:1.6}
+pre code{background:none;border:none;padding:0;color:inherit}
+table{border-collapse:collapse;width:100%;font-family:Inter,sans-serif;font-size:15px;margin:1em 0}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left}th{color:var(--mut);font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+img{max-width:100%;border:1px solid var(--line);border-radius:10px;margin:1em 0}
+blockquote{border-left:3px solid var(--acc);margin:1em 0;padding:.4em 1em;color:var(--mut);background:var(--soft)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+.top{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--acc)}
+.back{font-family:Inter,sans-serif;font-size:14px}
+</style></head><body><div class="wrap">
+<p class="top">Grasping in the Dark · research paper</p>
+<h1 id="grasping-in-the-dark-sample-efficient-reinforcement-learning-for-robotic-manipulation-from-reward-on-a-single-gpu">Grasping in the Dark: Sample-Efficient Reinforcement Learning for Robotic Manipulation, from Reward, on a Single GPU</h1>
+<p><strong>A reproducible study of HIL-SERL in simulation</strong></p>
+<p>Rajat Dandekar · Vizuara AI · <em>RL in Production</em> — Session 3 (Robotics)</p>
+<hr />
+<h2 id="abstract">Abstract</h2>
+<p>Reinforcement learning is often dismissed as impractical for real robots: too sample-hungry, too fragile, too expensive to run outside a simulator. <strong>HIL-SERL</strong> (Human-in-the-Loop Sample-Efficient Robotic RL; Luo et al., 2024) is the counter-argument — it trains vision-based manipulation policies to near-perfect success in one to two hours on a <em>single</em> real robot. In this work we reproduce the core of HIL-SERL — <strong>Soft Actor-Critic (SAC)</strong> combined with <strong>Reinforcement Learning with Prior Data (RLPD)</strong> — entirely in simulation, <strong>fully autonomously</strong> (no human intervention, no hand-designed reward: the environment supplies a sparse success signal), on a <strong>single L4 GPU</strong>. On the LeRobot <code>gym-hil</code> <code>PandaPickCube</code> task, a Franka Panda learns to pick up and lift a cube — going from <strong>0% success to ~100% success in ≈5,000 gradient steps (≈40 minutes)</strong>, learning almost entirely from a reward it initially never receives. We present the full recipe, the learning dynamics, an honest account of the engineering required to make distributed RL run reliably on ephemeral cloud GPUs, and a concrete <strong>sim-to-real bridge</strong> to the affordable ($200) SO-101 arm. Everything — the Modal training app, the Colab evaluation notebook, and the trained checkpoint — is open and one command from reproduction.</p>
+<hr />
+<h2 id="1-introduction">1. Introduction</h2>
+<p>Two facts sit in tension. First, reinforcement learning has produced some of the most striking results in machine learning, from game-playing to alignment. Second, ask a roboticist whether they run RL <em>on the physical robot</em>, and the usual answer is "no — it needs too much data." A real arm gives you one timeline, no free resets, and no free failures; a simulator gives you thousands of parallel copies, instant resets, and consequence-free crashes. The gap between "RL works" and "RL works <em>here</em>" is a <strong>data-efficiency</strong> gap.</p>
+<p><strong>HIL-SERL</strong> closes that gap. It reaches near-100% success on delicate real-world manipulation — assembling connectors, inserting RAM, threading a timing belt — in <strong>1 to 2.5 hours of real training</strong> on a single robot. It does so by stacking three ideas: a sample-efficient off-policy learner (<strong>SAC</strong>), a trick for reusing prior data so exploration doesn't start from scratch (<strong>RLPD</strong>), and a <strong>learned reward from pixels</strong> plus <strong>occasional human corrections</strong> so the whole loop can run on raw camera images without a hand-engineered reward function.</p>
+<p>For a workshop whose thesis is <em>"RL is production-ready,"</em> HIL-SERL is the ideal centerpiece — but a live human-in-the-loop demo on real hardware is impractical in a classroom. Our contribution is therefore a <strong>clean, reproducible, single-GPU reproduction of HIL-SERL's learning core in simulation</strong>:</p>
+<ul>
+<li>We run SAC + RLPD <strong>autonomously</strong> on <code>gym-hil</code>'s <code>PandaPickCube</code> task. In simulation the environment computes a sparse reward directly, so <strong>no human and no learned reward classifier are needed</strong> — the human is a <em>concept we teach</em>, not a runtime dependency.</li>
+<li>We show the entire learning curve: a policy that succeeds <strong>0 times</strong> in its first 20 episodes and <strong>20/20 times</strong> by the end, converging in <strong>≈40 minutes on one L4 GPU (≈$0.55 of compute)</strong>.</li>
+<li>We document the real engineering — distributed actor-learner over gRPC, headless MuJoCo rendering, and a checkpoint-serialization bug that crashes training — because "it works" is only credible with the failure modes attached.</li>
+<li>We provide the <strong>sim-to-real bridge</strong>: exactly what carries over unchanged to a physical <strong>SO-101</strong> and what must be re-collected.</li>
+</ul>
+<p>This is not a new algorithm. It is a faithful, honest, end-to-end <em>demonstration</em> that reinforcement learning genuinely learns robotic manipulation from reward — cheaply enough that a student can rerun it.</p>
+<hr />
+<h2 id="2-background">2. Background</h2>
+<h3 id="21-the-data-wall-on-a-real-robot">2.1 The data wall on a real robot</h3>
+<p><img alt="" src="figures/gen/concept_sparse_reward.png" />
+ In a simulator, one RL step is nearly free. On a real arm every term of the RL loop becomes expensive: parallelism is gone (one arm, one timeline), free resets are gone (something physical must reset the object), and free failure is gone (a crash costs a gearbox). Every design choice in HIL-SERL is, at root, a response to this constraint.</p>
+<h3 id="22-soft-actor-critic-sac">2.2 Soft Actor-Critic (SAC)</h3>
+<p><img alt="" src="figures/tutorial/sac-the-full-algorithm-1.png" />
+ SAC (Haarnoja et al., 2018) is a maximum-entropy, off-policy actor-critic. "Off-policy" is the load-bearing word: it learns from a <strong>replay buffer</strong> of past transitions rather than only fresh on-policy rollouts, which is what makes it sample-efficient enough to consider for real hardware. The entropy term keeps exploration alive without hand-tuned noise schedules, and a temperature parameter auto-balances reward against exploration.</p>
+<h3 id="23-rlpd-reinforcement-learning-with-prior-data">2.3 RLPD: Reinforcement Learning with Prior Data</h3>
+<p><img alt="" src="figures/gen/rlpd_sampling.png" />
+ RLPD (Ball et al., 2023) is the sample-efficiency engine. It is a small set of modifications to off-policy RL that, combined, let an agent learn dramatically faster from a handful of prior demonstrations:</p>
+<ol>
+<li><strong>Symmetric sampling</strong> — every training batch is 50% fresh online experience and 50% prior/offline data. The agent is never starved of successful examples, even when its own exploration rarely succeeds.</li>
+<li><strong>LayerNorm on the critics</strong> — prevents catastrophic value over-estimation when bootstrapping from off-distribution data.</li>
+<li><strong>Large critic ensembles with random subsetting and a high update-to-data ratio</strong> — squeezes more learning out of each collected transition.</li>
+</ol>
+<p>RLPD is <em>why</em> a sparse-reward grasp can be learned in thousands, not millions, of steps.</p>
+<h3 id="24-serl-and-hil-serl">2.4 SERL and HIL-SERL</h3>
+<p>SERL (Luo et al., ICRA 2024) packaged these ideas into a software suite for real-robot RL, learning tasks in tens of minutes from demonstrations. <strong>HIL-SERL</strong> (Luo et al., 2024) adds two things on top: a <strong>learned binary reward classifier</strong> that turns raw camera images into a sparse success signal (so no hand-designed reward is needed), and <strong>human-in-the-loop interventions</strong> — a person watches the policy and takes over with a SpaceMouse the instant it is about to fail. Those corrections enter the replay buffer (an idea borrowed from HG-DAgger), and the intervention rate falls to zero as the policy takes over.</p>
+<p><img alt="" src="figures/gen/method_pipeline.png" /></p>
+<p><img alt="" src="figures/tutorial/hil-serl-the-human-in-the-loop-3.png" />
+ The figure above captures the full loop: the policy acts; if it is about to fail, the human takes over; corrective transitions flow into a mixed offline buffer; RLPD updates the policy and critics from a 50/50 blend; and human guidance — heavy early — fades as reliability rises.</p>
+<p><strong>The simulation simplification.</strong> In our setting, the <code>gym-hil</code> MuJoCo environment computes the reward from ground-truth simulator state. This removes <em>both</em> the reward classifier and the human from the runtime loop: training is fully autonomous. What remains is exactly the sample-efficient learning core — SAC + RLPD — which is what we study.</p>
+<hr />
+<h2 id="3-method">3. Method</h2>
+<h3 id="31-the-learning-core">3.1 The learning core</h3>
+<p>We train a <strong>Gaussian actor</strong> policy with SAC. Observations are two 128×128 RGB camera streams (a front view and a wrist view) plus an 18-dimensional proprioceptive state (<code>qpos</code>, <code>qvel</code>, gripper, and end-effector position); a shared frozen ResNet-10 vision encoder maps images to features. The action is a 3-dimensional end-effector displacement plus a discrete gripper command. The learner uses <strong>RLPD-style symmetric sampling</strong> — <code>online_ratio = 0.5</code> — mixing the online replay buffer with an offline buffer seeded from ~30 demonstrations, LayerNorm critics, and an update-to-data ratio of 2.</p>
+<h3 id="32-asynchronous-actor-learner">3.2 Asynchronous actor-learner</h3>
+<p><img alt="" src="figures/gen/actor_learner.png" /></p>
+<p>HIL-SERL runs as <strong>two processes communicating over gRPC</strong>. The <strong>actor</strong> steps the environment with the current policy and streams transitions; the <strong>learner</strong> holds the replay buffers, performs gradient updates, and periodically pushes fresh weights back to the actor. This decoupling is what lets a real robot act at a steady control rate while a GPU trains as fast as it can. We run both processes inside a single container over <code>localhost</code>, which is the simplest, lowest-latency, and most secure topology (the gRPC port is never exposed).</p>
+<h3 id="33-autonomous-reward-in-simulation">3.3 Autonomous reward in simulation</h3>
+<p>The <code>PandaPickCube</code> environment emits a <strong>sparse reward</strong>: <code>1.0</code> when the cube is lifted more than 10 cm, <code>0.0</code> otherwise. This is deliberately unforgiving — the agent receives essentially no gradient signal until it <em>accidentally</em> completes a full reach-grasp-lift. It is precisely the regime where prior data (RLPD) is decisive: the offline demonstrations keep successful (state, action) pairs in every batch, so the value function has something to latch onto long before the policy can succeed on its own.</p>
+<hr />
+<h2 id="4-experimental-setup">4. Experimental Setup</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Task</td>
+<td>LeRobot <code>gym-hil</code> · <code>PandaPickCube</code> (Franka Panda, MuJoCo)</td>
+</tr>
+<tr>
+<td>Observation</td>
+<td>front + wrist cameras (128×128 RGB) + 18-D proprioception</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>3-D end-effector delta + discrete gripper</td>
+</tr>
+<tr>
+<td>Reward</td>
+<td>sparse: <code>1.0</code> on a &gt;10 cm lift, else <code>0.0</code></td>
+</tr>
+<tr>
+<td>Algorithm</td>
+<td>SAC + RLPD (<code>online_ratio=0.5</code>, LayerNorm critics, <code>utd_ratio=2</code>, <code>num_critics=2</code>)</td>
+</tr>
+<tr>
+<td>Demonstrations</td>
+<td>~30 offline episodes (<code>lilkm/pick_cube_franka_panda_30</code>)</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td><strong>single NVIDIA L4</strong> on Modal, headless (<code>MUJOCO_GL=egl</code>)</td>
+</tr>
+<tr>
+<td>Checkpointing</td>
+<td>every 1,000 gradient steps → Modal Volume → auto-pushed to the HF Hub</td>
+</tr>
+</tbody>
+</table>
+<p>Training is launched with one command (<code>modal run --detach ...</code>), runs detached in the cloud, and streams metrics to a log we parse for the learning curve. Full config and commands are in the appendix and the open repository.</p>
+<h3 id="the-engineering-honestly">The engineering, honestly</h3>
+<p>Making distributed RL run reliably on ephemeral cloud GPUs surfaced several real bugs, each fixed by <em>running</em> the system rather than trusting documentation:</p>
+<ul>
+<li><strong>The output directory must be pristine.</strong> LeRobot's config validator refuses to start if the output directory already exists — and both the learner and actor run that validator against the <em>same</em> directory. We give the actor its own throwaway directory (it checkpoints nothing; it receives weights over gRPC).</li>
+<li><strong>A checkpoint-serialization crash.</strong> At each checkpoint, the learner also dumps the replay buffer to disk as a dataset. The buffer stores image observations as <code>float32</code> with values in <code>[0, 255]</code>, but the image writer rejects floats outside <code>[0, 1]</code> — raising an unhandled exception that <em>halts training at the first save</em>. We patch the writer to clip-and-cast <code>[0, 255]</code> floats to <code>uint8</code>. The fix touches only on-disk serialization; the batch the policy trains on is normalized separately and is unaffected.</li>
+<li><strong>Frequent checkpoints + auto-upload.</strong> Because cloud GPU containers can be preempted, we save every 1,000 steps and push each new checkpoint to the Hub <em>from inside the training job</em>, so a good policy externalizes the instant it exists.</li>
+</ul>
+<p>These are not incidental. A claim that "RL is production-ready" is only honest with its operational failure modes attached — and every one of them is mundane and fixable.</p>
+<hr />
+<h2 id="5-results">5. Results</h2>
+<h3 id="51-the-learning-curve">5.1 The learning curve</h3>
+<p><img alt="Training reward curve" src="figures/gen/reward_curve.png" />
+ The headline result is the reward curve. The policy begins by <strong>failing every episode</strong> — sparse reward, no idea how to grasp. Its <strong>first successful lift</strong> appears at roughly step 2,900. From there, RLPD's prior-data blend compounds quickly: success rate climbs steeply, and within <strong>≈5,000 gradient steps</strong> the policy grasps essentially every time.</p>
+<p><img alt="Grasp success rate by training stage" src="figures/gen/fig_success_bars.png" />
+ The bar chart makes the same story categorical: <strong>~0%</strong> at random initialization, a noisy <strong>~12%</strong> through mid-training as the first successes trickle in, and <strong>~81–95%</strong> for the converged policy. The jump between the second and third bar is the whole result — a policy that could barely find the reward becomes one that hits it almost every time.</p>
+<p>Concretely, measured over rolling windows of the actor's episodes during a single run:</p>
+<ul>
+<li><strong>First 20 episodes:</strong> <code>0 / 20</code> successes.</li>
+<li><strong>Last 20 episodes:</strong> <code>19–20 / 20</code> successes.</li>
+<li><strong>Rolling success rate</strong> plateaus at <strong>~95–100%</strong> by ≈step 6,800 (see the learning curve), from a first successful grasp near step 2,900.</li>
+<li><strong>Held-out evaluation</strong> of the released converged checkpoint (autonomous, no exploration noise) over 50 fresh episodes is reported alongside the checkpoint on the Hugging Face Hub.</li>
+</ul>
+<p>The entire run reaches a near-perfect policy in <strong>≈40 minutes on one L4</strong> — on the order of <strong>$0.55 of compute</strong>.</p>
+<h3 id="52-anatomy-of-the-learning-dynamics">5.2 Anatomy of the learning dynamics</h3>
+<p>The learning curve is not a smooth ramp — it is a <strong>phase transition</strong>, and understanding <em>why</em> is the most instructive part of this study. <img alt="Per-phase episode outcomes" src="figures/gen/fig_episode_outcomes.png" /> Reading the run episode-by-episode, three regimes are visible:</p>
+<ol>
+<li><strong>The dark phase (≈steps 0–2,900): reward never arrives, but the critic is not idle.</strong> The actor flails and collects almost nothing but zeros. It is tempting to call this wasted time — it is the opposite. Because RLPD makes <strong>half of every gradient batch come from the offline demonstrations</strong>, the critic is, from step one, being shown <em>successful</em> (state, action, reward=1) transitions. It is quietly building a <strong>value landscape</strong> — a sense that "end-effector closing on the cube, cube rising" is worth a great deal — long before the actor can produce that state on its own. The policy looks stuck; the value function is doing the homework.</li>
+<li><strong>Discovery (≈steps 2,900–5,000): the actor stumbles into a region the critic already prizes.</strong> The first autonomous success is not the start of learning — it is the moment the actor's exploration finally reaches the part of state space the critic has <em>already</em> learned to value from the offline data. That first success is therefore not diluted into noise; it lands on fertile ground and is immediately reinforced. Successes now enter the <em>online</em> buffer too, the two halves of the batch begin to agree, and the update-to-data ratio of 2 compounds each new success into several gradient steps of improvement.</li>
+<li><strong>Consolidation (≈steps 5,000+): lock-in.</strong> Once online and offline data tell the same story, the entropy term anneals, exploration narrows around the successful trajectory, and success rate saturates near 100%. The policy has not merely memorized the demos — it optimizes the reward directly, which is why it generalizes across randomized cube positions the demonstrations never covered.</li>
+</ol>
+<p>The single most important design decision behind this curve is RLPD's <strong>50/50 symmetric sampling</strong>. On a naive off-policy learner, one success buried in ~2,000 online failures is a signal-to-noise ratio of 1:2000 — statistically invisible. Forcing half of every batch to be known successes raises that ratio to roughly <strong>1:1</strong>, which is what turns a needle-in-a-haystack exploration problem into a tractable one. LayerNorm on the critics is the safety rail that makes this aggressive reuse stable: it caps the value over-estimation that would otherwise explode when bootstrapping from off-distribution offline data.</p>
+<h3 id="53-sample-efficiency-in-context">5.3 Sample efficiency in context</h3>
+<p><img alt="Sample-efficiency milestones" src="figures/gen/fig_sample_efficiency.png" />
+ Two numbers frame the efficiency claim: the <strong>first</strong> successful grasp near step <strong>~2,900</strong>, and <strong>reliable</strong> grasping by <strong>~5,000</strong> gradient steps — the whole trajectory inside ≈40 minutes on one L4. Reaching a reliable grasp in thousands (not millions) of steps, from a reward that is zero for the first ~2,900 of them, is only possible because of RLPD's symmetric sampling: the successful demonstrations anchor the value function while the policy learns to reproduce and then surpass them. Strip out the prior data and this same task reverts to the classic sparse-reward wall, where a from-scratch agent can explore for hundreds of thousands of steps without a single reward to learn from.</p>
+<h3 id="54-before-and-after">5.4 Before and after</h3>
+<p><img alt="Before — untrained, flailing" src="videos/before.gif" /></p>
+<p><img alt="After — trained, a clean grasp" src="videos/after.gif" />
+ The clearest evidence is visual. <strong>Before</strong> training, the policy flails: the end-effector wanders, the gripper opens and closes at random, the cube is rarely touched. <strong>After</strong> training, the same policy executes a clean reach, close, and lift — repeatably, across randomized cube positions. Nothing about the task or the reward changed; only the weights did. That is reinforcement learning doing the one thing imitation cannot: getting <em>better</em> than any single demonstration by optimizing the reward directly.</p>
+<hr />
+<h2 id="6-sim-to-real-the-so-101-bridge">6. Sim-to-Real: the SO-101 bridge</h2>
+<p>The point of learning on a <em>Franka Panda in simulation</em> is a <strong>$200 SO-101 arm on a real desk</strong>. The encouraging fact is how little changes.</p>
+<p><img alt="" src="figures/gen/sim_to_real_bridge.png" /></p>
+<p><strong>Reused byte-for-byte</strong> — the "learning brain": the asynchronous actor-learner, the SAC learner, the RLPD sampling, the Gaussian-actor policy network, the ResNet-10 reward-classifier architecture, and the SAC hyperparameters.</p>
+<p><strong>Changes (configuration only):</strong> the robot becomes an <code>so101_follower</code> (six Feetech servos on a serial bus); a leader arm provides teleoperation; end-effector-space inverse kinematics and tight workspace bounds are set (finding good bounds is the single biggest lever on speed and safety).</p>
+<p><strong>Must be re-collected on the physical arm:</strong> ~15–25 fresh teleoperated demonstrations, and — crucially — a <strong>reward-classifier dataset</strong> of real labeled camera frames, because on hardware there is no simulator to hand you the reward. Here the human returns, both to demonstrate and to intervene.</p>
+<p>Practitioners have trained a real SO-101 grasp from scratch this way in roughly <strong>1–3 hours</strong>. The simulation study in this paper is, quite literally, one configuration file away from that.</p>
+<hr />
+<h2 id="7-a-real-robot-case-study">7. A real-robot case study: HIL-SERL on an SO-101 (whiteboard wiping)</h2>
+<p>To pressure-test the bridge, we ran the same method on a <strong>physical SO-101</strong> — the honest counterpart to the clean simulation above. The task: <strong>pick up a duster and wipe a marker off a whiteboard.</strong> The rig is deliberately modest — a single SO-101 <em>follower</em> arm doing the task, an SO-101 <em>leader</em> arm through which a human demonstrates and intervenes, two 128&times;128 cameras (front + wrist), and, notably, an <strong>Apple-Silicon Mac (MPS, no CUDA)</strong>. Every RL tutorial assumes a gamepad and an NVIDIA GPU; we had neither.</p>
+<p><img alt="The real SO-101 rig" src="figures/gen/wb_real_rig.png" /></p>
+<h3 id="71-the-method-on-hardware">7.1 The method on hardware</h3>
+<p>The learning core is unchanged — SAC + RLPD, an asynchronous actor&ndash;learner, offline demos seeding the replay buffer. What changes is the reward and the human: on hardware the environment cannot hand you a reward, so the human presses a key on success; and the human <em>intervenes</em> by physically moving the leader arm whenever the policy is about to fail. Those corrections flow into the buffer, and the <strong>intervention rate falling over time</strong> is the clearest signal of progress.</p>
+<p><img alt="The leader-arm human-in-the-loop cycle" src="figures/gen/wb_intervention_loop.png" /></p>
+<h3 id="72-four-walls">7.2 Four walls (and why the docs lie)</h3>
+<p>Stock LeRobot does not support this setup out of the box, and each gap taught us something structural:</p>
+<ol>
+<li><strong>No CUDA.</strong> The SAC learner assumes NVIDIA; Apple&rsquo;s MPS runs the (small, ~8&nbsp;M-param) networks but at ~8&nbsp;fps against a 10&nbsp;fps target — fine for a proof-of-concept loop, not for same-day convergence.</li>
+<li><strong>The leader arm is not a supported controller.</strong> HIL-SERL&rsquo;s intervention step is hardcoded to end-effector deltas and requires <code>get_teleop_events()</code>, which only the gamepad and keyboard teleoperators implement. The <code>control_mode: "leader"</code> the docs describe is a dead config field. <em>The documentation is ahead of the implementation</em> — verified on the release and on <code>main</code>.</li>
+<li><strong>The whole pipeline assumes end-effector space.</strong> Running joint-space (to match the leader) means the policy&rsquo;s batched <code>[1,6]</code> action is never squeezed, and — more subtly — the SAC actor never normalizes its action.</li>
+<li><strong>Recorded demos have no reward.</strong> <code>lerobot-record</code> datasets lack the <code>next.reward</code> column the SAC offline buffer requires.</li>
+</ol>
+<p><img alt="The four walls and their fixes" src="figures/gen/wb_four_walls.png" /></p>
+<h3 id="73-the-subtlest-bug-action-normalization-again">7.3 The subtlest bug: action normalization (again)</h3>
+<p>The most instructive failure is one we had <em>already met in simulation</em>. The SAC actor returns a raw <code>tanh</code>-squashed action in <code>[-1,1]</code> and does <strong>no</strong> normalization; a separate processor is supposed to map it to the real action scale. In end-effector space the <code>[-1,1]</code> output <em>is</em> the delta (scaled downstream), so the omission is invisible. In joint space that <code>[-1,1]</code> goes straight to the motors as a joint target — so the arm drifts to a near-zero pose and <strong>freezes</strong>. It looks like the policy gave up; in fact the action space was never mapped to real joints. The fix is a single unified convention: demos, policy output, leader interventions, and the replay buffer all live in <code>[-1,1]</code>, and the value is unnormalized to joint degrees <strong>only at the robot boundary</strong> (<code>RobotEnv.step</code>), which keeps the buffer consistent while the motors still receive real targets.</p>
+<p><img alt="The unified action convention" src="figures/gen/wb_action_convention.png" /></p>
+<p>This is the same lesson as our simulation eval bug (&sect;5.4 note), in a different disguise: <strong>inference-time normalization is a separate, easy-to-omit pipeline, and omitting it produces a policy that looks broken but isn&rsquo;t.</strong></p>
+<h3 id="74-honest-results">7.4 Honest results</h3>
+<p><img alt="Sim proves the method; real hardware shows what it takes" src="figures/gen/wb_sim_to_real.png" /> The full HIL-SERL loop ran <strong>live on real hardware with leader interventions</strong> — none of which stock LeRobot supports. Ten leader-teleoperated demos warm-started the buffer; human corrections flowed in as designed. A <strong>fully autonomous, reliable wipe did not emerge in a single session</strong> — three factors stack against it: MPS-speed training, only 10 seed demos, and the harder joint-space formulation (the paper leans on end-effector space and far more interaction). The value here is the <em>loop</em>, not the trophy: watching a real arm explore, stall, get corrected by a human, and fold that correction into its own learning is a more honest picture of RL in robotics than a highlight reel. For faster convergence the levers are clear — a gamepad, end-effector space, CUDA, more demos, and a trained reward classifier. Full code and the complete autopsy of every wall are open (see references).</p>
+<hr />
+<h2 id="8-discussion-and-limitations">8. Discussion and Limitations</h2>
+<p><strong>What we did not do.</strong> We did not run the human-in-the-loop or the learned reward classifier: in simulation the environment supplies the reward, so both are unnecessary at runtime. This is a faithful reproduction of HIL-SERL's <em>learning core</em>, not its full real-robot loop — a distinction we keep explicit throughout.</p>
+<p><strong>Autonomous vs. human-guided.</strong> On real hardware, human interventions dramatically accelerate and stabilize learning and provide safety. Our autonomous sim result shows the <em>lower bound</em> of what the algorithm achieves with no human — and it is already near-perfect on this task, which is itself an argument for the strength of RLPD on well-shaped simulation dynamics.</p>
+<p><strong>Task simplicity.</strong> <code>PandaPickCube</code> is a deliberately simple, single-object lift. The value of the study is pedagogical and infrastructural — the <em>recipe</em> and the <em>reproducibility</em>, not task difficulty. The method scales to the far harder tasks in the original HIL-SERL paper.</p>
+<hr />
+<h2 id="9-conclusion">9. Conclusion</h2>
+<p>Reinforcement learning is not a simulator toy. On a single, cheap GPU, from a reward it initially never receives, SAC + RLPD teaches a robot arm to grasp — going from zero to near-perfect in about forty minutes, fully autonomously. The same code is one configuration file from a $200 arm on a real desk. The workshop's central question — <em>does RL actually work in robotics?</em> — has a concrete, reproducible answer, and it is yes.</p>
+<hr />
+<h2 id="references">References</h2>
+<ul>
+<li>J. Luo, C. Xu, J. Wu, S. Levine. <em>Precise and Dexterous Robotic Manipulation via Human-in-the-Loop Reinforcement Learning.</em> arXiv:2410.21845, 2024.</li>
+<li>P. Ball, L. Smith, I. Kostrikov, S. Levine. <em>Efficient Online Reinforcement Learning with Offline Data (RLPD).</em> ICML 2023. arXiv:2302.02948.</li>
+<li>J. Luo et al. <em>SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning.</em> ICRA 2024. arXiv:2401.16013.</li>
+<li>T. Haarnoja, A. Zhou, P. Abbeel, S. Levine. <em>Soft Actor-Critic.</em> ICML 2018. arXiv:1801.01290.</li>
+<li>LeRobot / Hugging Face. <em>HIL-SERL in simulation (<code>gym-hil</code>).</em> https://huggingface.co/docs/lerobot/hilserl_sim</li>
+<li>R. Dandekar. <em>HIL-SERL on a real SO-101: whiteboard wiping with leader-arm interventions</em> (code + autopsy). https://github.com/RajatDandekar/so101-hilserl-whiteboard — dataset <code>RajatDandekar/so101_whiteboard_wipe</code>, policy <code>RajatDandekar/so101_whiteboard_wipe_hilserl</code> on the Hugging Face Hub.</li>
+</ul>
+<hr />
+<h2 id="appendix-a-reproducibility">Appendix A — Reproducibility</h2>
+<p><strong>Train (detached, single L4):</strong></p>
+<pre><code class="language-bash">modal run --detach modal/train_hilserl.py::main \
+  --config configs/train_gym_hil.json --save-freq 1000 --gpu L4 \
+  --hf-repo &lt;user&gt;/hilserl-panda-pickcube-sac
+</code></pre>
+<p><strong>Evaluate a checkpoint (success rate + video):</strong></p>
+<pre><code class="language-bash">modal run modal/train_hilserl.py::evaluate --job-name hilserl_panda_pickcube --n-episodes 50
+</code></pre>
+<p><strong>Key config:</strong> <code>env.task=PandaPickCube-v0</code> (autonomous, headless), <code>algorithm=sac</code>, <code>utd_ratio=2</code>, <code>num_critics=2</code>, <code>mixer=online_offline</code>, <code>online_ratio=0.5</code>, offline seed <code>lilkm/pick_cube_franka_panda_30</code>.</p>
+<p>Code, checkpoint, and the Colab evaluation notebook: see the project repository and <code>RajatDandekar/hilserl-panda-pickcube-sac</code> on the Hugging Face Hub.</p>
+<hr><p class="back"><a href="index.html">← back to the project page</a></p>
+</div></body></html>
