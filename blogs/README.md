@@ -20,6 +20,7 @@ you from intuition → math → a worked example → code (Gymnasium). The markd
 | 09 | [DPO and Agentic RL: Align Without a Reward Model, Then Step Into the World](./09-dpo-and-agentic-rl/) | ✅ Draft |
 | 10 | [Socratic Alignment: Teaching a Small Model to Withhold the Answer](./10-socratic-alignment/) | ✅ Draft |
 | 11 | [Dreaming to Dodge: Training a Doom Agent Entirely Inside Its Own Dream](./11-world-models/) | ✅ Draft |
+| 12 | [Grasping in the Dark: A Robot Arm Learns to Pick Up a Cube from a Reward It Almost Never Sees](./12-robot-rl/) | ✅ Draft |
 
 ## Writing a new post
 

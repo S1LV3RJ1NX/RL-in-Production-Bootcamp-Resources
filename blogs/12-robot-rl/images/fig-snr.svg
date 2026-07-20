@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="509.474812pt" height="311.346pt" viewBox="0 0 509.474812 311.346" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-07-20T23:17:51.148200</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.0, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 311.346 
+L 509.474812 311.346 
+L 509.474812 0 
+L 0 0 
+z
+" style="fill: #fafafa"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 70.892 270.786 
+L 494.972 270.786 
+L 494.972 26.85 
+L 70.892 26.85 
+z
+" style="fill: #fafafa"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 154.422909 270.786 
+L 154.422909 26.85 
+" clip-path="url(#p66b8f36351)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: round"/>
+     </g>
+     <g id="text_1">
+      <text style="font-size: 10px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #525252" transform="translate(122.563534 289.946)">uniform replay</text>
+      <text style="font-size: 10px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #525252" transform="translate(93.534628 301.876)">(1 success in ~2,000 steps)</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <path d="M 411.441091 270.786 
+L 411.441091 26.85 
+" clip-path="url(#p66b8f36351)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: round"/>
+     </g>
+     <g id="text_2">
+      <text style="font-size: 10px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #525252" transform="translate(352.161403 289.946)">RLPD symmetric sampling</text>
+      <text style="font-size: 10px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #525252" transform="translate(355.956716 301.876)">(50% batch from demos)</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_3">
+      <path d="M 70.892 251.972175 
+L 494.972 251.972175 
+" clip-path="url(#p66b8f36351)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: round"/>
+     </g>
+     <g id="text_3">
+      <!-- $\mathdefault{10^{-1}}$ -->
+      <g style="fill: #525252" transform="translate(39.832 257.208175)">
+       <text>
+        <tspan x="0" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">1</tspan>
+        <tspan x="6.115952" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">0</tspan>
+        <tspan x="12.337177" y="-5.542188" style="font-size: 7.7px; font-family: 'Helvetica Neue'; fill: #525252">−</tspan>
+        <tspan x="16.957138" y="-5.542188" style="font-size: 7.7px; font-family: 'Helvetica Neue'; fill: #525252">1</tspan>
+       </text>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_4">
+      <path d="M 70.892 189.474 
+L 494.972 189.474 
+" clip-path="url(#p66b8f36351)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: round"/>
+     </g>
+     <g id="text_4">
+      <!-- $\mathdefault{10^{0}}$ -->
+      <g style="fill: #525252" transform="translate(44.452 194.71)">
+       <text>
+        <tspan x="0" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">1</tspan>
+        <tspan x="6.115952" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">0</tspan>
+        <tspan x="12.337177" y="-5.542188" style="font-size: 7.7px; font-family: 'Helvetica Neue'; fill: #525252">0</tspan>
+       </text>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_5">
+      <path d="M 70.892 126.975825 
+L 494.972 126.975825 
+" clip-path="url(#p66b8f36351)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: round"/>
+     </g>
+     <g id="text_5">
+      <!-- $\mathdefault{10^{1}}$ -->
+      <g style="fill: #525252" transform="translate(44.452 132.211825)">
+       <text>
+        <tspan x="0" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">1</tspan>
+        <tspan x="6.115952" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">0</tspan>
+        <tspan x="12.337177" y="-5.542188" style="font-size: 7.7px; font-family: 'Helvetica Neue'; fill: #525252">1</tspan>
+       </text>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_4">
+     <g id="line2d_6">
+      <path d="M 70.892 64.477651 
+L 494.972 64.477651 
+" clip-path="url(#p66b8f36351)" style="fill: none; stroke: #e5e5e5; stroke-width: 0.8; stroke-linecap: round"/>
+     </g>
+     <g id="text_6">
+      <!-- $\mathdefault{10^{2}}$ -->
+      <g style="fill: #525252" transform="translate(44.452 69.713651)">
+       <text>
+        <tspan x="0" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">1</tspan>
+        <tspan x="6.115952" y="-0.999188" style="font-size: 11px; font-family: 'Helvetica Neue'; fill: #525252">0</tspan>
+        <tspan x="12.337177" y="-5.542188" style="font-size: 7.7px; font-family: 'Helvetica Neue'; fill: #525252">2</tspan>
+       </text>
+      </g>
+     </g>
+    </g>
+    <g id="ytick_5"/>
+    <g id="ytick_6"/>
+    <g id="ytick_7"/>
+    <g id="ytick_8"/>
+    <g id="ytick_9"/>
+    <g id="ytick_10"/>
+    <g id="ytick_11"/>
+    <g id="ytick_12"/>
+    <g id="ytick_13"/>
+    <g id="ytick_14"/>
+    <g id="ytick_15"/>
+    <g id="ytick_16"/>
+    <g id="ytick_17"/>
+    <g id="ytick_18"/>
+    <g id="ytick_19"/>
+    <g id="ytick_20"/>
+    <g id="ytick_21"/>
+    <g id="ytick_22"/>
+    <g id="ytick_23"/>
+    <g id="ytick_24"/>
+    <g id="ytick_25"/>
+    <g id="ytick_26"/>
+    <g id="ytick_27"/>
+    <g id="ytick_28"/>
+    <g id="ytick_29"/>
+    <g id="ytick_30"/>
+    <g id="ytick_31"/>
+    <g id="ytick_32"/>
+    <g id="ytick_33"/>
+    <g id="ytick_34"/>
+    <g id="ytick_35"/>
+    <g id="ytick_36"/>
+    <g id="text_7">
+     <text style="font-size: 12px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #0a0a0a" transform="translate(18.792 246.611437) rotate(-90)">transitions from successful episodes</text>
+     <text style="font-size: 12px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; fill: #0a0a0a" transform="translate(33.108 217.164562) rotate(-90)">per 256-batch  (log scale)</text>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 90.168364 62687.648732 
+L 218.677455 62687.648732 
+L 218.677455 245.271747 
+L 90.168364 245.271747 
+z
+" clip-path="url(#p66b8f36351)" style="fill: #525252; stroke: #0a0a0a; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 347.186545 62687.648732 
+L 475.695636 62687.648732 
+L 475.695636 57.777223 
+L 347.186545 57.777223 
+z
+" clip-path="url(#p66b8f36351)" style="fill: #c8421a; stroke: #0a0a0a; stroke-width: 0.9; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 70.892 270.786 
+L 70.892 26.85 
+" style="fill: none; stroke: #e5e5e5; stroke-width: 1.25; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 70.892 270.786 
+L 494.972 270.786 
+" style="fill: none; stroke: #e5e5e5; stroke-width: 1.25; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_8">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="154.422909" y="236.719548" transform="rotate(-0 154.422909 236.719548)">≈ 0.13</text>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="411.441091" y="49.225024" transform="rotate(-0 411.441091 49.225024)">128</text>
+   </g>
+   <g id="patch_7">
+    <path d="M 300.866311 98.883744 
+Q 355.217284 78.678599 408.310703 58.940955 
+" style="fill: none; stroke: #c8421a; stroke-width: 1.2; stroke-linecap: round"/>
+    <path d="M 403.41987 58.412035 
+L 408.310703 58.940955 
+L 404.953067 62.536269 
+" style="fill: none; stroke: #c8421a; stroke-width: 1.2; stroke-linecap: round"/>
+   </g>
+   <g id="text_10">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #c8421a" x="262.370545" y="111.02176" transform="rotate(-0 262.370545 111.02176)">×1,000</text>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 14px; font-family: 'Geist', 'Inter', 'Helvetica Neue', 'Arial', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #0a0a0a" x="282.932" y="20.85" transform="rotate(-0 282.932 20.85)">Why the grasp is learnable: RLPD keeps successes in every batch</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p66b8f36351">
+   <rect x="70.892" y="26.85" width="424.08" height="243.936"/>
+  </clipPath>
+ </defs>
+</svg>

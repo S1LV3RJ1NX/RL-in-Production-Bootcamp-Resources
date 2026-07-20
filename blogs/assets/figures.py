@@ -2183,6 +2183,48 @@ def build_blog11() -> None:
 
 
 # ----------------------------------------------------------------------------
+# Blog 12 — Robot RL (HIL-SERL: SAC + RLPD grasping)
+# ----------------------------------------------------------------------------
+BLOG12 = "12-robot-rl"
+
+
+def fig_snr() -> None:
+    """Successful transitions per 256-sample batch: naive replay vs RLPD 50/50."""
+    # Naive uniform replay early in training: ~1 successful episode's worth of
+    # transitions in ~2000 collected -> 256 * (1/2000) per batch.
+    naive = 256 * (1 / 2000)
+    # RLPD symmetric sampling: half of every batch comes from the offline
+    # demo buffer, where every episode is a success.
+    rlpd = 128
+    labels = ["uniform replay\n(1 success in ~2,000 steps)",
+              "RLPD symmetric sampling\n(50% batch from demos)"]
+    vals = [naive, rlpd]
+    colors = [MUTED, ACCENT]
+    pos = np.arange(len(labels))
+
+    fig, ax = plt.subplots(figsize=(7.6, 4.4))
+    ax.bar(pos, vals, width=0.5, color=colors, edgecolor=INK, lw=0.9)
+    ax.set_yscale("log")
+    ax.set_ylim(0.05, 400)
+    for x, v, txt in zip(pos, vals, ["≈ 0.13", "128"]):
+        ax.text(x, v * 1.25, txt, ha="center", va="bottom",
+                fontsize=11.5, color=INK, fontweight="bold")
+    ax.annotate("×1,000", xy=(1, 128), xytext=(0.42, 18),
+                fontsize=11, color=ACCENT, fontweight="bold",
+                arrowprops=dict(arrowstyle="->", color=ACCENT, lw=1.2))
+    ax.set_xticks(pos)
+    ax.set_xticklabels(labels, fontsize=10)
+    ax.set_ylabel("transitions from successful episodes\nper 256-batch  (log scale)")
+    ax.set_title("Why the grasp is learnable: RLPD keeps successes in every batch")
+    save(fig, BLOG12, "fig-snr")
+
+
+def build_blog12() -> None:
+    print(f"[{BLOG12}]")
+    fig_snr()
+
+
+# ----------------------------------------------------------------------------
 # Registry + CLI
 # ----------------------------------------------------------------------------
 BUILDERS = {
@@ -2197,6 +2239,7 @@ BUILDERS = {
     "09": build_blog09,
     "10": build_blog10,
     "11": build_blog11,
+    "12": build_blog12,
 }
 
 
