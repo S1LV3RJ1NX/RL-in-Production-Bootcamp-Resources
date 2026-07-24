@@ -1,0 +1,14 @@
+{
+  "name": "rl-lecture-sac-rlpd-hilserl",
+  "version": "1.0.0",
+  "main": "slides.md",
+  "scripts": {
+    "dev": "slidev --open",
+    "build": "slidev build",
+    "export": "slidev export"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.14.1",
+    "@slidev/theme-default": "^0.25.0"
+  }
+}
