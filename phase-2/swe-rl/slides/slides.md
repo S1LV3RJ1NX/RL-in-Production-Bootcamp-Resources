@@ -621,6 +621,181 @@ title: "The result"
 </div>
 
 ---
+title: "Before and after — the 7 bugs"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">The real feel — what actually changed</div>
+
+## Before RL it failed these. After RL it fixes them.
+
+<p class="lede mt-2">The headline number is one thing; the <em>bugs</em> are another. Here are real puzzles the <strong>same 1.5B model</strong> could not fix before training and fixes after — across two categories: tricky <strong>hard</strong> algorithms and sneaky <strong>medium</strong> Python gotchas.</p>
+
+<div class="grid grid-cols-2 gap-8 mt-4">
+<div class="callout-quiet">
+<h4 style="color: var(--accent-1);">Hard puzzles</h4>
+<p class="text-sm" style="margin:0;">a closure trap · bracket matching · RPN division — real algorithmic bugs.</p>
+</div>
+<div class="callout-quiet">
+<h4 style="color: var(--accent-2);">Medium puzzles (Python gotchas)</h4>
+<p class="text-sm" style="margin:0;">shared class state · float equality · generator exhaustion.</p>
+</div>
+</div>
+
+</div>
+
+---
+title: "Hard — the closure trap"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Hard puzzle · make_counters</div>
+
+## It made every function return the same number.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/mini-scope-bug.png" style="width:100%;" />
+<p class="fig-caption">Before: all the lambdas shared one <code>i</code>. After: each binds its own.</p>
+</div>
+<div>
+<p class="text-sm">The task: return <code>n</code> functions where the i-th returns <code>i</code>. Before RL the model wrote <code>lambda: i</code> — every function closes over the <em>same</em> variable, so they all return its final value.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: <code>lambda i=i: i</code> — binding <code>i</code> as a default captures its <em>current</em> value. The classic Python late-binding gotcha, learned from the reward alone.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Hard — bracket matching"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Hard puzzle · is_balanced</div>
+
+## It only counted round brackets.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/mini-balanced-parens.png" style="width:100%;" />
+<p class="fig-caption">Before: only <code>( )</code>. After: all three types, and they must <em>match</em>.</p>
+</div>
+<div>
+<p class="text-sm">The task: is a string of <code>()[]{}</code> balanced? Before RL the model handled only parentheses and ignored <code>[]</code> and <code>{}</code> entirely.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: a matching map <code>{')':'(', ']':'[', '}':'{'}</code> and a check that each closer pops its correct opener — not just a count.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Hard — division the wrong way"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Hard puzzle · eval_rpn</div>
+
+## Division rounded the wrong way for negatives.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/mini-eval-rpn.png" style="width:100%;" />
+<p class="fig-caption">Before: <code>a // b</code> (toward −∞). After: <code>int(a / b)</code> (toward zero).</p>
+</div>
+<div>
+<p class="text-sm">The task: evaluate a Reverse Polish expression. Before RL the model used <code>a // b</code> — floor division rounds toward negative infinity, which is wrong for a negative result.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: <code>int(a / b)</code> truncates toward zero, matching the RPN convention. A genuinely subtle edge case.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Medium — shared class state"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Medium puzzle · Inventory</div>
+
+## Every object secretly shared one list.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/mini-shared-state.png" style="width:100%;" />
+<p class="fig-caption">Before: a class-level list, shared. After: a per-object list in <code>__init__</code>.</p>
+</div>
+<div>
+<p class="text-sm">The task: each <code>Inventory</code> keeps its own items. Before RL the model wrote <code>items = []</code> at the class level — one list shared by every instance, so adding to <code>a</code> showed up in <code>b</code>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: <code>self.items = []</code> in <code>__init__</code> — per-object state. A mistake even experienced Python developers make.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Medium — 0.1 + 0.2 ≠ 0.3"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Medium puzzle · remove_value</div>
+
+## Floating-point equality tripped it up.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/mini-float-equality.png" style="width:100%;" />
+<p class="fig-caption">Before: <code>x != target</code>. After: <code>math.isclose</code>.</p>
+</div>
+<div>
+<p class="text-sm">The task: remove all elements equal to a target. Before RL the model used <code>x != target</code> — but <code>0.1 + 0.2</code> is <code>0.30000000000000004</code>, so it isn't exactly <code>0.3</code> and never gets removed.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: <code>math.isclose(x, target)</code> compares with a tolerance. Never test floats with <code>==</code>.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Medium — the empty generator"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Medium puzzle · sum_and_max</div>
+
+## The generator was already empty on the second pass.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/mini-generator.png" style="width:100%;" />
+<p class="fig-caption">Before: <code>sum()</code> drained it. After: <code>list()</code> it once, then reuse.</p>
+</div>
+<div>
+<p class="text-sm">The task: return <code>(sum, max)</code> of an iterable. Before RL the model called <code>sum(numbers)</code> then <code>max(numbers)</code> — but a generator can be consumed only once, so <code>max</code> saw nothing.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: <code>numbers = list(numbers)</code> first, then both passes work. A gotcha you only hit with generators, not lists.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
 title: "Same algorithm as the labs"
 ---
 
@@ -872,6 +1047,81 @@ title: "Before and after"
 <li><code>tuple_to_dict</code> — an index that ran off the end</li>
 <li><code>max_product_tuple</code> — returned the pair, not the product</li>
 </ul>
+</div>
+</div>
+
+</div>
+
+---
+title: "Example — find_Volume"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Real fix 1 · find_Volume</div>
+
+## It computed a box, not a prism.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/before-and-after-rl-3.png" style="width:100%;" />
+<p class="fig-caption">Before: all three sides multiplied. After: the missing ½.</p>
+</div>
+<div>
+<p class="text-sm">A triangular prism is <em>half</em> a box. Before RL the model wrote <code>length * width * height</code> — a full box, so every answer was double.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL it re-learned the ½: <code>0.5 * base * height * width</code>. And the fix passes the <em>hidden</em> tests too — a genuine correction, not a test-shaped guess.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Example — cube_Sum"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Real fix 2 · cube_Sum</div>
+
+## The loop stopped too early.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/before-and-after-rl-4.png" style="width:100%;" />
+<p class="fig-caption">Before: <code>range(2, n+1, 2)</code> misses numbers. After: <code>range(2, 2*n+1, 2)</code>.</p>
+</div>
+<div>
+<p class="text-sm">The task wants the first <em>n</em> even numbers. Before RL the loop <code>range(2, n+1, 2)</code> stopped far too early — for <code>n=2</code> it only reached 2 and missed 4.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL: <code>range(2, 2*n+1, 2)</code> covers the first n even numbers. A classic off-by-range bug.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Example — tuple_to_dict"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Real fix 3 · tuple_to_dict</div>
+
+## It ran off the end of the tuple.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/before-and-after-rl-5.png" style="width:100%;" />
+<p class="fig-caption">Before: <code>tup[i+1]</code> reads past the end → IndexError. After: step two at a time.</p>
+</div>
+<div>
+<p class="text-sm">The task: pair adjacent tuple elements into a dict. Before RL the model read <code>tup[i+1]</code> one step past the end and crashed with an <code>IndexError</code>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">After RL it walks <strong>two</strong> elements at a time, pairing each key with the next value. With <code>max_product_tuple</code> and <code>find_Average_Of_Cube</code>, that's five genuine fixes.</p>
+</div>
 </div>
 </div>
 
@@ -1349,6 +1599,32 @@ title: "The result"
 <p class="text-sm">In a controlled A/B, ECHO roughly <strong>doubles</strong> GRPO's pass@1: <strong>8B: 2.70 → 5.17</strong>; <strong>14B: 5.17 → 10.79</strong>.</p>
 <div class="callout mt-2">
 <p class="text-sm" style="margin:0;">Read it honestly: these are a handful of 89 tasks and depend on private training data, so the <strong>relative doubling</strong> is the claim — not the exact number.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Before and after — the feel"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-5);">Before and after — what it looks like on a task</div>
+
+## An agent that looks before it leaps.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/echo-before-after-illustrative.png" style="width:100%;" />
+<p class="fig-caption">Before: react to each error. After: anticipate the terminal, then choose a better command.</p>
+</div>
+<div>
+<p class="text-sm">What does the world model buy on an actual task? Without it, the agent types commands somewhat blindly and reacts to each error <em>after</em> it happens. With ECHO, it can <strong>anticipate</strong> the terminal's reply — expect the "no such file" before running — and pick a better move.</p>
+<div class="callout-quiet mt-2">
+<h4 style="color: var(--accent-1);">Honest note</h4>
+<p class="text-sm" style="margin:0;">This one is <strong>illustrative</strong> — the 8B / 14B runs are still training, so we'll drop in real before/after terminal transcripts the moment they land.</p>
 </div>
 </div>
 </div>
