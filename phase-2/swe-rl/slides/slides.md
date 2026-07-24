@@ -1010,11 +1010,11 @@ layout: center
 
 <div class="section-cover max-w-4xl">
 
-<div class="eyebrow mb-3">Homework · a research project to try</div>
+<div class="eyebrow mb-3">A completed experiment — and your launch point</div>
 
 # Can the model<br/>*cheat* the tests?
 
-<p class="lede mt-5">A quick but important aside — and your optional homework. Because the reward is "did the visible tests pass?", a clever enough model can learn to satisfy those <em>specific</em> checks without truly solving the problem. That is <strong>reward hacking</strong>.</p>
+<p class="lede mt-5">Because the reward is "did the visible tests pass?", a clever enough model can learn to satisfy those <em>specific</em> checks without truly solving the problem — <strong>reward hacking</strong>. We built a reward to resist it and ran the experiment. The next three slides are <strong>what we found</strong> — final results — and then it is yours to extend.</p>
 
 </div>
 
@@ -1072,7 +1072,7 @@ title: "The RL payoff"
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-2);">Result 3 · the payoff in training</div>
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Result 3 · the payoff, in a matched RL run</div>
 
 ## Swap only the reward — and true correctness rises.
 
