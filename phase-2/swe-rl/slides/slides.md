@@ -646,7 +646,155 @@ layout: center
 
 # Agentic RL<br/>on real code.
 
-<p class="lede mt-5">We leave the toy puzzles behind. Real programming tasks with <em>hidden</em> tests, real GPUs in the cloud, and — the heart of it — actual before-and-after code showing a model go from failing a task to solving it. This is the workshop's own research project.</p>
+<p class="lede mt-5">This is the heart of the lecture, and its name: <strong>agentic reinforcement learning</strong>. The model stops being a one-shot answerer and becomes an <em>agent</em> — it acts, sees what happens, and decides again, using real tools in a real environment. We build that machinery first, then run it for real on cloud GPUs and watch a model go from failing a task to solving it.</p>
+
+</div>
+
+---
+title: "What makes RL agentic"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">The theory — what "agentic" means</div>
+
+## From a one-shot answer to an agent.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/agentic-single-vs-multi.png" style="width:100%;" />
+<p class="fig-caption">Project 1 answered once. An agent acts, observes, and decides — many times.</p>
+</div>
+<div>
+<p class="text-sm">In Project 1 the model did <strong>one thing</strong>: read the bug, write the fix, get graded. That is <strong>single-turn</strong> RL.</p>
+<p class="text-sm mt-2"><strong>Agentic RL</strong> makes the model an <strong>agent</strong>: it takes <em>many</em> steps — run a command, read the error, edit a file, run the tests again — using real <strong>tools</strong> and reacting to whatever each one returns.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">This is the real shape of software work — and the core idea of this lecture. Everything on the next few slides is how that loop is actually built.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "The agent-tool loop"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-3);">The loop</div>
+
+## Think, act, observe — and repeat.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/agentic-react-loop.png" style="width:100%;" />
+<p class="fig-caption">The model reasons, calls a tool, the environment runs it, and the result flows back.</p>
+</div>
+<div>
+<p class="text-sm">One <strong>turn</strong> of an agent: it <span class="v-state">thinks</span>, then <span class="v-act">acts</span> by emitting a <strong>tool call</strong> (say, <code>run_sanctioned_tests</code>). The environment runs the tool and hands back an <strong>observation</strong>, which is appended to the model's context. Then it goes again.</p>
+<p class="text-sm mt-2">This reason–act–observe pattern is often called <strong>ReAct</strong>. The loop runs up to <code>H</code> turns, then the agent calls <code>submit</code> and is graded.</p>
+</div>
+</div>
+
+</div>
+
+---
+title: "The agent's tools"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">The tool surface</div>
+
+## The agent's whole world: six tools.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/agentic-tool-surface.png" style="width:100%;" />
+<p class="fig-caption">Read, search, edit, run the visible tests, submit — all on a safe copy.</p>
+</div>
+<div>
+<p class="text-sm">Our agent has exactly six tools: <code>bash</code>, <code>search</code>, <code>open</code>, <code>edit</code>, <code>run_sanctioned_tests</code>, and <code>submit</code>. It works on a private <strong>copy</strong> of the code, so it can experiment without risk.</p>
+<div class="callout-quiet mt-2">
+<h4 style="color: var(--accent-2);">Same contract, any scale</h4>
+<p class="text-sm" style="margin:0;">These same six tools drive an agent over one small file — or, unchanged, over a whole GitHub repository. It is the interface production SWE-agents use.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "How observations come back"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">How the observation comes back — the mechanism</div>
+
+## The tool's output becomes the next thing the model reads.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/agentic-observation-back.png" style="width:100%;" />
+<p class="fig-caption">Dispatch the call, capture the output as text, trim it, append it to the chat.</p>
+</div>
+<div>
+<p class="text-sm">When the model calls a tool, three things happen: the call is <strong>dispatched</strong> to the environment; the tool's raw output (a printout, an error, a file's contents) is <strong>captured as text</strong>; and that text is <strong>appended to the conversation</strong> as the observation the model reads next.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">One practical guard: observations are <strong>trimmed</strong> (here, to 4,000 characters) so a single <code>cat hugefile</code> can't flood the model's limited context window.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "One trajectory, one reward"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Where the reward lives</div>
+
+## A whole trajectory, graded by its final state.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/agentic-trajectory-reward.png" style="width:100%;" />
+<p class="fig-caption">Actions and observations alternate; the reward arrives only at the very end.</p>
+</div>
+<div>
+<p class="text-sm">A full episode — a <strong>trajectory</strong> — is a chain of (action, observation) pairs ending in <code>submit</code>. The <span class="v-reward">reward</span> is <strong>sparse</strong>: it lands only on the final state (did the tests pass?), not on each step along the way.</p>
+<p class="text-sm mt-2">So GRPO grades the <em>whole trajectory</em>: sample several complete runs of the same task, score each by its final reward, and reinforce the better runs — the same group-relative trick as before, now over entire trajectories.</p>
+</div>
+</div>
+
+</div>
+
+---
+title: "Whose tokens get trained"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-5);">A detail that sets up Project 3</div>
+
+## Only the agent's own tokens learn.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/agentic-token-mask.png" style="width:100%;" />
+<p class="fig-caption">Action tokens get the gradient; observation tokens are masked out.</p>
+</div>
+<div>
+<p class="text-sm">A subtle but crucial point. The trajectory holds two kinds of tokens: the ones the <strong>model wrote</strong> (its actions) and the ones the <strong>tools returned</strong> (the observations). RL trains only the tokens the model actually generated — the observation tokens are <strong>masked out</strong>, because the model didn't write them.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Hold onto this. <strong>Project 3 (ECHO)</strong> asks: what if we <em>stopped</em> ignoring those observation tokens — and taught the model to predict them?</p>
+</div>
+</div>
+</div>
 
 </div>
 
@@ -656,7 +804,7 @@ title: "From puzzles to real tasks"
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-4);">Real tasks</div>
+<div class="eyebrow mb-2" style="color: var(--accent-4);">From the general agent to a measurable task</div>
 
 ## Visible tests to train on, hidden tests to grade honestly.
 
@@ -666,7 +814,7 @@ title: "From puzzles to real tasks"
 <p class="fig-caption">MBPP+: each task has a few visible tests and many hidden ones.</p>
 </div>
 <div>
-<p class="text-sm"><strong>MBPP+</strong> gives 378 real Python problems. Each has a prompt, a few <strong>visible tests</strong> (what the reward sees), and many <strong>hidden tests</strong> (the honest ground truth the model never trains on).</p>
+<p class="text-sm">To <em>train</em> that agent we need tasks we can grade by the thousand. <strong>MBPP+</strong> gives 378 real Python problems — a short-horizon slice of the loop (edit, run tests, submit) that still runs thousands of RL steps. Each has a prompt, a few <strong>visible tests</strong> (what the reward sees), and many <strong>hidden tests</strong> (the honest ground truth the model never trains on).</p>
 <div class="callout mt-2">
 <p class="text-sm" style="margin:0;">The visible tests are what you optimize; the hidden tests tell you if the model <em>really</em> solved it — or just satisfied the few checks it could see.</p>
 </div>
