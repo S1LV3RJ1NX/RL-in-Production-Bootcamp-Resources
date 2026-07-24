@@ -1356,23 +1356,154 @@ title: "The result"
 </div>
 
 ---
-title: "Our replication"
+title: "Reproducing ECHO — the tools"
 ---
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-1);">Reproducing it — real ML is messy</div>
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Reproducing it — meet the machinery</div>
 
-## Matching the *system* to the shape of the task.
+## First, a naming fix: these are *frameworks*, not environments.
 
-<div class="grid grid-cols-2 gap-8 mt-2">
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
 <div>
-<p class="text-sm">Reproducing ECHO is where the earlier progression bites. Our first trainer (<strong>SkyRL</strong>) was <strong>synchronous</strong>: the inference engine sat idle ~15 minutes during each long rollout, and a watchdog killed it as "crashed" — every config failed the same way.</p>
-<p class="text-sm mt-2">The fix is a <strong>fully asynchronous</strong> trainer (<strong>prime-rl</strong>), where the engines never idle — exactly the framework the task's shape demands.</p>
+<img class="figimg" src="/figures/frameworks-not-environments.png" style="width:100%;" />
+<p class="fig-caption">The framework is the training machinery; the environment is the terminal the agent acts in.</p>
+</div>
+<div>
+<p class="text-sm">Good instinct to question the word. <strong>SkyRL</strong> and <strong>prime-rl</strong> are <strong>RL training frameworks</strong> — post-training libraries that run the whole RL loop. They are <em>not</em> environments.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">The <strong>environment</strong> is the thing the agent acts in and gets observations from — here, a real <strong>terminal</strong>. The framework is the machinery that trains the agent <em>around</em> that environment.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "The moving parts"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-3);">Why you need one at all</div>
+
+## What a distributed-RL framework has to run.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/rl-framework-parts.png" style="width:100%;" />
+<p class="fig-caption">Trainer, inference engine, environments, orchestrator — plus weight sync between them.</p>
+</div>
+<div>
+<p class="text-sm">Agentic RL at scale has parts that all run at once: the <span class="v-act">trainer</span> (policy + gradients, sharded across GPUs with <strong>FSDP</strong>); a fast <strong>inference engine</strong> (vLLM) that generates the actions; many <strong>environment</strong> sandboxes; an <strong>orchestrator</strong> that drives rollouts and computes the loss; and <strong>weight sync</strong> to keep inference current.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Project 2's 200-line loop handled all of this on <em>one</em> GPU. At eight GPUs with long async rollouts, you don't hand-roll it — you use a framework.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "SkyRL"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Framework 1 · SkyRL</div>
+
+## SkyRL — colocated, synchronous, and why it crashed.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/skyrl-colocated.png" style="width:100%;" />
+<p class="fig-caption">Trainer and vLLM share the same 8 GPUs and take turns — so the idle one gets killed.</p>
+</div>
+<div>
+<p class="text-sm"><strong>SkyRL</strong> (from Berkeley's Sky Computing lab) is an open RL post-training framework. We ran it on <strong>8×H100</strong> with <code>colocate_all</code>: the FSDP trainer and the vLLM engines <strong>share the same GPUs</strong>, taking turns — <strong>synchronous</strong>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">During each long rollout (16 turns, up to 1,200s) the idle engine looked "crashed" to a heartbeat watchdog, which killed it. <strong>Every configuration died the same way</strong> — synchronous is the wrong shape for long agentic rollouts.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "prime-rl"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Framework 2 · prime-rl</div>
+
+## prime-rl — disaggregated, async, and it fits.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/prime-rl-async.png" style="width:100%;" />
+<p class="fig-caption">4 GPUs train, 4 GPUs infer — separately, and at the same time.</p>
+</div>
+<div>
+<p class="text-sm"><strong>prime-rl</strong> (from Prime Intellect) is a <strong>fully asynchronous</strong> RL trainer with three separate processes — <strong>trainer</strong>, <strong>inference</strong>, and <strong>orchestrator</strong>. We split the <strong>8×H100</strong> into <strong>4 for training (FSDP2)</strong> and <strong>4 for inference (vLLM, dp=4)</strong>, running <em>concurrently</em>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Now inference <strong>never idles</strong> — so the watchdog never fires. Bonus: prime-rl ships <strong>ECHO natively</strong> — the bash-tool role simply gets the extra loss, at <code>alpha = 0.05</code>.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Where the environment lives"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-5);">So where <em>is</em> the environment?</div>
+
+## The environment lives in `verifiers` — a bash terminal on a sandbox.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/echo-stack-layers.png" style="width:100%;" />
+<p class="fig-caption">prime-rl trains; verifiers defines the environment; a Modal sandbox is the real terminal.</p>
+</div>
+<div>
+<p class="text-sm">The environment isn't <em>inside</em> prime-rl — it's a separate library, <strong>verifiers</strong>, that defines environments like <code>terminal-bash</code>. That environment drives a real <strong>bash terminal in a Modal sandbox</strong>: the agent types commands (≤ 16 turns, 1,200s/task) and the bash output is the observation.</p>
+<div class="callout-quiet mt-2">
+<p class="text-sm" style="margin:0;">The full stack: <strong>prime-rl</strong> (train) + <strong>verifiers</strong> (the environment) + <strong>Modal</strong> (the sandbox). ECHO's observation loss trains on exactly that bash output.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "The setup, concretely"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">How we set up the GPUs — and where we are</div>
+
+## The Project 3 recipe, concretely.
+
+<div class="grid grid-cols-2 gap-8 mt-3">
+<div>
+<h4 style="color: var(--accent-3);">The allocation</h4>
+<ul class="text-sm mt-1">
+<li><strong>8× H100</strong> = 4 train (FSDP2) + 4 infer (vLLM, dp=4)</li>
+<li>base model <strong>Qwen3-8B</strong>, 16k-token window</li>
+<li>16 rollouts/prompt, batch 16, ≤ 16 turns, 1,200s/task</li>
+<li>ECHO loss on the bash-tool tokens, <code>λ = 0.05</code></li>
+<li>eval on <strong>TerminalBench-2.0</strong> (avg@4)</li>
+</ul>
 </div>
 <div class="callout">
 <h4 style="color: var(--accent-2);">Where we are right now</h4>
-<p class="text-sm" style="margin:.2rem 0 0;">The ECHO extra-loss is implemented and <strong>numerically verified active</strong> — we can watch the environment-token loss fire — and the small smoke test passed. The full 8B / 14B runs are <strong>training as this lecture goes out</strong>; we'll drop in our measured curves the moment they land.</p>
+<p class="text-sm" style="margin:.2rem 0 0;">The ECHO loss is implemented and <strong>numerically verified active</strong> — we can watch the environment-token loss fire — and the smoke test passed. The full <strong>8B / 14B</strong> runs are <strong>training as this lecture goes out</strong>; we'll drop in the measured curves the moment they land.</p>
 </div>
 </div>
 
