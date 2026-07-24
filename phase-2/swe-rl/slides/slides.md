@@ -929,6 +929,82 @@ title: "Running it for real"
 </div>
 
 ---
+title: "What RL holds on the GPU"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-3);">The systems side — how many GPUs, and for what</div>
+
+## What reinforcement learning must hold on the GPU.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/gpu-memory-picture.png" style="width:100%;" />
+<p class="fig-caption">The model, its gradients, the optimizer state — and the reward, which needs no GPU at all.</p>
+</div>
+<div>
+<p class="text-sm">RL is memory-hungry because one GPU must hold several things at once: the <span class="v-act">policy</span> (the model weights), its <strong>gradients</strong>, and the <strong>optimizer state</strong> (Adam roughly doubles the model's footprint) — plus the <strong>generation</strong> cache that produces the rollouts.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Two happy simplifications here: <strong>no reference model</strong> (our GRPO uses none), and the <span class="v-reward">reward is a program</span> — running the tests on the CPU — <strong>not</strong> a reward model on the GPU.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "One H100, both jobs"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Our allocation</div>
+
+## One H100 per run — generating and training on the same card.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/gpu-one-h100-lora.png" style="width:100%;" />
+<p class="fig-caption">The same model generates the attempts and takes the gradient step — colocated.</p>
+</div>
+<div>
+<p class="text-sm">The simplest possible allocation: <strong>one H100</strong>, with the <em>same</em> model doing both the generation (rollouts) and the gradient update. Nothing is split across GPUs.</p>
+<div class="callout-quiet mt-2">
+<h4 style="color: var(--accent-2);">LoRA makes even 7B fit</h4>
+<p class="text-sm" style="margin:0;">We freeze the base weights and train only tiny <strong>LoRA adapters</strong>, so the gradients and optimizer state stay small — a 7B model trains comfortably on a single 80&nbsp;GB card.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Many runs, many GPUs"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Scaling by fan-out, not by sharding</div>
+
+## Sweeps are many one-GPU jobs, run in parallel.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/gpu-fanout.png" style="width:100%;" />
+<p class="fig-caption">Each model size, seed, and reward variant is its own independent H100 job.</p>
+</div>
+<div>
+<p class="text-sm">To compare 0.5B, 1.5B and 7B, several seeds, and the plain-vs-un-cheatable reward, we didn't build one giant job — we <strong>fanned out</strong> many <em>independent</em> single-GPU runs across H100s, each deployed fully server-side on Modal.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Because the runs never talk to each other, this needs <strong>no distributed coordination</strong> — and, as we'll see, no specialised RL framework either. <strong>Project 3 will change that.</strong></p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
 layout: center
 ---
 
@@ -943,24 +1019,122 @@ layout: center
 </div>
 
 ---
+title: "It catches the cheats"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Result 1 · deliberate cheats</div>
+
+## An un-cheatable reward catches what the plain one misses.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/iso-catches-cheats.png" style="width:100%;" />
+<p class="fig-caption">Against hard-coded / memorised answers: the plain reward catches 0%, ours catches 93%.</p>
+</div>
+<div>
+<p class="text-sm">We built a reward <em>designed to resist gaming</em> — the <strong>isomorphic perturbation reward</strong> (the how is in the paper; here we care only about what it did).</p>
+<p class="text-sm mt-2">Against deliberate cheats — hard-coded outputs, lookup tables — it caught <strong>6 of 6</strong> live in real sandboxes, and <strong>93%</strong> across 12,000 samples. The plain "did the visible tests pass?" reward caught <strong>0%</strong>.</p>
+</div>
+</div>
+
+</div>
+
+---
+title: "The honest tie"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Result 2 · the honest negative</div>
+
+## On *natural* mistakes, it ties the plain reward.
+
+<div class="grid grid-cols-2 gap-8 mt-3">
+<div class="callout-quiet">
+<h4 style="color: var(--accent-1);">What we hoped</h4>
+<p class="text-sm" style="margin:0;">That the un-cheatable reward would also catch ordinary, honest bugs — the kind a model writes by accident.</p>
+</div>
+<div class="callout-quiet">
+<h4 style="color: var(--accent-2);">What we measured</h4>
+<p class="text-sm" style="margin:0;">A near-tie: precision <strong>0.79</strong> (plain) vs <strong>0.78</strong> (ours). It kills memorisation, but naturally-wrong code needs genuinely new test inputs to expose.</p>
+</div>
+</div>
+
+<p class="text-sm mt-3">This is the honest, mature result — and a good research lesson: <strong>report the negative</strong>. (One tweak did lift its recall from <strong>0.90 to 0.97</strong> without hurting anything else.)</p>
+
+</div>
+
+---
+title: "The RL payoff"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Result 3 · the payoff in training</div>
+
+## Swap only the reward — and true correctness rises.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/iso-rl-payoff.png" style="width:100%;" />
+<p class="fig-caption">Plain reward: the visible score climbs, hidden correctness stays flat, the gap grows.</p>
+</div>
+<div>
+<p class="text-sm">The decisive test: two identical training runs, changing <em>only</em> the reward. With the plain reward, the visible score climbed to <strong>0.83</strong> while true (hidden-test) correctness stayed <strong>flat at 0.63</strong> — the reward-hacking gap grew to <strong>0.20</strong>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">With the un-cheatable reward, the gap stayed small and hidden correctness actually <strong>rose to 0.67</strong> — the only arm that got genuinely more correct.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
 title: "Isomorphic homework"
 ---
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-5);">Homework · get started with research</div>
+<div class="eyebrow mb-2" style="color: var(--accent-5);">Your homework</div>
 
-## Make the reward un-cheatable: the isomorphic idea.
+## A real research project, ready to run.
 
-<div class="grid grid-cols-2 gap-8 mt-2">
+<div class="grid grid-cols-2 gap-8 mt-3">
 <div>
-<p class="text-sm">One direction the workshop explored: re-grade each attempt on <strong>altered-but-equivalent</strong> versions of the tests — same meaning, different exact inputs. An answer shaped to the one visible test no longer scores, so the reward becomes much harder to cheat.</p>
-<p class="text-sm mt-2">We call it an <strong>isomorphic perturbation reward</strong>. Its headline claim is <em>horizon-invariance</em>: the reward-hacking gap stays flat even as tasks grow.</p>
+<p class="text-sm">That is the whole result: a reward that <strong>kills memorisation</strong>, <strong>ties on natural bugs</strong> (an honest negative), and, in a matched RL run, makes the model <strong>genuinely more correct</strong>.</p>
+<p class="text-sm mt-2">It is a complete, publishable research thread — paper plus runnable code — and it is yours to extend.</p>
 </div>
 <div class="callout">
-<h4 style="color: var(--accent-5);">Your starting point</h4>
-<p class="text-sm" style="margin:.2rem 0 0;">This is a real, publishable research thread with a full paper and runnable code. Read it, reproduce the magic-moment demo, and try your own perturbations. A perfect first research project.</p>
+<h4 style="color: var(--accent-5);">Get started</h4>
+<p class="text-sm" style="margin:.2rem 0 0;">Reproduce the "magic-moment" demo (watch a cheat get caught in a sandbox), then try your own perturbations and reward variants.</p>
 <p class="text-sm mt-2" style="margin:.4rem 0 0; color: var(--ink-3);">→ the swe-rl-ipr paper &amp; code (linked on the project-two site)</p>
+</div>
+</div>
+
+</div>
+
+---
+title: "Infrastructure grows with the task"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-3);">A natural progression — why the next project needs more</div>
+
+## The infrastructure grows with the task.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/infra-grows-with-task.png" style="width:100%;" />
+<p class="fig-caption">Single-turn on one GPU needs no framework; long agentic rollouts do.</p>
+</div>
+<div>
+<p class="text-sm">Project 2 was <strong>single-turn and short</strong>: one GPU, generation and training colocated, a ~200-line from-scratch GRPO loop. It needed <strong>no external RL framework</strong> — we controlled every line.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Project 3 is <strong>long, multi-turn, and agentic</strong>: many parallel sandbox rollouts, an async inference engine that mustn't idle, a distributed actor and learner. <em>That</em> is when you reach for a real framework — <strong>SkyRL</strong> and <strong>Prime Intellect's prime-rl</strong>, both of which we are actively using.</p>
+</div>
 </div>
 </div>
 
@@ -976,7 +1150,32 @@ layout: center
 
 # A world model,<br/>for free. <span style="color: var(--accent-5);">ECHO.</span>
 
-<p class="lede mt-5">The most advanced project — and the most surprising. ECHO trains a terminal agent with RL, but adds one small extra job: predict what the terminal will say back. That single change teaches the model a <em>world model</em> of the computer, for almost no extra cost. <strong>Results are training as we speak.</strong></p>
+<p class="lede mt-5">Remember the masked observation tokens from Project 2 — the ones RL <em>throws away</em>? ECHO stops ignoring them. By also learning to <strong>predict</strong> what the terminal says back, a terminal agent builds a <em>world model</em> of its computer — for almost no extra cost. This is agentic RL's next step, and its most surprising one.</p>
+
+</div>
+
+---
+title: "The signal RL throws away"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Picking up exactly where agentic RL left off</div>
+
+## Every rollout is full of evidence we're ignoring.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/echo-thrown-away.png" style="width:100%;" />
+<p class="fig-caption">The reward is one sparse number; the observations are a dense, rich stream — normally discarded.</p>
+</div>
+<div>
+<p class="text-sm">Recall the two kinds of tokens in a trajectory. The <span class="v-act">actions</span> get a single sparse reward at the very end. The <strong>observations</strong> — stdout, errors, files, logs — are rich and dense, and standard RL <strong>trains on none of them</strong>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Even a <em>failed</em> rollout, which earns no reward, is full of evidence about how the computer behaves. ECHO's whole idea is to stop wasting it.</p>
+</div>
+</div>
+</div>
 
 </div>
 
@@ -996,9 +1195,9 @@ title: "What is a world model"
 <p class="fig-caption">Before you flip the switch, you already expect the light. That's a world model.</p>
 </div>
 <div>
-<p class="text-sm">A <strong>world model</strong> is a model's ability to <em>predict what happens next</em> in its environment. You have one for light switches, doors, chessboards.</p>
+<p class="text-sm">A <strong>world model</strong> is the ability to <em>predict what happens next</em>. For a terminal agent, that means: given the commands so far, predict what the terminal will print back.</p>
 <div class="callout mt-2">
-<p class="text-sm" style="margin:0;">A terminal agent could have one of the <strong>terminal</strong>: given the commands so far, predict what the computer will print. An agent that anticipates its computer can plan instead of stumbling.</p>
+<p class="text-sm" style="margin:0;">And notice — predicting the observations <em>is</em> learning to model the environment. The signal we were throwing away is the world model, waiting to be learned.</p>
 </div>
 </div>
 </div>
@@ -1006,51 +1205,125 @@ title: "What is a world model"
 </div>
 
 ---
-title: "ECHO: predict the reply"
+title: "ECHO un-masks the observations"
 ---
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-5);">The ECHO trick</div>
+<div class="eyebrow mb-2" style="color: var(--accent-5);">The move — the payoff of the token mask</div>
 
-## One forward pass, two jobs out.
+## ECHO un-masks the observations and predicts them.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/echo-unmask.png" style="width:100%;" />
+<p class="fig-caption">The observation tokens that Project 2 masked out are now a prediction target.</p>
+</div>
+<div>
+<p class="text-sm">In Project 2, the observation tokens were <strong>masked</strong> — the model never trained on them. ECHO flips that: it keeps training the actions with GRPO, and <strong>additionally trains the model to predict the observation tokens</strong>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">Nothing new is collected. The observations were already in every rollout — ECHO simply stops throwing them away.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "One forward pass, two jobs"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-5);">The loss — for free</div>
+
+## Two jobs from the same forward pass.
 
 <div class="grid grid-cols-2 gap-8 mt-2 items-center">
 <div>
 <img class="figimg" src="/figures/echo-one-extra-loss-2.png" style="width:100%;" />
-<p class="fig-caption">Act (GRPO) and predict-the-reply share the same forward pass.</p>
+<p class="fig-caption">Act (GRPO) and predict-the-reply share one forward pass — no extra rollouts.</p>
 </div>
 <div>
-<p class="text-sm">Train the agent with GRPO as usual, but <strong>also</strong> train it to predict the terminal's response — reusing the <em>same forward pass</em>:</p>
+<p class="text-sm">The recipe is one line: keep GRPO on the actions, and add a small term that trains the model to predict the environment's tokens.</p>
 <div class="equation-small mt-1">
-L<sub>ECHO</sub> = L<sub>GRPO</sub> + <span class="v-gamma">λ</span> · L<sub>env</sub>,&nbsp;&nbsp; <span class="v-gamma">λ = 0.05</span>
+L<sub>ECHO</sub> = L<sub>GRPO</sub>(<span class="v-act">actions</span>) + <span class="v-gamma">λ</span> · L<sub>env</sub>(<span class="v-value">observations</span>)
 </div>
-<p class="text-sm mt-1"><code>L_env</code> just measures how surprised the model is by the terminal's reply. "For free" = negligible extra compute.</p>
+<p class="text-sm mt-1">With a small <span class="v-gamma">λ ≈ 0.05</span>. Because <code>L_env</code> reuses the <em>same forward pass</em>, it needs <strong>no extra rollouts and no extra model</strong> — a world model, essentially for free.</p>
 </div>
 </div>
 
 </div>
 
 ---
-title: "Testing in a real terminal"
+title: "Does it learn a world model"
 ---
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-4);">TerminalBench</div>
+<div class="eyebrow mb-2" style="color: var(--accent-2);">Does it actually learn one? Yes.</div>
 
-## Tested on 89 real terminal tasks.
+## It really does learn how the terminal behaves.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/echo-world-model-quality.png" style="width:100%;" />
+<p class="fig-caption">ECHO sharply reduces its surprise at the terminal's replies; plain GRPO barely moves.</p>
+</div>
+<div>
+<p class="text-sm">The clearest evidence: measure how <em>surprised</em> the model is by the terminal's output. Under ECHO, that surprise <strong>drops sharply</strong> — even on held-out trajectories it never generated. Under plain GRPO, it <strong>barely changes</strong>.</p>
+<div class="callout mt-2">
+<p class="text-sm" style="margin:0;">So the world model is real, not incidental: ECHO learns to anticipate the computer, and that anticipation transfers to new tasks.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "What it buys you"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-4);">Three wins from one extra loss</div>
+
+## A dense signal changes what RL can do.
+
+<div class="grid grid-cols-2 gap-8 mt-2 items-center">
+<div>
+<img class="figimg" src="/figures/echo-what-you-get.png" style="width:100%;" />
+<p class="fig-caption">A real world model, expert-level results without demos, and self-improvement without a verifier.</p>
+</div>
+<div>
+<p class="text-sm">The paper reports three striking wins. ECHO's policy <strong>predicts the terminal better</strong> (even on new tasks); it <strong>matches expert-SFT-then-GRPO without any expert demonstrations</strong>; and the observation loss <em>alone</em> enables <strong>verifier-free self-improvement</strong> on out-of-distribution tasks.</p>
+<div class="callout-quiet mt-2">
+<p class="text-sm" style="margin:0;">Turning a sparse-reward problem into a <em>dense</em> one is what makes all three possible.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+---
+title: "Tested in a real terminal"
+---
+
+<div class="text-left max-w-5xl">
+
+<div class="eyebrow mb-2" style="color: var(--accent-3);">The benchmark</div>
+
+## Measured on 89 real terminal tasks.
 
 <div class="grid grid-cols-2 gap-8 mt-2 items-center">
 <div>
 <img class="figimg" src="/figures/agents-in-a-real-terminal-1.png" style="width:100%;" />
-<p class="fig-caption">Real tasks: fix a bug, configure a tool, make a test pass — all by typing commands.</p>
+<p class="fig-caption">Real tasks — fix a bug, configure a tool, make a test pass — solved by typing commands.</p>
 </div>
 <div>
-<p class="text-sm">Agents are evaluated on <strong>TerminalBench-2.0</strong> — exactly <strong>89 genuine terminal tasks</strong>. Rollouts run in real, isolated cloud sandboxes (stateful terminals), one command at a time, over many steps.</p>
+<p class="text-sm">Agents are evaluated on <strong>TerminalBench-2.0</strong> — <strong>89 genuine terminal tasks</strong> — with the base models <strong>Qwen3-8B</strong> and <strong>Qwen3-14B</strong> (open-weight, so it's reproducible). Rollouts run in real, stateful cloud sandboxes.</p>
 <div class="callout-quiet mt-2">
-<h4 style="color: var(--accent-5);">Base models</h4>
-<p class="text-sm" style="margin:0;">Qwen3-8B and Qwen3-14B — open-weight, so the whole thing is reproducible.</p>
+<p class="text-sm" style="margin:0;">The authors call the terminal "the closest thing a language model has to an <em>embodied</em> setting" — a body that acts and perceives.</p>
 </div>
 </div>
 </div>
@@ -1058,24 +1331,24 @@ title: "Testing in a real terminal"
 </div>
 
 ---
-title: "The honest read"
+title: "The result"
 ---
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-2);">Trust the A/B, not the leaderboard</div>
+<div class="eyebrow mb-2" style="color: var(--accent-2);">The result — and how to read it</div>
 
-## The claim is the *relative* doubling.
+## Adding the one extra loss roughly *doubles* the score.
 
 <div class="grid grid-cols-2 gap-8 mt-2 items-center">
 <div>
 <img class="figimg" src="/figures/agents-in-a-real-terminal-4.png" style="width:100%;" />
-<p class="fig-caption">Same everything — only the extra loss added — and the score roughly doubles.</p>
+<p class="fig-caption">Same everything — only the extra loss added — and pass@1 roughly doubles.</p>
 </div>
 <div>
-<p class="text-sm">In a controlled head-to-head, adding just the one extra loss <strong>roughly doubles</strong> GRPO's score (e.g. 8B: 2.70 → 5.17; 14B: 5.17 → 10.79 pass@1).</p>
+<p class="text-sm">In a controlled A/B, ECHO roughly <strong>doubles</strong> GRPO's pass@1: <strong>8B: 2.70 → 5.17</strong>; <strong>14B: 5.17 → 10.79</strong>.</p>
 <div class="callout mt-2">
-<p class="text-sm" style="margin:0;">These are only a few of 89 tasks and depend on private training data, so we trust the <strong>relative</strong> A/B result — not the exact number. Teach the idea, not a leaderboard.</p>
+<p class="text-sm" style="margin:0;">Read it honestly: these are a handful of 89 tasks and depend on private training data, so the <strong>relative doubling</strong> is the claim — not the exact number.</p>
 </div>
 </div>
 </div>
@@ -1083,27 +1356,27 @@ title: "The honest read"
 </div>
 
 ---
-title: "The engineering fight"
+title: "Our replication"
 ---
 
 <div class="text-left max-w-5xl">
 
-<div class="eyebrow mb-2" style="color: var(--accent-1);">Real ML is messy — results in progress</div>
+<div class="eyebrow mb-2" style="color: var(--accent-1);">Reproducing it — real ML is messy</div>
 
 ## Matching the *system* to the shape of the task.
 
 <div class="grid grid-cols-2 gap-8 mt-2">
 <div>
-<p class="text-sm">Our first trainer was <strong>synchronous</strong>: the GPU inference engine sat idle ~15 minutes during each long, multi-step rollout. A background watchdog decided the idle engine had crashed and killed it — every configuration failed the same way.</p>
-<p class="text-sm mt-2">The fix: switch to a <strong>fully asynchronous</strong> trainer (prime-rl), where the engines never sit idle — directly removing the crash.</p>
+<p class="text-sm">Reproducing ECHO is where the earlier progression bites. Our first trainer (<strong>SkyRL</strong>) was <strong>synchronous</strong>: the inference engine sat idle ~15 minutes during each long rollout, and a watchdog killed it as "crashed" — every config failed the same way.</p>
+<p class="text-sm mt-2">The fix is a <strong>fully asynchronous</strong> trainer (<strong>prime-rl</strong>), where the engines never idle — exactly the framework the task's shape demands.</p>
 </div>
 <div class="callout">
 <h4 style="color: var(--accent-2);">Where we are right now</h4>
-<p class="text-sm" style="margin:.2rem 0 0;">The ECHO extra-loss is implemented and <strong>numerically verified active</strong>; the small smoke test passed. The full 8B / 14B runs are <strong>training on the cluster as this lecture goes out</strong> — we will drop in the measured curves the moment they land.</p>
+<p class="text-sm" style="margin:.2rem 0 0;">The ECHO extra-loss is implemented and <strong>numerically verified active</strong> — we can watch the environment-token loss fire — and the small smoke test passed. The full 8B / 14B runs are <strong>training as this lecture goes out</strong>; we'll drop in our measured curves the moment they land.</p>
 </div>
 </div>
 
-<p class="text-sm mt-3" style="color: var(--ink-3);">Beginner moral: matching your training <em>system</em> to the <em>shape</em> of your task matters as much as the algorithm.</p>
+<p class="text-sm mt-3" style="color: var(--ink-3);">The moral, one more time: matching your training <em>system</em> to the <em>shape</em> of the task matters as much as the algorithm.</p>
 
 </div>
 
