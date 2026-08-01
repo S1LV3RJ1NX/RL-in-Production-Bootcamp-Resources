@@ -1,0 +1,67 @@
+Our first two projects taught a model to fix code by rewarding it when the tests passed. This third project keeps all of that — same trial-and-reward loop, same tests-as-teacher — and adds one small, almost-free idea that gives the agent something new: a hunch about how its computer behaves. The idea comes from a research paper with a wonderful title, "ECHO: Terminal Agents Learn World Models for Free," and it is simpler than it sounds.
+
+The one-sentence version, which we will spend this chapter earning: train the agent to act as usual, but *also* ask it to guess what the terminal will say back — and get a feel for the whole computer for almost no extra cost.
+
+## First, what is a world model?
+
+Before you flip a light switch, you already expect the light to come on. You did not run an experiment; you just *knew*, because you carry a little model of how switches and lights behave inside your head. That expectation — a private prediction of what happens next — is a **world model** (a learner's built-in guess about how its environment will respond to its actions).
+
+Our agent here is a **terminal agent** — an agent that solves tasks by typing commands into the **terminal**, the text-only window where you tell a computer to list files or run the tests, and it types text back. [[sn: We met the terminal in an earlier chapter: you type something like `ls` to list files or `python test.py` to run the tests, and the computer replies with plain text. A terminal agent does its entire job this way — command in, reply out, over many steps.]] It works in a long back-and-forth: type a command, read the reply, type the next command, until the task is done. A world model, for this agent, means: given the commands so far, it can *predict what the terminal will print back* before it even hits enter.
+
+[[note: metaphor || A skilled cook does not taste-test every step blind. Before they add salt, they already expect roughly how the dish will change — years of cooking built that expectation. A world model is that expectation, for a computer: the agent develops a gut feel for what its commands will do, so it stops flying blind.]]
+
+## The ordinary training, in one picture
+
+Underneath, ECHO trains the terminal agent exactly the way our other projects trained their code-fixers: with **GRPO** ([Group Relative Policy Optimization](grpo-learning-from-a-group.html)), the trial-and-reward rule where the model tries a task several times, the tests hand back a `1` or a `0` for each try, and the model is nudged toward whatever beat the group's average. Nothing new there. The agent types commands, the task ends in a passing test (`reward = 1.0`) or not (`reward = 0.0`), and GRPO makes the winning behavior more likely.
+
+[[fig: A hand-drawn RL loop of three rounded cards joined by curved blue arrows, titled "the usual terminal-agent loop". Card 1 (black) "AGENT TYPES A COMMAND": a small robot icon with a purple monospace line "$ pytest test_it.py". Card 2 (black) "TERMINAL REPLIES": a dark terminal window with handwritten reply text "3 failed, 1 passed". Card 3 (black) "TESTS SCORE IT": a green "1" or red "0" tag. A curved blue arrow loops from card 3 back to card 1 labeled "many steps per task". Dashed takeaway box in black: "act -> read reply -> act again, until the tests pass". || The terminal agent's normal life: type a command, read what the computer says, repeat, and get graded by the tests at the end. This is plain GRPO.]]
+
+Here is the seed of the whole idea. In every step of that loop, the terminal *hands the agent a reply* — the output text after a command. Normally the agent reads it and moves on. ECHO asks a quietly clever question: what if we also made the agent *predict* that reply, and paid attention to how well it did?
+
+## The one extra job: predict the reply
+
+Here is the whole trick. Alongside its normal job of choosing good commands, we give the agent a small second job: predict the terminal's output text. Learning to predict what the computer says back is, in effect, learning how the computer behaves — which is exactly a world model. And this second job costs almost nothing, for a reason we will get to.
+
+[[fig: A hand-drawn system map titled "one forward pass, two jobs out". In the center, a single black rounded box labeled "THE MODEL — one forward pass" with a numbered circle 1 on it. Two blue arrows leave it. The upper arrow (numbered 2) points to a black card "JOB A: ACT — choose the next command" with a purple monospace "$ grep TODO ." inside and a green tag "trained by GRPO (reward 1/0)". The lower arrow (numbered 3) points to a black card "JOB B: PREDICT THE REPLY — guess the terminal's output text" with a small green tag "the extra loss". Where the two arrows split, an orange handwritten note: "same computation, reused". A green tag sits on the lower arrow: "weight = 0.05". Dashed takeaway box in black: "the reply-prediction rides along on work we already did -> 'for free'". || The ECHO wiring. The model does one pass of work, and two things come out of it: the action it takes, and a prediction of the terminal's reply. The second is scaled down small and added on for almost no extra cost.]]
+
+Put the two jobs beside each other. **Job A** is *acting*: choose the next command, the way GRPO already teaches. **Job B** is *predicting*: guess the text the terminal is about to print. The agent is scored on both — but Job B is turned down to a whisper, so it shapes the model gently without drowning out the real goal of solving tasks.
+
+## Writing it as one line of math
+
+Researchers write the full training goal — the **loss**, a single number the training tries to make smaller — as a sum of the two jobs:
+
+```
+L_ECHO = L_GRPO(actions) + lambda * L_env(observations)
+```
+
+Read it left to right. `L_GRPO(actions)` is the familiar part: the usual GRPO signal that pushes the agent toward commands that made the tests pass. `L_env(observations)` is the new part — the score for how well the agent predicted the terminal's replies (the "observations" are just the output text the environment sends back). And `lambda` (the Greek letter λ) is a small dial that sets how loud the new part is; in ECHO it is set to `lambda = 0.05` — one-twentieth weight, deliberately quiet. [[sn: Why so small? Acting is still the real job. If the reply-prediction loss were loud, the model might get very good at guessing terminal output while getting worse at actually solving tasks. `0.05` lets the world-model habit form in the background without hijacking the main goal.]]
+
+## What does "predict the reply" actually mean?
+
+`L_env` sounds fancy — it is officially a "length-normalized cross-entropy on the observation tokens" — but the plain-words version is friendly. A language model reads and writes text as **tokens** (small chunks of text, roughly word-pieces). When the terminal prints a reply, that reply is a string of tokens too. `L_env` measures **how surprised the model is by the terminal's reply, token by token** — and training simply works to *reduce that surprise*.
+
+[[fig: A hand-drawn terminal window (dark rounded rectangle) titled "predicting the reply, token by token". A purple monospace command line at the top: "$ pytest test_it.py". Below it, the real reply printed token by token in black: "2", "passed", ",", "1", "failed". Above each token, a small thought-bubble showing the model's guess before it saw the token: over "2" a green check (guessed right), over "passed" a green check, over "1" a red cross with a handwritten note "expected 'all'!" in red, over "failed" a green check. To the right, a hand-drawn dial pointing at a medium level, green label "surprise = how wrong the guesses were". A blue arrow curves back to the model icon labeled "training turns the dial down". Dashed takeaway box in black: "low surprise = the model already knows how the terminal behaves". || Predicting the reply, up close. For each token of the terminal's output the model had a guess; the mismatches are its surprise, and training works to shrink it.]]
+
+[[note: example || Suppose the agent runs a test file and the terminal is about to print `2 passed, 1 failed`. If the model was quietly expecting exactly those words, its "surprise" is low — a small `L_env`. If it expected `all tests passed` instead, reality contradicts it, surprise is high, and training nudges it so that next time, in that situation, it sees `2 passed, 1 failed` coming. Do that across thousands of commands and the model builds a real feel for how the computer responds.]]
+
+That is genuinely all a world model is here: a habit of not being surprised. An agent that is rarely surprised by its terminal has, in effect, learned how its terminal behaves.
+
+## Why "for free"?
+
+The word "free" in the title is doing real work, so let us be precise. When the model reads the whole conversation so far — the commands and the replies — it does one big chunk of computation called a **forward pass** (the model reading its input once and producing its output). That forward pass is the expensive part of any model, and the agent was *already doing it* to decide its next command.
+
+The clever bit: that same forward pass already contains the model's token-by-token predictions of the reply text — it had to read those tokens anyway. So computing `L_env` needs no second model, no second pass, and no new data. It reuses work already done and adds a single term to the loss. That is why the paper can honestly call the world model "for free": the extra compute is negligible.
+
+[[fig: A hand-drawn two-column "cost" comparison titled "what the extra world model costs". LEFT column, black header "a SEPARATE world model (the expensive way)": two stacked boxes — a blue "1st forward pass: act" and a second blue "2nd forward pass: predict replies" — with a big red "2x the work" tag and a red cross. RIGHT column, pale-green fill, black header "ECHO (the free way)": a single blue box "one forward pass" with two small arrows out labeled "act" and "predict replies", and a green "+ one line in the loss" tag with a green check. A bold orange arrow between the columns labeled "same result, near-zero extra cost". A green tag on the right: "weight 0.05". Dashed takeaway box in black: "reuse the pass you already paid for -> 'for free'". || The cost of the idea, drawn out. A separate world model would double the work; ECHO instead reuses the single forward pass the agent already does, adding only one term to the loss.]]
+
+[[note: aha || The whole idea in one sentence: because the model already reads the terminal's replies while deciding what to do, we can grade it on *predicting* those replies at almost no extra cost — and that grading is what quietly grows a world model.]]
+
+There is one subtle trap worth guarding against. For this extra loss to do anything at all, the terminal's reply tokens have to sit *inside the span of text the model is treated as having produced* — so that predicting them actually counts. [[sn: A naive setup feeds each terminal reply only into the *next* prompt the model reads, never into a span the model is scored on producing. Then `L_env` computes over zero tokens and silently contributes nothing — training runs, no error appears, and the "world model" never forms. The fix is boring but essential: verify the extra loss is really firing on real tokens.]] It is the kind of bug that raises no alarm — everything runs, the numbers look plausible, and the new idea simply does not exist. In this project the extra loss was checked and confirmed to be genuinely active.
+
+## What did it buy us?
+
+We save the numbers for the next chapter, where they deserve careful framing. The short version: the value of ECHO is the *idea*, not a leaderboard row. In a clean head-to-head — the same model, the same tasks, everything held fixed, with only this extra loss switched on — adding the world-model job roughly doubled the agent's score on a benchmark of real terminal tasks. That is a real, controlled result about the idea itself. The raw scores, though, are small absolute numbers and lean on private training data we cannot fully reproduce, so the honest claim is modest: a world model for almost no cost, shown to help in a fair comparison.
+
+[[fig: A hand-drawn before/after comparison titled "does the extra job help?". LEFT card, pale-red fill, labeled "plain GRPO" in black: a robot icon and a green tag "score: X". RIGHT card, pale-green fill, labeled "GRPO + predict-the-reply" in black: the same robot icon with a small thought-bubble sketch of a terminal (it now anticipates replies) and a green tag "score: about 2X". A bold blue arrow labeled "add L_env (weight 0.05)" points from left to right. Orange emphasis note beneath: "same model, same tasks -> only the extra loss changed". Dashed takeaway box in black: "a fair A/B, not a leaderboard -> the idea earns its keep". || The honest picture: in a controlled comparison where the only change is the added reply-prediction loss, the world-model version roughly doubled the plain version's score. Exact numbers, and their caveats, come next.]]
+
+We have the idea now — small enough to hold in one hand: keep training the agent to act, add a whisper-quiet job of predicting the terminal's replies, reuse the same forward pass, and a world model forms almost for free. What remains is the messier part: how an agent like this is actually trained on real hardware, what breaks along the way, and what the numbers truly say. That is where we head next.

@@ -1,0 +1,57 @@
+{
+  "site": {
+    "title": "Teaching Machines to Code",
+    "tagline": "How reinforcement learning turns a language model into a software engineer — built from scratch, three ways, for people who are new to all of it.",
+    "domain": "",
+    "org": "Vizuara AI Labs",
+    "byline": "A companion book for the RL-in-Production workshop"
+  },
+  "sections": [
+    {
+      "id": "ground", "num": "00", "title": "Before the Code",
+      "blurb": "No jargon yet. First we agree on what a 'software engineering task' even is, what a terminal is and why a coding AI lives inside one, and what reinforcement learning actually does. Then one algorithm — GRPO — that every project in this book is built on. If you have never trained a model, start exactly here.",
+      "articles": [
+        {"slug": "what-is-a-swe-task", "title": "What is a software engineering task?", "chip": "THE JOB", "blurb": "Before we teach a machine to do software engineering, we should be able to say — in plain words — what the job is. A broken function, a failing test, a bug report. We ground the whole book in one concrete, real example anyone can follow."},
+        {"slug": "what-is-a-terminal", "title": "The terminal: a coding agent's hands", "chip": "THE TERMINAL", "blurb": "Coders and coding agents both live in a black window full of text called the terminal. What it is, why it matters, and why giving an AI a terminal is like giving it hands — the difference between an AI that talks about code and one that actually changes it."},
+        {"slug": "rl-in-one-sitting", "title": "Reinforcement learning, from scratch", "chip": "THE RL LOOP", "blurb": "Try something, see if it worked, do more of what worked. That is the whole idea of reinforcement learning, and it is exactly how a person learns to ride a bike. We build the loop from that one sentence — and notice that 'did the tests pass?' is a perfect reward."},
+        {"slug": "grpo-learning-from-a-group", "title": "GRPO: learning from a group of tries", "chip": "GRPO", "blurb": "The single algorithm behind all three projects. Give the model the same problem several times, see which attempts beat the group's average, and nudge it toward those. No jargon, no value network — just 'compare your tries and keep the better ones.'"}
+      ]
+    },
+    {
+      "id": "mini", "num": "01", "title": "Project One — RL on Your Laptop",
+      "blurb": "The Mini-SWE-RL project: a from-scratch bug-fixing agent small enough to train on a MacBook in half an hour. Same algorithm as the systems that score on real GitHub bugs — just miniaturized so you can see every moving part. This is where the abstract loop becomes real code and a real result.",
+      "articles": [
+        {"slug": "the-bug-fixing-game", "title": "Turning bug-fixing into a game", "chip": "THE ENVIRONMENT", "blurb": "To train with RL you need a game: a situation, an action, and a score. We turn 'fix this buggy function' into exactly that — a tiny environment where the model submits a fix and the tests hand back a 1 or a 0. This is the whole world the agent learns in."},
+        {"slug": "the-sweet-spot", "title": "The sweet spot: puzzles that are just hard enough", "chip": "LEARNING SIGNAL", "blurb": "If the model already solves every puzzle, there is nothing to learn. If it fails them all, same problem. RL only learns when some tries succeed and some fail on the same problem. Finding that 'sweet spot' of difficulty was the single most important lesson of the project."},
+        {"slug": "training-on-a-laptop", "title": "Training with GRPO in thirty minutes", "chip": "THE TRAINING LOOP", "blurb": "The full loop, end to end: sample eight attempts per bug, score each with the tests, compute which beat the group average, and take one gradient step. We walk the real code — rollouts, rewards, the update — that turns 66.7% into 73.3% on an M4 MacBook."},
+        {"slug": "what-the-laptop-taught-us", "title": "Seven new bugs: what the laptop proved", "chip": "THE RESULT", "blurb": "After thirty minutes the model solved seven bugs it had never solved before — closure traps, cycle detection, bracket matching. We look at what actually changed, and why a 1.5-billion-parameter model on a laptop runs the same algorithm as a 32-billion one on 64 GPUs."}
+      ]
+    },
+    {
+      "id": "agentic", "num": "02", "title": "Project Two — Agentic RL on Real Code",
+      "blurb": "We leave the toy puzzles behind. Project two puts the model on real programming tasks with hidden tests, runs the training for real on cloud GPUs, and shows — with actual before-and-after code — a model going from failing a task to solving it. This is the project from the workshop's own research paper.",
+      "articles": [
+        {"slug": "from-puzzles-to-real-code", "title": "From toy puzzles to real programming tasks", "chip": "REAL TASKS", "blurb": "A benchmark called MBPP+ gives us hundreds of small but genuine programming problems, each with a visible test and a set of hidden tests the model never sees. Now 'did it really solve it?' has an honest answer — and that changes what reward can and cannot teach."},
+        {"slug": "before-and-after-rl", "title": "Before RL it failed, after RL it solves it", "chip": "BEFORE / AFTER", "blurb": "The heart of the project: real solutions the same model wrote for the same tasks, before and after a short RL run. A forgotten one-half in a volume formula, a loop that stops too early, an index that runs off the end — and how RL taught the model to fix each one."},
+        {"slug": "training-in-the-cloud", "title": "Scaling up: RL on cloud GPUs", "chip": "SCALE + MODAL", "blurb": "Half an hour on a laptop was project one. Now we rent real GPUs in the cloud, run the loop on models from half a billion to seven billion parameters, and read an honest learning curve — including the messy, real lessons about keeping a long training job alive."}
+      ]
+    },
+    {
+      "id": "echo", "num": "03", "title": "Project Three — A World Model, For Free",
+      "blurb": "The most advanced project, and the most surprising. ECHO trains a terminal agent with RL, but adds one extra job: predict what the terminal will say back. That single change teaches the model a 'world model' of the computer — for almost no extra cost — and makes it a markedly better engineer.",
+      "articles": [
+        {"slug": "what-is-a-world-model", "title": "What is a world model, and why an agent wants one", "chip": "WORLD MODEL", "blurb": "Before you type a command, you have a hunch about what will happen. That hunch is a world model — a little simulator of the world in your head. We build the idea from everyday life, then ask what it would mean for an agent to have one of the terminal."},
+        {"slug": "echo-one-extra-loss", "title": "ECHO: predict the reply, get a world model free", "chip": "THE ECHO IDEA", "blurb": "ECHO's trick in one sentence: while training the agent to act, also train it to predict the terminal's response — reusing the very same forward pass. One small extra term in the loss, and the agent learns how the computer behaves as a side effect of learning to use it."},
+        {"slug": "agents-in-a-real-terminal", "title": "Teaching an agent to live in a real terminal", "chip": "TERMINALBENCH", "blurb": "Real terminals are messy: many steps, real files, commands that hang. We look at how ECHO agents are trained and tested on hundreds of genuine terminal tasks in the cloud — and the honest engineering fight to make a long, multi-step RL run actually finish."}
+      ]
+    },
+    {
+      "id": "bigpicture", "num": "04", "title": "The Big Picture",
+      "blurb": "Three projects, one idea. We pull the thread that runs through all of them — the environment is the teacher — and then look honestly at what is still hard and where this goes next, from un-cheatable rewards to agents that carry a world model wherever they work.",
+      "articles": [
+        {"slug": "the-teacher-is-the-environment", "title": "The one idea behind all three projects", "chip": "SYNTHESIS", "blurb": "Laptop puzzles, cloud coding tasks, terminal world models — underneath, the same move. Nobody hand-labels the right answer; a real environment (tests, a terminal) grades the model's attempts, and RL does the rest. Why that idea is quietly reshaping how software gets built."},
+        {"slug": "where-this-goes-next", "title": "What's still hard, and where this goes next", "chip": "FUTURE WORK", "blurb": "An honest close: rewards a clever model can cheat (and one idea for un-cheatable ones), longer multi-step tasks, real repositories, and agents that carry a world model everywhere. What we would build next — and what you now know enough to build yourself."}
+      ]
+    }
+  ]
+}

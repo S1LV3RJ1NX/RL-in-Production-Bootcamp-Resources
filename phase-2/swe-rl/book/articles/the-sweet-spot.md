@@ -1,0 +1,63 @@
+Here is the single most important lesson from our first project, and it is not about code or clever algorithms at all — it is about *difficulty*. A model learns to fix bugs only when the puzzles we give it are the right kind of hard: not so easy that it always wins, not so hard that it always loses, but caught in between, where sometimes it succeeds and sometimes it fails. Get that wrong and the training does nothing, no matter how long you run it. This chapter is about finding that in-between zone — the sweet spot — and why it exists.
+
+## Why an easy problem teaches nothing
+
+Picture teaching someone to shoot free throws. If you stand them one inch from the hoop, every shot goes in. They feel great — and they learn nothing, because there is nothing to *correct*. Now move them to the far end of a football field: every shot misses, and again they learn nothing, because no attempt was any better than another. Learning happens at the distance where some shots drop and some clang off the rim. The *difference* between the makes and the misses is the lesson.
+
+[[fig: A hand-drawn wide scene titled "the sweet spot" showing a basketball hoop on the right and a shooter figure at three distances, drawn as three stick figures on a black baseline. Position 1 (far left, red note "TOO FAR"): tiny figure with three red "0" miss marks arcing short of the hoop and a red label "always misses -> nothing to fix". Position 2 (middle, pale-green fill highlight, orange note "SWEET SPOT"): figure with a mix of green "1" makes and red "0" misses arcing at the rim, and a green label "some in, some out -> the lesson lives here". Position 3 (close to hoop, plain note "TOO CLOSE"): figure with three green "1" makes and a black label "always makes -> nothing to fix". A blue arrow runs along the baseline from left to right labeled "distance = difficulty". Dashed takeaway box in black: "learning only happens where wins and losses MIX". || Difficulty is like distance from the hoop. Too far, every shot misses; too close, every drops; only in between do makes and misses mix — and that mix is where learning happens.]]
+
+Our learning method, [GRPO](grpo-learning-from-a-group.html) (short for **Group Relative Policy Optimization** — a way of learning by comparing a batch of attempts against their own average), works in exactly this way. For one buggy puzzle it lets the model try several times, scores each try with the tests, and then asks a single question of each attempt: *were you better or worse than the group average?* [[sn: This is the "Group Relative" in the name — every attempt is judged relative to its groupmates, not against some fixed outside standard. The group grades itself.]] That comparison is the entire teaching signal. And here is the catch that governs everything: a comparison needs *disagreement*. If every attempt in the group gets the same score, there is nothing to compare, and the model learns nothing.
+
+## The formula, and the zero that ruins everything
+
+We can see this precisely in one line. GRPO measures each attempt by its **advantage** — a number saying how far above or below the group average that attempt landed:
+
+```
+advantage_i = (reward_i − mean(rewards)) / std(rewards)
+```
+
+The **reward** here is our usual pass/fail grade from the tests: `reward = 1.0` if every test passes, `reward = 0.0` otherwise. The word `mean` is just the plain average of the group's rewards. Now look at what happens when every attempt scores the same. If all eight tries pass, every reward is `1.0`, the mean is `1.0`, and each attempt's `reward_i − mean` is `1.0 − 1.0 = 0`. If all eight fail, every reward is `0.0`, the mean is `0.0`, and again every difference is `0`. Either way, **every advantage is 0** — and an advantage of zero means "no better, no worse than average," which tells the model to change nothing at all.
+
+[[note: aha || A group of attempts only teaches when it *disagrees with itself*. All-pass and all-fail groups both produce advantage 0, and 0 means "learn nothing." Variance — a mix of wins and losses on the same problem — is the fuel RL runs on.]]
+
+[[fig: A hand-drawn two-panel comparison titled "which groups actually teach?". LEFT panel, pale-red fill, labeled "flat group": eight small cards, all showing a green "1", a green horizontal line labeled "average = 1.0" resting exactly on top of them, and a big black label "advantage = 0 for everyone" with a red handwritten note "nothing to learn — every try is average". RIGHT panel, pale-green fill, labeled "mixed group": eight cards showing a scatter of green "1"s and red "0"s, a black dashed line drawn through the middle labeled "average", orange up-arrows on the cards above the line and faint down-arrows on the cards below, and a green note "clear signal!". A dashed takeaway box spanning both panels in black: "RL needs disagreement INSIDE the group". || The same eight-try group, two outcomes. On the left everyone agrees, so every advantage is zero and nothing moves. On the right the group is split, and that split is the whole lesson.]]
+
+## Three difficulty files, three fates
+
+So the puzzles have to be tuned to the model — hard enough to sometimes fail, easy enough to sometimes succeed. In Mini-SWE-RL we did not guess at this; we built **45 puzzles across three files** and measured what the model actually did with each.
+
+The first file, `puzzles.py`, holds **15 easy** puzzles. The little **Qwen2.5-Coder-1.5B** model (a coding language model with 1.5 billion tunable numbers inside it) solved **100%** of them — all 15 out of 15 — every single time. Perfect score. And a perfect score, as we just saw, is a training disaster: every group is all-pass, every advantage is `0`, and there is nothing left to teach. [[sn: It feels backwards that "the model gets everything right" is bad news. But RL is not there to celebrate what the model already knows — it is there to move the model past its current limits. A problem it has already mastered is, for training, dead weight.]]
+
+The third file, `puzzles_hard.py`, holds **15 hard** puzzles — real algorithm and data-structure bugs. Here the model solved **73.3%** (11 of 15). Better, but many of these were consistent: a hard puzzle the model reliably flunked produces an all-fail group, and an all-fail group also teaches nothing.
+
+The middle file, `puzzles_medium.py`, holds **15 medium** puzzles, designed on purpose to land in the mixed zone — where the model wins some tries and loses others. They are a special breed of bug worth meeting up close.
+
+## What a "gotcha" bug looks like
+
+The medium puzzles are **Python gotchas** — traps where the code looks obviously correct and quietly does the wrong thing. They are perfect training material because they sit right at the model's edge: it half-knows them, so on the same puzzle it sometimes catches the trap and sometimes walks straight into it. Three flavors:
+
+- **The float-equality trap** (`med_float_equality`): in a computer, `0.1 + 0.2` does not equal `0.3`. It comes out as `0.30000000000000004`, because fractions are stored in binary and most decimals cannot be represented exactly. Code that checks `if 0.1 + 0.2 == 0.3` therefore fails, surprising everyone.
+- **The shared-state trap** (`med_class_shared_state`, a cousin of the classic "mutable default" bug): a value meant to belong to one object is accidentally shared across *every* object — because it lives on the shared class instead of on each instance — so a change in one silently leaks into all the others.
+- **The generator-exhaustion trap** (`med_generator_exhaustion`): a **generator** (a sequence produced lazily, one item at a time) is used up the first time you loop over it; loop a second time and it is empty, as if it vanished.
+
+[[note: example || Try `med_float_equality` by hand. The buggy check is `0.1 + 0.2 == 0.3`, which is `False` because the left side is really `0.30000000000000004`. The fix is to ask "are these *close enough*?" instead: `abs((0.1 + 0.2) - 0.3) < 1e-9`. Same intent, but now the comparison tolerates the tiny binary rounding error — and passes.]]
+
+There is also a closure trap in the hard file, `hard_scope_bug`, where a small function made inside a loop grabs the loop variable *by reference*, so every copy ends up seeing the loop's final value instead of the value it was made with. None of these are exotic — they are the exact bugs that trip up working programmers every day, which is why they make honest, teachable problems.
+
+## Measuring the sweet spot directly
+
+To pick the training set, we ran every one of the 45 puzzles through a quick census: try each puzzle **4 times** — 4 **rollouts** (a rollout is one full recorded attempt) — at `temperature = 0.8`. **Temperature** is a dial for randomness; at `0.8` the model takes small creative risks, so its four tries genuinely differ instead of being four identical answers. Then we sorted every puzzle into one of three buckets by how many of its four tries passed.
+
+[[fig: A hand-drawn "group of tries" scene titled "census: 4 tries per puzzle". On the left, a black box "one puzzle: med_float_equality" and a small dial drawn beside it labeled in purple "temperature = 0.8" with a blue note "adds randomness -> tries differ". A blue arrow fans out to four small stacked cards labeled "try 1..4", reading green "1", red "0", green "1", red "0" (two pass, two fail). To the right, a green handwritten line "2 of 4 passed = 50%" and a black label "-> MIXED bucket". Below, two faded example rows for contrast: an all-green row tagged "-> ALL SOLVED (toss)" and an all-red row tagged "-> ALL FAILED (toss)", both with a small red "advantage = 0". Dashed takeaway box in black: "keep the puzzles that land 25–75%". || How each puzzle was sorted. Four tries at temperature 0.8; count the passes; a puzzle in the 25–75% band goes into the training set, and the all-pass or all-fail puzzles are discarded.]]
+
+[[fig: A hand-drawn histogram titled "45 puzzles, sorted by solve rate (4 tries each)". Three vertical bars on a black baseline. LEFT bar, tall, pale-green fill, labeled "MIXED (25–75% solve)" with a big green "18" on top and a black note "1–3 of 4 tries pass"; an orange arrow points at it with the handwritten word "TRAIN ON THESE". MIDDLE bar, shorter, plain, labeled "ALL SOLVED" with a green "9" on top and a red note "advantage = 0". RIGHT bar, shortest, pale-red fill, labeled "ALL FAILED" with a green "3" on top and a red note "advantage = 0". A dashed takeaway box in black at the bottom: "18 useful + 9 too easy + 3 too hard = 45". || The census that built the training set. Only the 18 mixed puzzles carry a learning signal; the 9 always-solved and 3 never-solved puzzles were set aside as useless for RL.]]
+
+The counts came out cleanly. **18 puzzles were mixed** — between 25% and 75% of their tries passed — and these carry the best learning signal, because their groups disagree with themselves. **9 puzzles were solved every time** (all-pass, advantage `0`, useless for training). And **3 puzzles failed every time** (all-fail, advantage `0`, also useless). We threw out the 9 and the 3, and the **18 mixed puzzles became the entire training set.**
+
+[[note: confusion || A tempting mistake: "the hardest puzzles must teach the most, so train on those." Not so. A puzzle the model *never* solves is exactly as useless as one it *always* solves — both give a flat group and zero advantage. The best teachers are the puzzles it solves *inconsistently*. Hardness is not the goal; disagreement is.]]
+
+## The lesson: difficulty is relative to the model
+
+Notice what this really says. There is no such thing as a puzzle that is "good for RL" in the abstract. A puzzle is good for *this* model at *this* moment only if this model gets it right sometimes and wrong other times. Hand the same easy puzzles to a much weaker model and they would suddenly land in the sweet spot; hand the mixed puzzles to a far stronger model and it would ace them all, turning them useless. **Difficulty must be calibrated to the learner.** [[sn: This is also why our headline gains landed on the medium puzzles — a jump you will see in the training chapter — while the hard puzzles, already near the model's ceiling, barely moved. There was simply more room to grow where the model was still unsure.]]
+
+That is the sweet spot, and it is the quiet foundation under everything that follows. Before you run a single training step, you have to make your problems the *right kind of hard* — or all the machinery downstream will spin without ever learning a thing. With our 18 mixed puzzles in hand, we are ready to build the loop that turns those disagreeing attempts into a better model — exactly where the next chapter goes.
